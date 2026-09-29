@@ -44,7 +44,12 @@ var _ = Describe("CRD validation", func() {
 		Entry("serviceRef and address", func(s *zitiv1.ZitiServiceSpec) {
 			s.Host.ServiceRef = &zitiv1.ServiceRef{Name: "web", Port: 80}
 		}, "set exactly one of serviceRef and address"),
-		Entry("no host target", func(s *zitiv1.ZitiServiceSpec) { s.Host = zitiv1.Host{} }, "set exactly one of serviceRef and address"),
+		Entry("no host target", func(s *zitiv1.ZitiServiceSpec) { s.Host = zitiv1.Host{} }, "intercept and host are required"),
+		Entry("observe needs no intercept or host", func(s *zitiv1.ZitiServiceSpec) {
+			s.ManagementPolicy = zitiv1.ManagementObserve
+			s.Intercept, s.Host = zitiv1.Intercept{}, zitiv1.Host{}
+		}, ""),
+		Entry("adopt is not allowed for services", func(s *zitiv1.ZitiServiceSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
 		Entry("address without port", func(s *zitiv1.ZitiServiceSpec) { s.Host.Port = 0 }, "port is required with address"),
 		Entry("port out of range", func(s *zitiv1.ZitiServiceSpec) { s.Intercept.Ports = []int32{70000} }, "less than or equal to 65535"),
 		Entry("no addresses", func(s *zitiv1.ZitiServiceSpec) { s.Intercept.Addresses = nil }, "addresses"),

@@ -125,3 +125,63 @@ func TestOperatorEnrolledAgainstRealController(t *testing.T) {
 		t.Fatalf("ziti identity not enrolled: %v", got)
 	}
 }
+
+func TestAdoptAgainstRealController(t *testing.T) {
+	mgmt := os.Getenv("ZITI_MGMT_URL")
+	if mgmt == "" {
+		t.Skip("ZITI_MGMT_URL not set")
+	}
+	u, _ := url.Parse(mgmt)
+	pool, err := rest_util.GetControllerWellKnownCaPool("https://" + u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := rest_util.NewAuthenticatorUpdb(os.Getenv("ZITI_USERNAME"), os.Getenv("ZITI_PASSWORD"))
+	auth.RootCas = pool
+	real, err := ziti.NewREST(mgmt, auth, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zid, err := real.Create(t.Context(), ziti.Identities, ziti.Entity{
+		"name": "team-a.backend", "type": "Default", "isAdmin": false, "roleAttributes": []string{"old"},
+		"externalId": "ext-adopt-test", "appData": map[string]any{"k": "v"}, "tags": map[string]any{"owner": "human"},
+		"enrollment": map[string]any{"ott": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = real.Delete(context.Background(), ziti.Identities, zid) })
+
+	e := setupIdentity(t)
+	e.r.Clients = staticProvider{real}
+	setPolicy(t, e, zitiv1.ManagementAdopt)
+	e.reconcile(t)
+
+	got, _ := real.List(t.Context(), ziti.Identities, `name="team-a.backend"`)
+	if len(got) != 1 {
+		t.Fatalf("identities = %v", got)
+	}
+	tags := got[0].Tags()
+	if tags["owner"] != "human" || tags["ziti-operator-uid"] != "uid-1" || tags["ziti-operator-adopted"] != "true" {
+		t.Fatalf("tags = %v", tags)
+	}
+	if got[0]["externalId"] != "ext-adopt-test" || got[0]["appData"].(map[string]any)["k"] != "v" {
+		t.Fatalf("hand-made fields lost: %v", got[0])
+	}
+	if attrs := got[0]["roleAttributes"].([]any); len(attrs) != 1 || attrs[0] != "team-a.web" {
+		t.Fatalf("roleAttributes = %v", attrs)
+	}
+	if e.get(t).Status.ZitiID != zid || len(e.secret(t).Data[SecretKeyJWT]) < 20 {
+		t.Fatalf("status = %+v", e.get(t).Status)
+	}
+
+	if err := e.k.Delete(t.Context(), e.get(t)); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	got, _ = real.List(t.Context(), ziti.Identities, `name="team-a.backend"`)
+	if len(got) != 1 || len(got[0].Tags()) != 1 || got[0].Tags()["owner"] != "human" {
+		t.Fatalf("after release: %v", got)
+	}
+}

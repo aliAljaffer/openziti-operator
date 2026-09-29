@@ -55,6 +55,15 @@ type ZitiIdentitySpec struct {
 	// +optional
 	EnrollmentMode EnrollmentMode `json:"enrollmentMode,omitempty"`
 
+	// managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName:
+	// it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity.
+	// Observe only reads the existing identity and never writes to Ziti.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
+
+	// deletionPolicy does not apply to adopted identities. Those are released, never deleted.
 	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
@@ -90,6 +99,7 @@ type ZitiIdentityStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ztid
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Enrollment Expires",type=date,JSONPath=".status.enrollmentExpiresAt"

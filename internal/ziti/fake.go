@@ -156,6 +156,20 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 	return nil
 }
 
+func (f *Fake) Patch(_ context.Context, kind Kind, id string, body Entity) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "patch "+string(kind)+" "+id)
+	cur, ok := f.Objects[kind][id]
+	if !ok {
+		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+	}
+	for k, v := range clone(body) {
+		cur[k] = v
+	}
+	return nil
+}
+
 func (f *Fake) Delete(_ context.Context, kind Kind, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

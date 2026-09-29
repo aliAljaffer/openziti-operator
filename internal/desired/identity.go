@@ -3,6 +3,8 @@
 package desired
 
 import (
+	"strings"
+
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
@@ -32,4 +34,28 @@ func Identity(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection, authPolicyID
 		"authPolicyId":   authPolicyID,
 		"tags":           ownerTags(conn, "ZitiIdentity", &id.ObjectMeta),
 	}, nil
+}
+
+// AdoptTags returns the existing tags plus the ownership tags. Ziti replaces the whole tag map on PATCH.
+func AdoptTags(conn *zitiv1.ZitiConnection, id *zitiv1.ZitiIdentity, existing map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range existing {
+		out[k] = v
+	}
+	for k, v := range ownerTags(conn, "ZitiIdentity", &id.ObjectMeta) {
+		out[k] = v
+	}
+	out[TagAdopted] = "true"
+	return out
+}
+
+// ReleaseTags returns the existing tags without any operator tag.
+func ReleaseTags(existing map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range existing {
+		if !strings.HasPrefix(k, TagPrefix) {
+			out[k] = v
+		}
+	}
+	return out
 }

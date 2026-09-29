@@ -17,6 +17,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
     - jsonPath: .status.zitiName
       name: Ziti Name
       type: string
@@ -127,6 +130,8 @@ spec:
                   It defaults to the first entry.
                 type: string
               intercept:
+                description: intercept and host are ignored when managementPolicy
+                  is Observe.
                 properties:
                   addresses:
                     items:
@@ -155,6 +160,15 @@ spec:
                 - addresses
                 - ports
                 type: object
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates and updates the Ziti entities. Observe only reads the existing service
+                  named zitiName and reports its status. It never writes to Ziti.
+                enum:
+                - Manage
+                - Observe
+                type: string
               roleAttributes:
                 items:
                   type: string
@@ -164,9 +178,6 @@ spec:
                 maxLength: 1000
                 minLength: 1
                 type: string
-            required:
-            - host
-            - intercept
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -175,8 +186,12 @@ spec:
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
             - message: more than one intercept protocol requires host.forwardProtocol
-              rule: '!has(self.intercept.protocols) || size(self.intercept.protocols)
+              rule: '!has(self.intercept) || !has(self.intercept.protocols) || size(self.intercept.protocols)
                 < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)'
+            - message: intercept and host are required unless managementPolicy is
+                Observe
+              rule: self.managementPolicy == 'Observe' || (has(self.intercept) &&
+                has(self.host))
           status:
             description: status defines the observed state of ZitiService
             properties:

@@ -50,6 +50,8 @@ type Client interface {
 	List(ctx context.Context, kind Kind, filter string) ([]Entity, error)
 	Create(ctx context.Context, kind Kind, body Entity) (string, error)
 	Update(ctx context.Context, kind Kind, id string, body Entity) error
+	// Patch changes only the fields in body. A "tags" field replaces the whole tag map.
+	Patch(ctx context.Context, kind Kind, id string, body Entity) error
 	Delete(ctx context.Context, kind Kind, id string) error
 }
 
@@ -239,6 +241,11 @@ func (c *REST) Create(ctx context.Context, kind Kind, body Entity) (string, erro
 // Update replaces the entity. Fields missing from body, including tags, are cleared.
 func (c *REST) Update(ctx context.Context, kind Kind, id string, body Entity) error {
 	_, err := c.do(ctx, http.MethodPut, string(kind)+"/"+id, nil, body)
+	return err
+}
+
+func (c *REST) Patch(ctx context.Context, kind Kind, id string, body Entity) error {
+	_, err := c.do(ctx, http.MethodPatch, string(kind)+"/"+id, nil, body)
 	return err
 }
 

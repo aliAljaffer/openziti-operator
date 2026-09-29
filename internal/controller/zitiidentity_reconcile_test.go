@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/desired"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -362,5 +363,111 @@ func TestIdentityCertificateExpiry(t *testing.T) {
 				t.Error("warning repeated on the next reconcile")
 			}
 		})
+	}
+}
+
+func handMade(e *idEnv, tags map[string]any) string {
+	return e.zc.Put(ziti.Identities, ziti.Entity{
+		"name": "team-a.backend", "type": "Default", "roleAttributes": []string{"old"}, "authPolicyId": "default",
+		"externalId": "ext-1", "tags": tags, "authenticators": map[string]any{"cert": map[string]any{"id": "a1"}},
+	})
+}
+
+func setPolicy(t *testing.T, e *idEnv, p zitiv1.ManagementPolicy) {
+	t.Helper()
+	z := e.get(t)
+	z.Spec.ManagementPolicy = p
+	if err := e.k.Update(t.Context(), z); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIdentityAdoptKeepsTagsAndReleasesInsteadOfDeleting(t *testing.T) {
+	e := setupIdentity(t)
+	setPolicy(t, e, zitiv1.ManagementAdopt)
+	id := handMade(e, map[string]any{"owner": "human"})
+	e.reconcile(t)
+
+	got := e.zc.Objects[ziti.Identities][id]
+	tags := got.Tags()
+	if tags["owner"] != "human" || tags[desired.TagUID] != "uid-1" || tags[desired.TagAdopted] != "true" {
+		t.Fatalf("tags = %v", tags)
+	}
+	if attrs, _ := json.Marshal(got["roleAttributes"]); string(attrs) != `["team-a.web"]` || got["externalId"] != "ext-1" {
+		t.Errorf("identity = %v", got)
+	}
+	for _, c := range e.zc.Calls {
+		if strings.HasPrefix(c, "update") || strings.HasPrefix(c, "create identities") || strings.HasPrefix(c, "delete") {
+			t.Errorf("unexpected write %q", c)
+		}
+	}
+	z := e.get(t)
+	if z.Status.ZitiID != id || !z.Status.Enrolled {
+		t.Errorf("status = %+v", z.Status)
+	}
+	if _, err := e.secretOrNil(t); err == nil {
+		t.Error("adopting an enrolled identity must not create a Secret")
+	}
+
+	if err := e.k.Delete(t.Context(), z); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	got = e.zc.Objects[ziti.Identities][id]
+	if got == nil {
+		t.Fatal("adopted identity was deleted")
+	}
+	if tags := got.Tags(); tags["owner"] != "human" || len(tags) != 1 {
+		t.Errorf("tags after release = %v", tags)
+	}
+}
+
+func (e *idEnv) secretOrNil(t *testing.T) (*corev1.Secret, error) {
+	var s corev1.Secret
+	err := e.k.Get(t.Context(), e.key, &s)
+	return &s, err
+}
+
+func TestIdentityAdoptErrors(t *testing.T) {
+	e := setupIdentity(t)
+	setPolicy(t, e, zitiv1.ManagementAdopt)
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondSynced); c.Reason != "NotFound" {
+		t.Errorf("missing identity: %+v", c)
+	}
+	if len(e.zc.Objects[ziti.Identities]) != 0 {
+		t.Error("adopt must not create")
+	}
+
+	handMade(e, map[string]any{desired.TagUID: "other"})
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondSynced); c.Reason != "NameConflict" {
+		t.Errorf("owned by another: %+v", c)
+	}
+}
+
+func TestIdentityObserveNeverWrites(t *testing.T) {
+	e := setupIdentity(t)
+	setPolicy(t, e, zitiv1.ManagementObserve)
+	id := handMade(e, map[string]any{"owner": "human"})
+	e.reconcile(t)
+
+	for _, c := range e.zc.Calls {
+		if !strings.HasPrefix(c, "list") {
+			t.Errorf("unexpected write %q", c)
+		}
+	}
+	z := e.get(t)
+	if z.Status.ZitiID != id || !z.Status.Enrolled || condStatusOf(z, CondReady) != metav1.ConditionTrue {
+		t.Errorf("status = %+v", z.Status)
+	}
+	if len(z.Finalizers) != 0 {
+		t.Errorf("finalizers = %v", z.Finalizers)
+	}
+	if _, err := e.secretOrNil(t); err == nil {
+		t.Error("observe must not create a Secret")
+	}
+	if got := e.zc.Objects[ziti.Identities][id]; got.Tags()["owner"] != "human" || len(got.Tags()) != 1 {
+		t.Errorf("identity changed: %v", got)
 	}
 }

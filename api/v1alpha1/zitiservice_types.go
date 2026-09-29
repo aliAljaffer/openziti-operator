@@ -21,6 +21,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type ManagementPolicy string
+
+const (
+	ManagementManage  ManagementPolicy = "Manage"
+	ManagementAdopt   ManagementPolicy = "Adopt"
+	ManagementObserve ManagementPolicy = "Observe"
+)
+
 type DeletionPolicy string
 
 const (
@@ -77,7 +85,8 @@ type Access struct {
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.intercept.protocols) || size(self.intercept.protocols) < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)",message="more than one intercept protocol requires host.forwardProtocol"
+// +kubebuilder:validation:XValidation:rule="!has(self.intercept) || !has(self.intercept.protocols) || size(self.intercept.protocols) < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)",message="more than one intercept protocol requires host.forwardProtocol"
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.intercept) && has(self.host))",message="intercept and host are required unless managementPolicy is Observe"
 type ZitiServiceSpec struct {
 	// +kubebuilder:default=default
 	// +optional
@@ -92,13 +101,23 @@ type ZitiServiceSpec struct {
 	// +optional
 	RoleAttributes []string `json:"roleAttributes,omitempty"`
 
+	// managementPolicy Manage creates and updates the Ziti entities. Observe only reads the existing service
+	// named zitiName and reports its status. It never writes to Ziti.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
+
 	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
-	Intercept Intercept `json:"intercept"`
-	Host      Host      `json:"host"`
+	// intercept and host are ignored when managementPolicy is Observe.
+	// +optional
+	Intercept Intercept `json:"intercept,omitzero"`
+	// +optional
+	Host Host `json:"host,omitzero"`
 
 	// hostingRouter must be in the connection's hostingRouters. It defaults to the first entry.
 	// +optional
@@ -144,6 +163,7 @@ type ZitiServiceStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ztsvc
+// +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Hosted",type=string,JSONPath=".status.conditions[?(@.type=='Hosted')].status"
 // +kubebuilder:printcolumn:name="Dialable",type=string,JSONPath=".status.conditions[?(@.type=='Dialable')].status"

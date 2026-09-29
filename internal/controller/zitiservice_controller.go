@@ -80,7 +80,7 @@ func (r *ZitiServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if !svc.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, &svc)
 	}
-	if controllerutil.AddFinalizer(&svc, Finalizer) {
+	if svc.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve && controllerutil.AddFinalizer(&svc, Finalizer) {
 		if err := r.Update(ctx, &svc); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -148,7 +148,7 @@ func (r *ZitiServiceReconciler) finalize(ctx context.Context, svc *zitiv1alpha1.
 	if !controllerutil.ContainsFinalizer(svc, Finalizer) {
 		return nil
 	}
-	if svc.Spec.DeletionPolicy != zitiv1alpha1.DeletionPolicyOrphan {
+	if svc.Spec.DeletionPolicy != zitiv1alpha1.DeletionPolicyOrphan && svc.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
 		_, zc, err := r.connect(ctx, svc)
 		if err != nil {
 			r.Recorder.Eventf(svc, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -188,6 +188,9 @@ func (r *ZitiServiceReconciler) sync(ctx context.Context, svc *zitiv1alpha1.Ziti
 	routers, err := zc.List(ctx, ziti.EdgeRouters, "")
 	if err != nil {
 		return nil, err
+	}
+	if svc.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		return r.observeExisting(ctx, zc, name, routers)
 	}
 	b.RouterIDs = map[string]string{}
 	for _, rt := range routers {
@@ -303,6 +306,56 @@ func (r *ZitiServiceReconciler) sync(ctx context.Context, svc *zitiv1alpha1.Ziti
 	return r.observe(ctx, zc, name, ids, routers, configTypes, []ziti.Entity{
 		withID(icBody, ids.Intercept), withID(hcBody, ids.Host),
 	}, withID(svcBody, ids.Service))
+}
+
+// observeExisting reports on a service that was created outside this operator. It never writes to Ziti.
+func (r *ZitiServiceReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers []ziti.Entity) (*syncResult, error) {
+	found, err := zc.List(ctx, ziti.Services, fmt.Sprintf(`name="%s"`, name))
+	if err != nil {
+		return nil, err
+	}
+	if len(found) == 0 {
+		return nil, &specError{"NotFound", fmt.Sprintf("service %q not found in Ziti", name)}
+	}
+	svc := found[0]
+	configTypes, err := zc.List(ctx, ziti.ConfigTypes, "")
+	if err != nil {
+		return nil, err
+	}
+	typeNames := map[string]string{}
+	for _, t := range configTypes {
+		typeNames[t.ID()] = t.Name()
+	}
+	all, err := zc.List(ctx, ziti.Configs, "")
+	if err != nil {
+		return nil, err
+	}
+	ids := zitiv1alpha1.EntityIDs{Service: svc.ID()}
+	var configs []ziti.Entity
+	for _, c := range all {
+		if !slices.Contains(anyStrings(svc["configs"]), c.ID()) {
+			continue
+		}
+		configs = append(configs, c)
+		switch typeNames[fmt.Sprint(c["configTypeId"])] {
+		case "intercept.v1":
+			ids.Intercept = c.ID()
+		case "host.v1":
+			ids.Host = c.ID()
+		}
+	}
+	return r.observe(ctx, zc, name, ids, routers, configTypes, configs, svc)
+}
+
+func anyStrings(v any) []string {
+	l, _ := v.([]any)
+	out := make([]string, 0, len(l))
+	for _, e := range l {
+		if s, ok := e.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func withID(e ziti.Entity, id string) ziti.Entity {

@@ -265,3 +265,46 @@ func TestHealthyServiceIsReady(t *testing.T) {
 		t.Errorf("terminators = %v", s.Status.Terminators)
 	}
 }
+
+func TestObserveReadsExistingServiceWithoutWriting(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiService) {
+		s.Spec.ManagementPolicy = zitiv1.ManagementObserve
+		s.Spec.Intercept, s.Spec.Host = zitiv1.Intercept{}, zitiv1.Host{}
+	})
+	e.reconcile(t)
+	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondSynced); c == nil || c.Reason != "NotFound" {
+		t.Fatalf("missing service: %+v", c)
+	}
+
+	var icType, hostType string
+	for id, ct := range e.zc.Objects[ziti.ConfigTypes] {
+		if ct.Name() == "intercept.v1" {
+			icType = id
+		} else {
+			hostType = id
+		}
+	}
+	ic := e.zc.Put(ziti.Configs, ziti.Entity{"name": "ic", "configTypeId": icType, "data": map[string]any{"protocols": []string{"tcp"}}})
+	hc := e.zc.Put(ziti.Configs, ziti.Entity{"name": "hc", "configTypeId": hostType, "data": map[string]any{"protocol": "tcp"}})
+	svcID := e.zc.Put(ziti.Services, ziti.Entity{"name": "app.example.com", "configs": []string{ic, hc}})
+	e.zc.Put(ziti.Terminators, ziti.Entity{"serviceId": svcID, "routerId": "id-main"})
+	e.zc.Calls = nil
+
+	e.reconcile(t)
+	if w := e.writes(); len(w) != 0 {
+		t.Errorf("writes = %v", w)
+	}
+	s := e.get(t)
+	if s.Status.IDs.Service != svcID || s.Status.IDs.Intercept != ic || s.Status.IDs.Host != hc {
+		t.Errorf("ids = %+v", s.Status.IDs)
+	}
+	if len(s.Status.Terminators) != 1 || s.Status.Terminators[0].Router != "r-main" {
+		t.Errorf("terminators = %+v", s.Status.Terminators)
+	}
+	if condStatus(s, CondSynced) != metav1.ConditionTrue {
+		t.Errorf("conditions = %+v", s.Status.Conditions)
+	}
+	if len(s.Finalizers) != 0 {
+		t.Errorf("finalizers = %v", s.Finalizers)
+	}
+}

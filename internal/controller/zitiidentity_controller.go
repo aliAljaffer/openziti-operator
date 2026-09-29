@@ -76,7 +76,7 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if !id.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, &id)
 	}
-	if controllerutil.AddFinalizer(&id, Finalizer) {
+	if id.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve && controllerutil.AddFinalizer(&id, Finalizer) {
 		if err := r.Update(ctx, &id); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -120,7 +120,9 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 	if !controllerutil.ContainsFinalizer(id, Finalizer) {
 		return nil
 	}
-	if id.Spec.DeletionPolicy != zitiv1alpha1.DeletionPolicyOrphan {
+	mode := id.Spec.ManagementPolicy
+	orphan := id.Spec.DeletionPolicy == zitiv1alpha1.DeletionPolicyOrphan
+	if mode != zitiv1alpha1.ManagementObserve && (mode == zitiv1alpha1.ManagementAdopt || !orphan) {
 		_, zc, err := connect(ctx, r.Client, r.Clients, id.Spec.ConnectionRef)
 		if err != nil {
 			r.Recorder.Eventf(id, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -131,6 +133,13 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 			return err
 		}
 		for _, e := range existing {
+			if isAdopted(e) {
+				if err := zc.Patch(ctx, ziti.Identities, e.ID(), ziti.Entity{"tags": desired.ReleaseTags(e.Tags())}); err != nil {
+					return err
+				}
+				r.Recorder.Eventf(id, "Normal", "Released", "released identity %s, it stays in Ziti", e.Name())
+				continue
+			}
 			if err := zc.Delete(ctx, ziti.Identities, e.ID()); err != nil {
 				return err
 			}
@@ -141,26 +150,31 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 	return r.Update(ctx, id)
 }
 
+func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "true" }
+
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.IdentityName(id)
 	if strings.ContainsAny(name, `"\`) {
 		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
 	}
 
-	policyName := id.Spec.AuthPolicy
-	if policyName == "" {
-		policyName = defaultAuthPolicy
-	}
-	policies, err := zc.List(ctx, ziti.AuthPolicies, fmt.Sprintf(`name="%s"`, policyName))
-	if err != nil {
-		return err
-	}
-	if len(policies) != 1 {
-		return &specError{"InvalidSpec", fmt.Sprintf("auth policy %q not found in Ziti", policyName)}
-	}
-	body, err := desired.Identity(id, conn, policies[0].ID())
-	if err != nil {
-		return &specError{"InvalidSpec", err.Error()}
+	mode := id.Spec.ManagementPolicy
+	var body ziti.Entity
+	if mode != zitiv1alpha1.ManagementObserve {
+		policyName := id.Spec.AuthPolicy
+		if policyName == "" {
+			policyName = defaultAuthPolicy
+		}
+		policies, err := zc.List(ctx, ziti.AuthPolicies, fmt.Sprintf(`name="%s"`, policyName))
+		if err != nil {
+			return err
+		}
+		if len(policies) != 1 {
+			return &specError{"InvalidSpec", fmt.Sprintf("auth policy %q not found in Ziti", policyName)}
+		}
+		if body, err = desired.Identity(id, conn, policies[0].ID()); err != nil {
+			return &specError{"InvalidSpec", err.Error()}
+		}
 	}
 
 	existing, err := zc.List(ctx, ziti.Identities, tagFilter(id.UID))
@@ -171,19 +185,24 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	switch {
 	case len(existing) > 0:
 		zid = existing[0]
-		if !desired.Matches(body, zid) {
-			if err := zc.Update(ctx, ziti.Identities, zid.ID(), body); err != nil {
+		if mode != zitiv1alpha1.ManagementObserve && !desired.Matches(body, zid) {
+			if isAdopted(zid) {
+				err = zc.Patch(ctx, ziti.Identities, zid.ID(), ziti.Entity{"roleAttributes": body["roleAttributes"], "authPolicyId": body["authPolicyId"]})
+			} else {
+				err = zc.Update(ctx, ziti.Identities, zid.ID(), body)
+			}
+			if err != nil {
 				return err
 			}
 			r.Recorder.Eventf(id, "Normal", "Updated", "updated identity %s", name)
 		}
-	default:
+	case mode == zitiv1alpha1.ManagementManage || mode == "":
 		clash, err := zc.List(ctx, ziti.Identities, fmt.Sprintf(`name="%s"`, name))
 		if err != nil {
 			return err
 		}
 		if len(clash) > 0 {
-			return &specError{"NameConflict", fmt.Sprintf("identity %q already exists and is not managed by this operator", name)}
+			return &specError{"NameConflict", fmt.Sprintf("identity %q already exists and is not managed by this operator, use managementPolicy Adopt or Observe", name)}
 		}
 		create := ziti.Entity{"enrollment": map[string]any{"ott": true}}
 		maps.Copy(create, body)
@@ -193,6 +212,29 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		}
 		r.Recorder.Eventf(id, "Normal", "Created", "created identity %s", name)
 		zid = ziti.Entity{"id": newID}
+	default:
+		found, err := zc.List(ctx, ziti.Identities, fmt.Sprintf(`name="%s"`, name))
+		if err != nil {
+			return err
+		}
+		if len(found) == 0 {
+			return &specError{"NotFound", fmt.Sprintf("identity %q not found in Ziti", name)}
+		}
+		zid = found[0]
+		if mode == zitiv1alpha1.ManagementAdopt {
+			if owner, _ := zid.Tags()[desired.TagUID].(string); owner != "" {
+				return &specError{"NameConflict", fmt.Sprintf("identity %q is already managed by another ZitiIdentity", name)}
+			}
+			err := zc.Patch(ctx, ziti.Identities, zid.ID(), ziti.Entity{
+				"roleAttributes": body["roleAttributes"],
+				"authPolicyId":   body["authPolicyId"],
+				"tags":           desired.AdoptTags(conn, id, zid.Tags()),
+			})
+			if err != nil {
+				return err
+			}
+			r.Recorder.Eventf(id, "Normal", "Adopted", "adopted identity %s", name)
+		}
 	}
 
 	id.Status.ZitiID = zid.ID()
@@ -202,6 +244,10 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	auth, _ := zid["authenticators"].(map[string]any)
 	id.Status.Enrolled = len(auth) > 0
 	operator := id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentOperator
+
+	if mode == zitiv1alpha1.ManagementObserve {
+		return r.observeIdentity(ctx, id, zc)
+	}
 
 	switch {
 	case id.Status.Enrolled && operator:
@@ -255,6 +301,26 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	id.Status.Enrolled, id.Status.EnrollmentExpiresAt = true, nil
 	setIdentityCond(id, CondReady, true, "Enrolled", "", "")
 	return r.trackCert(ctx, id, zc)
+}
+
+func (r *ZitiIdentityReconciler) observeIdentity(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) error {
+	if id.Status.Enrolled {
+		id.Status.EnrollmentExpiresAt = nil
+		setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+		return r.trackCert(ctx, id, zc)
+	}
+	setIdentityCond(id, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
+	enrollments, err := zc.List(ctx, ziti.Enrollments, fmt.Sprintf(`identity="%s"`, id.Status.ZitiID))
+	if err != nil {
+		return err
+	}
+	id.Status.EnrollmentExpiresAt = nil
+	for _, e := range enrollments {
+		if exp, err := time.Parse(time.RFC3339, fmt.Sprint(e["expiresAt"])); err == nil {
+			id.Status.EnrollmentExpiresAt = &metav1.Time{Time: exp}
+		}
+	}
+	return nil
 }
 
 // trackCert records the earliest client certificate expiry. It warns before expiry.

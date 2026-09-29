@@ -23,6 +23,7 @@ const (
 	TagNamespace = TagPrefix + "namespace"
 	TagName      = TagPrefix + "name"
 	TagUID       = TagPrefix + "uid"
+	TagAdopted   = TagPrefix + "adopted"
 )
 
 type Builder struct {
