@@ -4,6 +4,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"sync"
@@ -39,7 +40,15 @@ type cachedClient struct {
 var _ ClientProvider = (*SecretClientProvider)(nil)
 
 func (p *SecretClientProvider) For(ctx context.Context, conn *zitiv1.ZitiConnection) (ziti.Client, error) {
-	ref := conn.Spec.Auth.Updb.SecretRef
+	var ref zitiv1.SecretRef
+	switch {
+	case conn.Spec.Auth.Cert != nil:
+		ref = conn.Spec.Auth.Cert.SecretRef
+	case conn.Spec.Auth.Updb != nil:
+		ref = conn.Spec.Auth.Updb.SecretRef
+	default:
+		return nil, fmt.Errorf("connection %q sets neither auth.updb nor auth.cert", conn.Name)
+	}
 	var secret corev1.Secret
 	if err := p.Reader.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, &secret); err != nil {
 		return nil, fmt.Errorf("credential secret: %w", err)
@@ -57,16 +66,27 @@ func (p *SecretClientProvider) For(ctx context.Context, conn *zitiv1.ZitiConnect
 		return c.client, nil
 	}
 
-	user, pass := string(secret.Data["username"]), string(secret.Data["password"])
-	if user == "" || pass == "" {
-		return nil, fmt.Errorf("credential secret %s/%s needs keys username and password", ref.Namespace, ref.Name)
-	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM([]byte(cm.Data[cmRef.Key])) {
 		return nil, fmt.Errorf("CA bundle %s/%s key %q has no PEM certificates", cmRef.Namespace, cmRef.Name, cmRef.Key)
 	}
-	auth := rest_util.NewAuthenticatorUpdb(user, pass)
-	auth.RootCas = pool
+	var auth rest_util.Authenticator
+	if conn.Spec.Auth.Cert != nil {
+		a, err := certAuthenticator(&secret, ref)
+		if err != nil {
+			return nil, err
+		}
+		a.RootCas = pool
+		auth = a
+	} else {
+		user, pass := string(secret.Data["username"]), string(secret.Data["password"])
+		if user == "" || pass == "" {
+			return nil, fmt.Errorf("credential secret %s/%s needs keys username and password", ref.Namespace, ref.Name)
+		}
+		a := rest_util.NewAuthenticatorUpdb(user, pass)
+		a.RootCas = pool
+		auth = a
+	}
 	c, err := ziti.NewREST(conn.Spec.ManagementURL, auth, p.RequestsPerSecond)
 	if err != nil {
 		return nil, err
@@ -76,6 +96,19 @@ func (p *SecretClientProvider) For(ctx context.Context, conn *zitiv1.ZitiConnect
 	}
 	p.cache[conn.Name] = cachedClient{key: key, client: c}
 	return c, nil
+}
+
+func certAuthenticator(secret *corev1.Secret, ref zitiv1.SecretRef) (*rest_util.AuthenticatorCert, error) {
+	pair, err := tls.X509KeyPair(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
+	if err != nil {
+		return nil, fmt.Errorf("credential secret %s/%s needs keys %s and %s with a matching certificate and key: %w",
+			ref.Namespace, ref.Name, corev1.TLSCertKey, corev1.TLSPrivateKeyKey, err)
+	}
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
+	return rest_util.NewAuthenticatorCert(leaf, pair.PrivateKey), nil
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch

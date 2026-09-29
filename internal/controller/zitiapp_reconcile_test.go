@@ -235,6 +235,21 @@ func TestOrphanKeepsEntities(t *testing.T) {
 	if e.count(ziti.Services) != 1 || e.count(ziti.Configs) != 2 {
 		t.Error("orphan policy deleted entities")
 	}
+	for kind, objs := range e.zc.Objects {
+		for _, o := range objs {
+			if kind == ziti.ConfigTypes || kind == ziti.EdgeRouters {
+				continue
+			}
+			for k := range o.Tags() {
+				if strings.HasPrefix(k, "ziti-operator-") {
+					t.Errorf("%s %s still carries %s", kind, o.Name(), k)
+				}
+			}
+			if kind == ziti.Configs && o["data"] == nil {
+				t.Errorf("released config %s lost its data", o.Name())
+			}
+		}
+	}
 }
 
 func TestInvalidSpecDoesNotCreateAnything(t *testing.T) {

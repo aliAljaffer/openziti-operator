@@ -101,19 +101,22 @@ func (r *ZitiAccessPolicyReconciler) finalize(ctx context.Context, ap *zitiv1alp
 	if !controllerutil.ContainsFinalizer(ap, Finalizer) {
 		return nil
 	}
-	if ap.Spec.DeletionPolicy != zitiv1alpha1.DeletionPolicyOrphan {
-		_, zc, err := connect(ctx, r.Client, r.Clients, ap.Spec.ConnectionRef)
-		if err != nil {
-			r.Recorder.Eventf(ap, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
-			return err
-		}
-		set, err := newEntitySet(ctx, zc, r.Recorder, ap, ap.UID, accessKinds)
-		if err != nil {
-			return err
-		}
-		if err := set.prune(ctx); err != nil {
-			return err
-		}
+	_, zc, err := connect(ctx, r.Client, r.Clients, ap.Spec.ConnectionRef)
+	if err != nil {
+		r.Recorder.Eventf(ap, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
+		return err
+	}
+	set, err := newEntitySet(ctx, zc, r.Recorder, ap, ap.UID, accessKinds)
+	if err != nil {
+		return err
+	}
+	if ap.Spec.DeletionPolicy == zitiv1alpha1.DeletionPolicyOrphan {
+		err = set.release(ctx)
+	} else {
+		err = set.prune(ctx)
+	}
+	if err != nil {
+		return err
 	}
 	controllerutil.RemoveFinalizer(ap, Finalizer)
 	return r.Update(ctx, ap)

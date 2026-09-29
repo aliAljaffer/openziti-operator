@@ -48,8 +48,19 @@ type UpdbAuth struct {
 	SecretRef SecretRef `json:"secretRef"`
 }
 
+// CertAuth reads the keys "tls.crt" and "tls.key" from the Secret, the format cert-manager writes.
+// The certificate must belong to a Ziti identity that may call the Edge Management API.
+type CertAuth struct {
+	SecretRef SecretRef `json:"secretRef"`
+}
+
+// ConnectionAuth sets exactly one of updb and cert.
+// +kubebuilder:validation:XValidation:rule="has(self.updb) != has(self.cert)",message="set exactly one of updb and cert"
 type ConnectionAuth struct {
-	Updb UpdbAuth `json:"updb"`
+	// +optional
+	Updb *UpdbAuth `json:"updb,omitempty"`
+	// +optional
+	Cert *CertAuth `json:"cert,omitempty"`
 }
 
 // ZitiConnectionSpec defines how the operator reaches a Ziti Edge Management API.

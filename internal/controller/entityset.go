@@ -83,3 +83,24 @@ func (s *entitySet) prune(ctx context.Context) error {
 	}
 	return nil
 }
+
+// release removes the operator tags from every owned entity and leaves the entities in Ziti.
+// Ziti replaces the whole tag map on a write, so other tags stay. Configs need a full update, the other kinds a patch.
+func (s *entitySet) release(ctx context.Context) error {
+	for _, kind := range s.kinds {
+		for _, e := range s.existing[kind] {
+			var err error
+			tags := desired.ReleaseTags(e.Tags())
+			if kind == ziti.Configs {
+				err = s.zc.Update(ctx, kind, e.ID(), ziti.Entity{"name": e.Name(), "configTypeId": e["configTypeId"], "data": e["data"], "tags": tags})
+			} else {
+				err = s.zc.Patch(ctx, kind, e.ID(), ziti.Entity{"tags": tags})
+			}
+			if err != nil {
+				return err
+			}
+			s.rec.Eventf(s.obj, "Normal", "Released", "released %s %s, it stays in Ziti", kind, e.Name())
+		}
+	}
+	return nil
+}

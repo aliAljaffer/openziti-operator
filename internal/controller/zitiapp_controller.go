@@ -152,23 +152,23 @@ func (r *ZitiAppReconciler) finalize(ctx context.Context, svc *zitiv1alpha1.Ziti
 	if !controllerutil.ContainsFinalizer(svc, Finalizer) {
 		return nil
 	}
-	if svc.Spec.DeletionPolicy != zitiv1alpha1.DeletionPolicyOrphan && svc.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
+	if svc.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
 		_, zc, err := r.connect(ctx, svc)
 		if err != nil {
 			r.Recorder.Eventf(svc, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
 			return err
 		}
-		for _, kind := range deleteOrder {
-			existing, err := zc.List(ctx, kind, tagFilter(svc.UID))
-			if err != nil {
-				return err
-			}
-			for _, e := range existing {
-				if err := zc.Delete(ctx, kind, e.ID()); err != nil {
-					return err
-				}
-				r.Recorder.Eventf(svc, "Normal", "Deleted", "deleted %s %s", kind, e.Name())
-			}
+		set, err := newEntitySet(ctx, zc, r.Recorder, svc, svc.UID, deleteOrder)
+		if err != nil {
+			return err
+		}
+		if svc.Spec.DeletionPolicy == zitiv1alpha1.DeletionPolicyOrphan {
+			err = set.release(ctx)
+		} else {
+			err = set.prune(ctx)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	controllerutil.RemoveFinalizer(svc, Finalizer)

@@ -12,10 +12,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/openziti/edge-api/rest_util"
 	"golang.org/x/time/rate"
+
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 )
 
 type Kind string
@@ -158,8 +161,10 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := c.http.Do(req)
 		if err != nil {
+			metrics.APIRequests.WithLabelValues(method, kindOf(path), "error").Inc()
 			return nil, err
 		}
+		metrics.APIRequests.WithLabelValues(method, kindOf(path), strconv.Itoa(resp.StatusCode)).Inc()
 		raw, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
@@ -182,6 +187,12 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 		}
 		return &env, nil
 	}
+}
+
+// kindOf returns the entity kind of an API path, so metrics do not get one series per id.
+func kindOf(path string) string {
+	kind, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	return kind
 }
 
 const pageSize = 500

@@ -11,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/openziti/edge-api/rest_model"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 )
 
 type stubAuth struct {
@@ -101,4 +104,30 @@ func stringify(v []Entity) string {
 		b.WriteString(string(mustJSON(e)))
 	}
 	return b.String()
+}
+
+func TestMetricsCountRequestsByKindAndCode(t *testing.T) {
+	if kindOf("services/abc123") != "services" || kindOf("/service-policies") != "service-policies" || kindOf("version") != "version" {
+		t.Error("kindOf must keep only the first path segment")
+	}
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"pagination":{"totalCount":0}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewREST(srv.URL+"/edge/management/v1", &stubAuth{hc: srv.Client()}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := metrics.APIRequests.WithLabelValues("GET", "terminators", "200")
+	conflict := metrics.APIRequests.WithLabelValues("DELETE", "terminators", "409")
+	okBefore, conflictBefore := testutil.ToFloat64(ok), testutil.ToFloat64(conflict)
+	_, _ = c.List(t.Context(), Terminators, "")
+	_ = c.Delete(t.Context(), Terminators, "x")
+	if testutil.ToFloat64(ok)-okBefore != 1 || testutil.ToFloat64(conflict)-conflictBefore != 1 {
+		t.Errorf("counters: get200 +%v, delete409 +%v", testutil.ToFloat64(ok)-okBefore, testutil.ToFloat64(conflict)-conflictBefore)
+	}
 }

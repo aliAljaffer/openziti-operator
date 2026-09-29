@@ -229,6 +229,11 @@ func TestIdentityDelete(t *testing.T) {
 		want := 0
 		if policy == zitiv1.DeletionPolicyOrphan {
 			want = 1
+			for _, o := range e.zc.Objects[ziti.Identities] {
+				if len(o.Tags()) != 0 {
+					t.Errorf("orphaned identity keeps tags %v", o.Tags())
+				}
+			}
 		}
 		if n := len(e.zc.Objects[ziti.Identities]); n != want {
 			t.Errorf("%s: identities = %d, want %d", policy, n, want)

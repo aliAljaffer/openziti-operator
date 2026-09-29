@@ -102,7 +102,26 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               auth:
+                description: ConnectionAuth sets exactly one of updb and cert.
                 properties:
+                  cert:
+                    description: |-
+                      CertAuth reads the keys "tls.crt" and "tls.key" from the Secret, the format cert-manager writes.
+                      The certificate must belong to a Ziti identity that may call the Edge Management API.
+                    properties:
+                      secretRef:
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    required:
+                    - secretRef
+                    type: object
                   updb:
                     description: UpdbAuth reads the keys "username" and "password"
                       from the Secret.
@@ -120,9 +139,10 @@ spec:
                     required:
                     - secretRef
                     type: object
-                required:
-                - updb
                 type: object
+                x-kubernetes-validations:
+                - message: set exactly one of updb and cert
+                  rule: has(self.updb) != has(self.cert)
               caBundle:
                 properties:
                   configMapRef:

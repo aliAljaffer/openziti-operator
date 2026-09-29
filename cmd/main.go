@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -31,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -63,6 +65,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var zitiRequestsPerSecond float64
+	var orphanPolicy string
+	var orphanInterval time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -88,7 +92,14 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10, "Rate limit for calls to the Ziti Edge Management API.")
+	flag.StringVar(&orphanPolicy, "orphan-policy", string(controller.OrphanReport),
+		"What to do with Ziti entities of this cluster whose owner resource is gone: report or delete.")
+	flag.DurationVar(&orphanInterval, "orphan-sweep-interval", time.Hour, "How often to look for orphaned Ziti entities.")
 	flag.Parse()
+	if orphanPolicy != string(controller.OrphanReport) && orphanPolicy != string(controller.OrphanDelete) {
+		setupLog.Error(nil, "Invalid --orphan-policy, use report or delete", "value", orphanPolicy)
+		os.Exit(1)
+	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -228,6 +239,17 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "service")
 		os.Exit(1)
 	}
+	if err := mgr.Add(&controller.OrphanSweeper{
+		Reader:   mgr.GetAPIReader(),
+		Clients:  clients,
+		Policy:   controller.OrphanPolicy(orphanPolicy),
+		Interval: orphanInterval,
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+	}); err != nil {
+		setupLog.Error(err, "Failed to add orphan sweeper")
+		os.Exit(1)
+	}
+	ctrlmetrics.Registry.MustRegister(&controller.ConditionCollector{Reader: mgr.GetClient()})
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

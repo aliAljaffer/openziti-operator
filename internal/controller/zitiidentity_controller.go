@@ -130,7 +130,7 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 	}
 	mode := id.Spec.ManagementPolicy
 	orphan := id.Spec.DeletionPolicy == zitiv1alpha1.DeletionPolicyOrphan
-	if mode != zitiv1alpha1.ManagementObserve && (mode == zitiv1alpha1.ManagementAdopt || !orphan) {
+	if mode != zitiv1alpha1.ManagementObserve {
 		_, zc, err := connect(ctx, r.Client, r.Clients, id.Spec.ConnectionRef)
 		if err != nil {
 			r.Recorder.Eventf(id, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -141,7 +141,7 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 			return err
 		}
 		for _, e := range existing {
-			if isAdopted(e) {
+			if isAdopted(e) || orphan {
 				if err := zc.Patch(ctx, ziti.Identities, e.ID(), ziti.Entity{"tags": desired.ReleaseTags(e.Tags())}); err != nil {
 					return err
 				}

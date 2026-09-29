@@ -230,3 +230,27 @@ func TestAllowedNamespacesIsEnforced(t *testing.T) {
 }
 
 func typesName(name string) types.NamespacedName { return types.NamespacedName{Name: name} }
+
+func TestAccessPolicyOrphanReleasesTags(t *testing.T) {
+	e := setupAccess(t, zitiv1.RoleScopeGlobal, func(ap *zitiv1.ZitiAccessPolicy, _ *zitiv1.ZitiConnection) {
+		ap.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
+		ap.Spec.EdgeRouters = []string{"r-entry"}
+	})
+	ap := e.reconcile(t)
+	if err := e.k.Delete(t.Context(), ap); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.r.Reconcile(t.Context(), e.reqFor()); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range accessKinds {
+		if len(e.zc.Objects[kind]) != 1 {
+			t.Fatalf("%s = %d, want 1", kind, len(e.zc.Objects[kind]))
+		}
+		for _, o := range e.zc.Objects[kind] {
+			if len(o.Tags()) != 0 {
+				t.Errorf("%s tags = %v", kind, o.Tags())
+			}
+		}
+	}
+}

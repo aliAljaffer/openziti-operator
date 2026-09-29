@@ -116,11 +116,22 @@ var _ = Describe("CRD validation", func() {
 				Spec:       zitiv1.ZitiConnectionSpec{ManagementURL: url, HostingRouters: routers},
 			}
 			c.Spec.CABundle.ConfigMapRef = zitiv1.ConfigMapKeyRef{Namespace: "n", Name: "c", Key: "k"}
-			c.Spec.Auth.Updb.SecretRef = zitiv1.SecretRef{Namespace: "n", Name: "s"}
+			c.Spec.Auth.Updb = &zitiv1.UpdbAuth{SecretRef: zitiv1.SecretRef{Namespace: "n", Name: "s"}}
 			return c
 		}
 		Expect(k8sClient.Create(ctx, conn("http://ctrl", []string{"r"}))).To(MatchError(ContainSubstring("should match")))
 		Expect(k8sClient.Create(ctx, conn("https://ctrl", nil))).To(MatchError(ContainSubstring("hostingRouters")))
+		both := conn("https://ctrl", []string{"r"})
+		both.Spec.Auth.Cert = &zitiv1.CertAuth{SecretRef: zitiv1.SecretRef{Namespace: "n", Name: "s"}}
+		Expect(k8sClient.Create(ctx, both)).To(MatchError(ContainSubstring("set exactly one of updb and cert")))
+		neither := conn("https://ctrl", []string{"r"})
+		neither.Spec.Auth.Updb = nil
+		Expect(k8sClient.Create(ctx, neither)).To(MatchError(ContainSubstring("set exactly one of updb and cert")))
+		certOnly := conn("https://ctrl", []string{"r"})
+		certOnly.Name = "conn-cert"
+		certOnly.Spec.Auth = zitiv1.ConnectionAuth{Cert: &zitiv1.CertAuth{SecretRef: zitiv1.SecretRef{Namespace: "n", Name: "s"}}}
+		Expect(k8sClient.Create(ctx, certOnly)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, certOnly) })
 		ok := conn("https://ctrl", []string{"r"})
 		Expect(k8sClient.Create(ctx, ok)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ok) })
