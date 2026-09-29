@@ -1,0 +1,80 @@
+apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.rbac.namespaced }}
+kind: Role
+{{- else }}
+kind: ClusterRole
+{{- end }}
+metadata:
+{{- if .Values.rbac.namespaced }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+  name: {{ include "ziti-operator.resourceName" (dict "suffix" "manager-role" "context" $) }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  {{- if not .Values.rbac.secretNamespaces }}
+  - configmaps
+  {{- end }}
+  - namespaces
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+{{- if not .Values.rbac.secretNamespaces }}
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- end }}
+- apiGroups:
+  - ziti.alialjaffer.com
+  resources:
+  - zitiaccesspolicies
+  - zitiapps
+  - ziticonnections
+  - zitiidentities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ziti.alialjaffer.com
+  resources:
+  - zitiaccesspolicies/finalizers
+  - zitiapps/finalizers
+  - ziticonnections/finalizers
+  - zitiidentities/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ziti.alialjaffer.com
+  resources:
+  - zitiaccesspolicies/status
+  - zitiapps/status
+  - ziticonnections/status
+  - zitiidentities/status
+  verbs:
+  - get
+  - patch
+  - update

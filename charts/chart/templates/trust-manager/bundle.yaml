@@ -1,0 +1,20 @@
+{{- if .Values.trustManager.enabled }}
+{{- if not .Values.trustManager.sources }}{{ fail "trustManager.sources needs at least one source when trustManager.enabled is true" }}{{ end }}
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: {{ .Values.trustManager.name }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  sources:
+    {{- toYaml .Values.trustManager.sources | nindent 4 }}
+  target:
+    configMap:
+      key: {{ .Values.trustManager.key }}
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Release.Namespace }}
+{{- end }}

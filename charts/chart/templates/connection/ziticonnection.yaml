@@ -1,0 +1,46 @@
+{{- if .Values.connection.create }}
+{{- $c := .Values.connection }}
+{{- if not $c.managementUrl }}{{ fail "connection.managementUrl is required when connection.create is true" }}{{ end }}
+{{- if not $c.hostingRouters }}{{ fail "connection.hostingRouters needs at least one router when connection.create is true" }}{{ end }}
+{{- if and $c.auth.updb.secretName $c.auth.cert.secretName }}{{ fail "set only one of connection.auth.updb.secretName and connection.auth.cert.secretName" }}{{ end }}
+{{- if not (or $c.auth.updb.secretName $c.auth.cert.secretName) }}{{ fail "set connection.auth.updb.secretName or connection.auth.cert.secretName" }}{{ end }}
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiConnection
+metadata:
+  name: {{ $c.name }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  managementUrl: {{ $c.managementUrl | quote }}
+  caBundle:
+    configMapRef:
+      namespace: {{ .Release.Namespace }}
+      name: {{ $c.caBundle.configMapName }}
+      key: {{ $c.caBundle.key }}
+  auth:
+    {{- if $c.auth.cert.secretName }}
+    cert:
+      secretRef:
+        namespace: {{ .Release.Namespace }}
+        name: {{ $c.auth.cert.secretName }}
+    {{- else }}
+    updb:
+      secretRef:
+        namespace: {{ .Release.Namespace }}
+        name: {{ $c.auth.updb.secretName }}
+    {{- end }}
+  roleScope: {{ $c.roleScope }}
+  clusterId: {{ $c.clusterId }}
+  hostingRouters:
+    {{- toYaml $c.hostingRouters | nindent 4 }}
+  {{- with $c.defaultEdgeRouters }}
+  defaultEdgeRouters:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $c.allowedNamespaces }}
+  allowedNamespaces:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

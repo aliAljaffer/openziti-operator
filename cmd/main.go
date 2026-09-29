@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -70,6 +71,7 @@ func main() {
 	var enableHTTP2 bool
 	var zitiRequestsPerSecond float64
 	var orphanPolicy string
+	var secretNamespaces string
 	var leaderElectionNamespace string
 	var orphanInterval time.Duration
 	var tlsOpts []func(*tls.Config)
@@ -99,6 +101,8 @@ func main() {
 	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10, "Rate limit for calls to the Ziti Edge Management API.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
 		"Namespace of the leader election Lease. Only needed when the manager runs outside a cluster.")
+	flag.StringVar(&secretNamespaces, "secret-namespaces", "",
+		"Comma separated namespaces where the operator may read and write Secrets. Empty means every namespace.")
 	flag.StringVar(&orphanPolicy, "orphan-policy", string(controller.OrphanReport),
 		"What to do with Ziti entities of this cluster whose owner resource is gone: report or delete.")
 	flag.DurationVar(&orphanInterval, "orphan-sweep-interval", time.Hour, "How often to look for orphaned Ziti entities.")
@@ -181,7 +185,7 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		// Cache only the Secrets this operator creates. Credentials are read without the cache.
 		Cache: cache.Options{ByObject: map[client.Object]cache.ByObject{
-			&corev1.Secret{}: {Label: labels.SelectorFromSet(labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue})},
+			&corev1.Secret{}: secretCache(secretNamespaces),
 		}},
 		Scheme:                  scheme,
 		Metrics:                 metricsServerOptions,
@@ -278,4 +282,18 @@ func main() {
 		setupLog.Error(err, "Failed to run manager")
 		os.Exit(1)
 	}
+}
+
+// secretCache limits the Secret informer to labeled Secrets, and to the given namespaces when set.
+func secretCache(namespaces string) cache.ByObject {
+	byObject := cache.ByObject{Label: labels.SelectorFromSet(labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue})}
+	for _, ns := range strings.Split(namespaces, ",") {
+		if ns = strings.TrimSpace(ns); ns != "" {
+			if byObject.Namespaces == nil {
+				byObject.Namespaces = map[string]cache.Config{}
+			}
+			byObject.Namespaces[ns] = cache.Config{}
+		}
+	}
+	return byObject
 }

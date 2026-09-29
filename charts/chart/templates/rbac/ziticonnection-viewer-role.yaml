@@ -1,0 +1,33 @@
+{{- if .Values.rbac.helpers.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.rbac.namespaced }}
+kind: Role
+{{- else }}
+kind: ClusterRole
+{{- end }}
+metadata:
+{{- if .Values.rbac.namespaced }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ include "ziti-operator.resourceName" (dict "suffix" "ziticonnection-viewer-role" "context" $) }}
+rules:
+- apiGroups:
+  - ziti.alialjaffer.com
+  resources:
+  - ziticonnections
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ziti.alialjaffer.com
+  resources:
+  - ziticonnections/status
+  verbs:
+  - get
+{{- end }}
