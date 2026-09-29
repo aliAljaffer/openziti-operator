@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/openziti/edge-api/rest_util"
 	"golang.org/x/time/rate"
@@ -56,6 +57,11 @@ type Client interface {
 	List(ctx context.Context, kind Kind, filter string) ([]Entity, error)
 	Create(ctx context.Context, kind Kind, body Entity) (string, error)
 	Update(ctx context.Context, kind Kind, id string, body Entity) error
+	// Enrollment returns the pending enrollment JWT of an entity (an edge router) and when it expires.
+	// List never returns the JWT. This is the only way to read it.
+	Enrollment(ctx context.Context, kind Kind, id string) (jwt string, expiresAt time.Time, err error)
+	// ReEnroll makes Ziti issue a new enrollment JWT for an entity that has not enrolled yet.
+	ReEnroll(ctx context.Context, kind Kind, id string) error
 	// Verify sends the proof of ownership of a certificate authority: a PEM certificate signed by it.
 	Verify(ctx context.Context, kind Kind, id string, pemCertificate string) error
 	// Patch changes only the fields in body. A "tags" field replaces the whole tag map.
@@ -227,12 +233,22 @@ func (c *REST) List(ctx context.Context, kind Kind, filter string) ([]Entity, er
 			break
 		}
 	}
-	if kind == Identities {
+	switch kind {
+	case Identities:
 		for _, e := range all {
 			stripEnrollmentSecrets(e)
 		}
+	case EdgeRouters:
+		for _, e := range all {
+			stripRouterSecrets(e)
+		}
 	}
 	return all, nil
+}
+
+func stripRouterSecrets(e Entity) {
+	delete(e, "enrollmentJwt")
+	delete(e, "enrollmentToken")
 }
 
 func stripEnrollmentSecrets(e Entity) {
@@ -274,6 +290,27 @@ type plainText string
 
 func (c *REST) Verify(ctx context.Context, kind Kind, id string, pemCertificate string) error {
 	_, err := c.do(ctx, http.MethodPost, string(kind)+"/"+id+"/verify", nil, plainText(pemCertificate))
+	return err
+}
+
+func (c *REST) Enrollment(ctx context.Context, kind Kind, id string) (string, time.Time, error) {
+	env, err := c.do(ctx, http.MethodGet, string(kind)+"/"+id, nil, nil)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	var d struct {
+		JWT       string `json:"enrollmentJwt"`
+		ExpiresAt string `json:"enrollmentExpiresAt"`
+	}
+	if err := json.Unmarshal(env.Data, &d); err != nil {
+		return "", time.Time{}, err
+	}
+	exp, _ := time.Parse(time.RFC3339, d.ExpiresAt)
+	return d.JWT, exp, nil
+}
+
+func (c *REST) ReEnroll(ctx context.Context, kind Kind, id string) error {
+	_, err := c.do(ctx, http.MethodPost, string(kind)+"/"+id+"/re-enroll", nil, map[string]any{})
 	return err
 }
 

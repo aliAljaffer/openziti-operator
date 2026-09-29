@@ -49,6 +49,7 @@ rules:
   - zitiedgerouterpolicies
   - zitiidentities
   - zitijwtsigners
+  - zitirouters
   - zitiserviceedgerouterpolicies
   - zitiservicepolicies
   - zitiservices
@@ -71,6 +72,7 @@ rules:
   - zitiedgerouterpolicies/finalizers
   - zitiidentities/finalizers
   - zitijwtsigners/finalizers
+  - zitirouters/finalizers
   - zitiserviceedgerouterpolicies/finalizers
   - zitiservicepolicies/finalizers
   - zitiservices/finalizers
@@ -87,6 +89,7 @@ rules:
   - zitiedgerouterpolicies/status
   - zitiidentities/status
   - zitijwtsigners/status
+  - zitirouters/status
   - zitiserviceedgerouterpolicies/status
   - zitiservicepolicies/status
   - zitiservices/status

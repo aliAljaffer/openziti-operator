@@ -418,3 +418,39 @@ var _ = Describe("one-to-one kinds", func() {
 		Expect(serp.Spec.Semantic).To(Equal("AnyOf"))
 	})
 })
+
+var _ = Describe("ZitiRouter", func() {
+	router := func(mut func(*zitiv1.ZitiRouterSpec)) *zitiv1.ZitiRouter {
+		r := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "router-case"}}
+		if mut != nil {
+			mut(&r.Spec)
+		}
+		return r
+	}
+
+	It("applies defaults and keeps zitiName and deletionPolicy fixed", func() {
+		r := router(func(s *zitiv1.ZitiRouterSpec) {
+			s.ZitiName = "a"
+			s.EnrollmentSecretRef = &zitiv1.SecretRef{Namespace: "routers", Name: "jwt"}
+		})
+		Expect(k8sClient.Create(ctx, r)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, r) })
+		Expect(r.Spec.ConnectionRef).To(Equal("default"))
+		Expect(r.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+
+		r.Spec.ZitiName = "b"
+		Expect(k8sClient.Update(ctx, r)).To(MatchError(ContainSubstring("zitiName is immutable")))
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "router-case"}, r)).To(Succeed())
+		r.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
+		Expect(k8sClient.Update(ctx, r)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
+	})
+
+	DescribeTable("rejects bad values",
+		func(mut func(*zitiv1.ZitiRouterSpec), wantErr string) {
+			Expect(k8sClient.Create(ctx, router(mut))).To(MatchError(ContainSubstring(wantErr)))
+		},
+		Entry("negative cost", func(s *zitiv1.ZitiRouterSpec) { s.Cost = -1 }, "greater than or equal to 0"),
+		Entry("cost over the limit", func(s *zitiv1.ZitiRouterSpec) { s.Cost = 70000 }, "less than or equal to 65535"),
+		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiRouterSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
+	)
+})

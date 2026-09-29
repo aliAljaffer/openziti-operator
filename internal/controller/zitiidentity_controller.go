@@ -30,7 +30,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -532,47 +531,11 @@ func (r *ZitiIdentityReconciler) currentEnrollmentJWT(ctx context.Context, id *z
 }
 
 func (r *ZitiIdentityReconciler) writeSecret(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, dataKey string, value []byte) error {
-	var secret corev1.Secret
-	key := r.secretKey(id)
-	err := r.Get(ctx, key, &secret)
-	switch {
-	case apierrors.IsNotFound(err):
-		secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name,
-			Labels: map[string]string{ManagedByLabel: ManagedByLabelValue}}}
-		if err := controllerutil.SetControllerReference(id, &secret, r.Scheme); err != nil {
-			return err
-		}
-		secret.Data = map[string][]byte{dataKey: value}
-		err = r.Create(ctx, &secret)
-		if apierrors.IsAlreadyExists(err) {
-			// The cache only shows labeled Secrets, so an existing Secret here belongs to someone else.
-			return &specError{"SecretConflict", fmt.Sprintf("Secret %s exists and is not owned by this ZitiIdentity", key.Name)}
-		}
-		return err
-	case err != nil:
-		return err
-	case !metav1.IsControlledBy(&secret, id):
-		return &specError{"SecretConflict", fmt.Sprintf("Secret %s exists and is not owned by this ZitiIdentity", key.Name)}
-	case string(secret.Data[dataKey]) == string(value):
-		return nil
-	}
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-	secret.Data[dataKey] = value
-	return r.Update(ctx, &secret)
+	return upsertOwnedSecret(ctx, r.Client, r.Scheme, id, r.secretKey(id), dataKey, value)
 }
 
 func (r *ZitiIdentityReconciler) dropJWT(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) error {
-	var secret corev1.Secret
-	if err := r.Get(ctx, r.secretKey(id), &secret); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if _, ok := secret.Data[SecretKeyJWT]; !ok || !metav1.IsControlledBy(&secret, id) {
-		return nil
-	}
-	delete(secret.Data, SecretKeyJWT)
-	return r.Update(ctx, &secret)
+	return dropSecretKey(ctx, r.Client, id, r.secretKey(id), SecretKeyJWT)
 }
 
 func (r *ZitiIdentityReconciler) SetupWithManager(mgr ctrl.Manager) error {

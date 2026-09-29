@@ -100,8 +100,11 @@ func (f *Fake) List(_ context.Context, kind Kind, filter string) ([]Entity, erro
 		}
 		if ok {
 			c := clone(e)
-			if kind == Identities {
+			switch kind {
+			case Identities:
 				stripEnrollmentSecrets(c)
+			case EdgeRouters:
+				stripRouterSecrets(c)
 			}
 			out = append(out, c)
 		}
@@ -138,6 +141,13 @@ func (f *Fake) Create(_ context.Context, kind Kind, body Entity) (string, error)
 		f.next++
 		b["jwt"] = fmt.Sprintf("jwt-%d", f.next)
 	}
+	if kind == EdgeRouters {
+		f.next++
+		b["enrollmentJwt"] = fmt.Sprintf("router-jwt-%d", f.next)
+		b["enrollmentExpiresAt"] = time.Now().Add(3 * time.Hour).UTC().Format(time.RFC3339)
+		b["isVerified"] = false
+		b["isOnline"] = false
+	}
 	if kind == CertificateAuthorities {
 		f.next++
 		b["verificationToken"] = fmt.Sprintf("tok-%d", f.next)
@@ -163,13 +173,15 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "name must be unique"}
 	}
 	next := clone(body)
-	if kind == CertificateAuthorities {
-		// Ziti accepts a new certPem and silently keeps the old certificate.
-		cur := f.Objects[kind][id]
-		for _, k := range []string{"certPem", "fingerprint", "verificationToken", "isVerified"} {
-			if v, ok := cur[k]; ok {
-				next[k] = v
-			}
+	// Ziti keeps these fields on an update. A CA also keeps its certificate: a new certPem is silently ignored.
+	keep := map[Kind][]string{
+		CertificateAuthorities: {"certPem", "fingerprint", "verificationToken", "isVerified"},
+		EdgeRouters:            {"enrollmentJwt", "enrollmentExpiresAt", "isVerified", "isOnline"},
+	}
+	cur := f.Objects[kind][id]
+	for _, k := range keep[kind] {
+		if v, ok := cur[k]; ok {
+			next[k] = v
 		}
 	}
 	f.put(kind, id, next)
@@ -182,6 +194,33 @@ func certFingerprint(certPEM string) string {
 		sum = sha1.Sum(block.Bytes)
 	}
 	return hex.EncodeToString(sum[:])
+}
+
+func (f *Fake) Enrollment(_ context.Context, kind Kind, id string) (string, time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "enrollment "+string(kind)+" "+id)
+	e, ok := f.Objects[kind][id]
+	if !ok {
+		return "", time.Time{}, &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+	}
+	jwt, _ := e["enrollmentJwt"].(string)
+	exp, _ := time.Parse(time.RFC3339, fmt.Sprint(e["enrollmentExpiresAt"]))
+	return jwt, exp, nil
+}
+
+func (f *Fake) ReEnroll(_ context.Context, kind Kind, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "re-enroll "+string(kind)+" "+id)
+	e, ok := f.Objects[kind][id]
+	if !ok {
+		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+	}
+	f.next++
+	e["enrollmentJwt"] = fmt.Sprintf("router-jwt-%d", f.next)
+	e["enrollmentExpiresAt"] = time.Now().Add(3 * time.Hour).UTC().Format(time.RFC3339)
+	return nil
 }
 
 // Verify accepts a certificate whose common name is the verification token. It does not check the signature.

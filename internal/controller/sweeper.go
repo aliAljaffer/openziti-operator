@@ -29,7 +29,7 @@ const (
 // sweepKinds is every kind the operator creates. Order matters for delete: policies before services before configs.
 var sweepKinds = []ziti.Kind{
 	ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.AuthPolicies,
-	ziti.Services, ziti.Configs, ziti.ExternalJWTSigners, ziti.CertificateAuthorities, ziti.Identities,
+	ziti.Services, ziti.Configs, ziti.ExternalJWTSigners, ziti.CertificateAuthorities, ziti.Identities, ziti.EdgeRouters,
 }
 
 // OrphanSweeper finds Ziti entities that carry this cluster's tag but belong to a resource that no longer exists.
@@ -141,7 +141,7 @@ func patchTags(ctx context.Context, zc ziti.Client, kind ziti.Kind, e ziti.Entit
 func ownerLists() []client.ObjectList {
 	return []client.ObjectList{
 		&zitiv1.ZitiAppList{}, &zitiv1.ZitiIdentityList{}, &zitiv1.ZitiAccessPolicyList{},
-		&zitiv1.ZitiJwtSignerList{}, &zitiv1.ZitiCAList{},
+		&zitiv1.ZitiJwtSignerList{}, &zitiv1.ZitiCAList{}, &zitiv1.ZitiRouterList{},
 		&zitiv1.ZitiConfigList{}, &zitiv1.ZitiServiceList{}, &zitiv1.ZitiServicePolicyList{},
 		&zitiv1.ZitiEdgeRouterPolicyList{}, &zitiv1.ZitiServiceEdgeRouterPolicyList{},
 	}

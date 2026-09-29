@@ -19,6 +19,7 @@ PAGES = {
     "docs/service-account-tokens.md": "Service-Account-Tokens",
     "docs/cert-manager.md": "cert-manager-CA",
     "docs/full-control.md": "Full-Control",
+    "docs/routers.md": "Edge-Routers",
     "docs/role-scope.md": "Role-Scope",
     "docs/existing-resources.md": "Existing-Resources",
     "docs/audit.md": "Audit",
@@ -33,7 +34,7 @@ PAGES = {
     "SECURITY.md": "Security",
 }
 for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiAccessPolicy", "ZitiJwtSigner", "ZitiCA",
-             "ZitiConfig", "ZitiService", "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy"):
+             "ZitiRouter", "ZitiConfig", "ZitiService", "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy"):
     PAGES[f"docs/reference/{kind}.md"] = kind
 
 LINK = re.compile(r"\]\(((?:\.\./|\./)*(?:docs/|reference/|adr/)*)([A-Za-z0-9_.-]+\.md)(#[^)]*)?\)")
@@ -48,6 +49,7 @@ SIDEBAR = """**[Home](Home)**
 - [Service account tokens](Service-Account-Tokens)
 - [cert-manager CA](cert-manager-CA)
 - [Full control (one resource per Ziti object)](Full-Control)
+- [Edge routers](Edge-Routers)
 
 **Resource reference**
 - [ZitiConnection](ZitiConnection)
@@ -56,6 +58,7 @@ SIDEBAR = """**[Home](Home)**
 - [ZitiAccessPolicy](ZitiAccessPolicy)
 - [ZitiJwtSigner](ZitiJwtSigner)
 - [ZitiCA](ZitiCA)
+- [ZitiRouter](ZitiRouter)
 - [ZitiConfig](ZitiConfig)
 - [ZitiService](ZitiService)
 - [ZitiServicePolicy](ZitiServicePolicy)

@@ -11,4 +11,5 @@ resources:
 - alialjaffer_v1alpha1_zitiservicepolicy.yaml
 - alialjaffer_v1alpha1_zitiedgerouterpolicy.yaml
 - alialjaffer_v1alpha1_zitiserviceedgerouterpolicy.yaml
+- alialjaffer_v1alpha1_zitirouter.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

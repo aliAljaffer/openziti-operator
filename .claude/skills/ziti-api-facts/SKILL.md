@@ -48,3 +48,10 @@ Each line was tested against a real controller. Test a new assumption the same w
 - `certPem` cannot change. `PUT` and `PATCH` return success and keep the old certificate. Replace the CA to follow a renewed issuer. The fingerprint is the SHA-1 of the DER certificate.
 - With `isAuthEnabled` and an `externalIdClaim`, a client certificate signed by a verified CA logs in as the identity whose `externalId` equals the claim value (`POST /edge/client/v1/authenticate?method=cert` over mTLS). A fresh certificate with the same common name works, so renewal needs no re-enrollment. An unknown name gets 401.
 - An `externalId` must be unique across identities.
+
+## Edge routers
+
+- `POST /edge-routers` takes `name`, `roleAttributes`, `isTunnelerEnabled`, `cost`, `noTraversal`, `disabled`, `tags`. It returns the ID only.
+- The detail and the list show `enrollmentJwt`, `enrollmentToken`, and `enrollmentExpiresAt` until the router has enrolled (`isVerified: true`). The JWT expires after about three hours. `List` strips the JWT. Read it with `Client.Enrollment`.
+- `PUT` and `PATCH` both work and keep the pending enrollment. `POST /edge-routers/{id}/re-enroll` issues a new JWT.
+- A router in tunnel mode has an identity with the same name and ID as the router.

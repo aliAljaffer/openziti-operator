@@ -13,6 +13,7 @@ resources:
 - bases/alialjaffer.ziti_zitiservicepolicies.yaml
 - bases/alialjaffer.ziti_zitiedgerouterpolicies.yaml
 - bases/alialjaffer.ziti_zitiserviceedgerouterpolicies.yaml
+- bases/alialjaffer.ziti_zitirouters.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

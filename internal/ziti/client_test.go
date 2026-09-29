@@ -131,3 +131,38 @@ func TestMetricsCountRequestsByKindAndCode(t *testing.T) {
 		t.Errorf("counters: get200 +%v, delete409 +%v", testutil.ToFloat64(ok)-okBefore, testutil.ToFloat64(conflict)-conflictBefore)
 	}
 }
+
+func TestRESTRouterJWTIsOnlyAvailableThroughEnrollment(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/re-enroll"):
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		case strings.HasSuffix(r.URL.Path, "/edge-routers/r1"):
+			_, _ = w.Write([]byte(`{"data":{"id":"r1","enrollmentJwt":"ROUTER-JWT","enrollmentToken":"ROUTER-TOKEN","enrollmentExpiresAt":"2030-01-01T00:00:00Z"}}`))
+		default:
+			_, _ = w.Write([]byte(`{"data":[{"id":"r1","name":"r","enrollmentJwt":"ROUTER-JWT","enrollmentToken":"ROUTER-TOKEN","isVerified":false}],"meta":{"pagination":{"totalCount":1}}}`))
+		}
+	}))
+	defer srv.Close()
+	c, err := NewREST(srv.URL+"/edge/management/v1", &stubAuth{hc: srv.Client()}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := c.List(t.Context(), EdgeRouters, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := stringify(list); strings.Contains(s, "ROUTER-JWT") || strings.Contains(s, "ROUTER-TOKEN") {
+		t.Errorf("the enrollment secrets reached the caller: %s", s)
+	}
+	if list[0]["isVerified"] != false {
+		t.Error("other fields must stay")
+	}
+	jwt, exp, err := c.Enrollment(t.Context(), EdgeRouters, "r1")
+	if err != nil || jwt != "ROUTER-JWT" || exp.Year() != 2030 {
+		t.Errorf("Enrollment = %q %v %v", jwt, exp, err)
+	}
+	if err := c.ReEnroll(t.Context(), EdgeRouters, "r1"); err != nil {
+		t.Errorf("ReEnroll: %v", err)
+	}
+}

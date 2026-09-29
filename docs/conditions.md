@@ -26,6 +26,10 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Ready` | Same as `Synced`. |
 | `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy` | `Synced` | The Ziti object exists and matches the spec. |
 | | `Ready` | Same as `Synced`. |
+| `ZitiRouter` | `Synced` | The router exists in Ziti and matches the spec. |
+| | `Enrolled` | The router has enrolled with its JWT. |
+| | `Online` | The router is connected to the controller. |
+| | `Ready` | `Enrolled` and `Online`. |
 | `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
 | | `Verified` | Ziti accepted the proof that you control the CA. |
 | | `Ready` | Same as `Verified`. |
@@ -95,6 +99,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `Released` | The operator removed its tags and left the entity in Ziti (`Orphan` or an adopted identity). |
 | `Adopted` | The operator took over an existing identity. |
 | `Enrolled`, `EnrollmentCreated`, `EnrollmentExpired` | Identity enrollment steps. |
+| `EnrollmentRenewed` | A `ZitiRouter` had an expired unused JWT, and Ziti issued a new one. |
 | `Verified`, `Renewed` | A `ZitiCA` was proven to Ziti, or its certificate changed and the CA was replaced. |
 | `CertificateRenewed`, `RenewalFailed`, `CertificateExpiring` | Certificate lifecycle. |
 | `IdentityFileLost` | See above. |

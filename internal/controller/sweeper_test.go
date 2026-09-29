@@ -32,6 +32,7 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 		&zitiv1.ZitiAccessPolicy{ObjectMeta: metav1.ObjectMeta{Name: "ap", Namespace: "n", UID: "live-accesspolicy"}},
 		&zitiv1.ZitiJwtSigner{ObjectMeta: metav1.ObjectMeta{Name: "sg", UID: "live-signer"}},
 		&zitiv1.ZitiCA{ObjectMeta: metav1.ObjectMeta{Name: "ca", UID: "live-ca"}},
+		&zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "rt", UID: "live-router"}},
 		&zitiv1.ZitiConfig{ObjectMeta: metav1.ObjectMeta{Name: "cfg", Namespace: "n", UID: "live-config"}},
 		&zitiv1.ZitiService{ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "n", UID: "live-service"}},
 		&zitiv1.ZitiServicePolicy{ObjectMeta: metav1.ObjectMeta{Name: "sp", Namespace: "n", UID: "live-servicepolicy"}},
@@ -57,7 +58,7 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	for kind, uid := range map[ziti.Kind]string{
 		ziti.ExternalJWTSigners: "live-signer", ziti.AuthPolicies: "live-signer", ziti.CertificateAuthorities: "live-ca",
 		ziti.Configs: "live-config", ziti.ServicePolicies: "live-servicepolicy", ziti.EdgeRouterPolicies: "live-erp",
-		ziti.ServiceEdgeRouterPolicies: "live-serp", ziti.Identities: "live-identity",
+		ziti.ServiceEdgeRouterPolicies: "live-serp", ziti.Identities: "live-identity", ziti.EdgeRouters: "live-router",
 	} {
 		zc.Put(kind, ziti.Entity{"id": "live-" + string(kind), "name": "live-" + string(kind), "tags": tags("prod", uid)})
 	}
@@ -92,7 +93,7 @@ func TestSweeperDeleteRemovesOrphansOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, kind := range []ziti.Kind{ziti.ExternalJWTSigners, ziti.AuthPolicies, ziti.CertificateAuthorities, ziti.Configs, ziti.ServicePolicies,
-		ziti.EdgeRouterPolicies, ziti.ServiceEdgeRouterPolicies, ziti.Identities} {
+		ziti.EdgeRouterPolicies, ziti.ServiceEdgeRouterPolicies, ziti.Identities, ziti.EdgeRouters} {
 		if _, ok := zc.Objects[kind]["live-"+string(kind)]; !ok {
 			t.Errorf("the live %s entity was deleted", kind)
 		}
