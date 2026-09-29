@@ -164,3 +164,20 @@ func TestAudit(t *testing.T) {
 		t.Errorf("codes = %v, want %v", got, want)
 	}
 }
+
+func TestLoadAndAudit(t *testing.T) {
+	f := ziti.NewFake()
+	f.Put(ziti.Configs, ziti.Entity{"name": "orphan-config"})
+	f.Put(ziti.ServicePolicies, ziti.Entity{"name": "empty-dial", "type": "Dial", "identityRoles": []string{}, "serviceRoles": []string{"#x"}})
+	g, err := Load(t.Context(), f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, fd := range g.Audit(time.Now()) {
+		got[fd.Code] = fd.Entity
+	}
+	if got[UnusedConfig] != "orphan-config" || got[EmptyRoles] != "empty-dial" {
+		t.Errorf("findings = %v", got)
+	}
+}

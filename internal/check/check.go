@@ -37,9 +37,9 @@ const (
 )
 
 type Finding struct {
-	Code    string
-	Entity  string
-	Message string
+	Code    string `json:"code"`
+	Entity  string `json:"entity"`
+	Message string `json:"message"`
 }
 
 type ServiceReport struct {
