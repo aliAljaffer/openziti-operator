@@ -4,6 +4,7 @@ package desired
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -257,5 +258,19 @@ func TestMatches(t *testing.T) {
 				t.Errorf("Matches = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestScopeAttributes(t *testing.T) {
+	got, err := ScopeAttributes(zitiv1.RoleScopeNamespaced, "ns", []string{"a", "b"})
+	if err != nil || !slices.Equal(got, []string{"ns.a", "ns.b"}) {
+		t.Errorf("namespaced = %v, %v", got, err)
+	}
+	got, err = ScopeAttributes(zitiv1.RoleScopeGlobal, "ns", []string{"a"})
+	if err != nil || !slices.Equal(got, []string{"a"}) {
+		t.Errorf("global = %v, %v", got, err)
+	}
+	if _, err = ScopeAttributes(zitiv1.RoleScopeNamespaced, "ns", []string{"all"}); err == nil {
+		t.Error("attribute all must be rejected when namespaced")
 	}
 }

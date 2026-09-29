@@ -5,9 +5,37 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ziti.alialjaffer.com
   resources:
   - ziticonnections
+  - zitiidentities
   - zitiservices
   verbs:
   - create
@@ -21,6 +49,7 @@ rules:
   - ziti.alialjaffer.com
   resources:
   - ziticonnections/finalizers
+  - zitiidentities/finalizers
   - zitiservices/finalizers
   verbs:
   - update
@@ -28,6 +57,7 @@ rules:
   - ziti.alialjaffer.com
   resources:
   - ziticonnections/status
+  - zitiidentities/status
   - zitiservices/status
   verbs:
   - get

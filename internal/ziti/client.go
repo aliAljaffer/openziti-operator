@@ -30,6 +30,8 @@ const (
 	EdgeRouters               Kind = "edge-routers"
 	Identities                Kind = "identities"
 	Terminators               Kind = "terminators"
+	Enrollments               Kind = "enrollments"
+	AuthPolicies              Kind = "auth-policies"
 )
 
 type Entity map[string]any

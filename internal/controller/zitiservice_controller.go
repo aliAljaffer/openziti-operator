@@ -125,15 +125,18 @@ func jitter(d time.Duration) time.Duration {
 }
 
 func (r *ZitiServiceReconciler) connect(ctx context.Context, svc *zitiv1alpha1.ZitiService) (*zitiv1alpha1.ZitiConnection, ziti.Client, error) {
-	name := svc.Spec.ConnectionRef
+	return connect(ctx, r.Client, r.Clients, svc.Spec.ConnectionRef)
+}
+
+func connect(ctx context.Context, k client.Reader, clients ClientProvider, name string) (*zitiv1alpha1.ZitiConnection, ziti.Client, error) {
 	if name == "" {
 		name = "default"
 	}
 	var conn zitiv1alpha1.ZitiConnection
-	if err := r.Get(ctx, types.NamespacedName{Name: name}, &conn); err != nil {
+	if err := k.Get(ctx, types.NamespacedName{Name: name}, &conn); err != nil {
 		return nil, nil, fmt.Errorf("connection %q: %w", name, err)
 	}
-	zc, err := r.Clients.For(ctx, &conn)
+	zc, err := clients.For(ctx, &conn)
 	return &conn, zc, err
 }
 

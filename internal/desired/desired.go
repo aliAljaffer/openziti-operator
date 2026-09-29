@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
@@ -37,16 +39,20 @@ func (b *Builder) ZitiName() string {
 }
 
 func (b *Builder) Tags() map[string]any {
-	cluster := b.Conn.Spec.ClusterID
+	return ownerTags(b.Conn, "ZitiService", &b.Svc.ObjectMeta)
+}
+
+func ownerTags(conn *zitiv1.ZitiConnection, kind string, m *metav1.ObjectMeta) map[string]any {
+	cluster := conn.Spec.ClusterID
 	if cluster == "" {
 		cluster = "default"
 	}
 	return map[string]any{
 		TagCluster:   cluster,
-		TagKind:      "ZitiService",
-		TagNamespace: b.Svc.Namespace,
-		TagName:      b.Svc.Name,
-		TagUID:       string(b.Svc.UID),
+		TagKind:      kind,
+		TagNamespace: m.Namespace,
+		TagName:      m.Name,
+		TagUID:       string(m.UID),
 	}
 }
 
@@ -151,12 +157,9 @@ func (b *Builder) HostConfig(typeID string) (ziti.Entity, error) {
 }
 
 func (b *Builder) Service(interceptID, hostID string) (ziti.Entity, error) {
-	attrs, err := ScopeRoles(b.scope(), b.Svc.Namespace, hashed(b.Svc.Spec.RoleAttributes))
+	attrs, err := ScopeAttributes(b.scope(), b.Svc.Namespace, b.Svc.Spec.RoleAttributes)
 	if err != nil {
 		return nil, err
-	}
-	for n := range attrs {
-		attrs[n] = strings.TrimPrefix(attrs[n], "#")
 	}
 	e := ziti.Entity{"name": b.ZitiName(), "tags": b.Tags()}
 	e["encryptionRequired"] = true
@@ -166,12 +169,17 @@ func (b *Builder) Service(interceptID, hostID string) (ziti.Entity, error) {
 	return e, nil
 }
 
-func hashed(attrs []string) []string {
-	out := make([]string, len(attrs))
+// ScopeAttributes applies ScopeRoles to plain role attributes, so they match the scoped "#attr" roles in policies.
+func ScopeAttributes(scope zitiv1.RoleScope, namespace string, attrs []string) ([]string, error) {
+	roles := make([]string, len(attrs))
 	for n, a := range attrs {
-		out[n] = "#" + a
+		roles[n] = "#" + a
 	}
-	return out
+	scoped, err := ScopeRoles(scope, namespace, roles)
+	for n := range scoped {
+		scoped[n] = strings.TrimPrefix(scoped[n], "#")
+	}
+	return scoped, err
 }
 
 func (b *Builder) Bind(serviceID string) (ziti.Entity, error) {

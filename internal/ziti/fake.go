@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Fake supports filters of the form `field="v"` and `field in ["a","b"]`, joined by " and ".
@@ -55,7 +56,7 @@ func match(e Entity, filter string) (bool, error) {
 	if filter == "" {
 		return true, nil
 	}
-	for _, t := range strings.Split(filter, " and ") {
+	for t := range strings.SplitSeq(filter, " and ") {
 		m := term.FindStringSubmatch(t)
 		if m == nil {
 			return false, &APIError{Status: http.StatusBadRequest, Code: "INVALID_FILTER", Message: t}
@@ -67,7 +68,7 @@ func match(e Entity, filter string) (bool, error) {
 		if err := json.Unmarshal([]byte(m[3]), &want); err != nil {
 			return false, &APIError{Status: http.StatusBadRequest, Code: "INVALID_FILTER", Message: t}
 		}
-		var got any = e[m[1]]
+		var got = e[m[1]]
 		if k, ok := strings.CutPrefix(m[1], "tags."); ok {
 			got = e.Tags()[k]
 		}
@@ -122,7 +123,23 @@ func (f *Fake) Create(_ context.Context, kind Kind, body Entity) (string, error)
 	}
 	b := clone(body)
 	delete(b, "id")
-	return f.put(kind, "", b), nil
+	if kind == Enrollments {
+		iid, _ := b["identityId"].(string)
+		for _, e := range f.Objects[Enrollments] {
+			if e["identity"] == iid {
+				return "", &APIError{Status: http.StatusBadRequest, Code: "ENROLLMENT_EXISTS", Message: "enrollment of same method exists"}
+			}
+		}
+		b["identity"] = iid
+		f.next++
+		b["jwt"] = fmt.Sprintf("jwt-%d", f.next)
+	}
+	id := f.put(kind, "", b)
+	if _, ott := clone(body)["enrollment"].(map[string]any); ott && kind == Identities {
+		f.next++
+		f.put(Enrollments, "", Entity{"identity": id, "jwt": fmt.Sprintf("jwt-%d", f.next), "expiresAt": time.Now().Add(3 * time.Hour).UTC().Format(time.RFC3339)})
+	}
+	return id, nil
 }
 
 func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) error {

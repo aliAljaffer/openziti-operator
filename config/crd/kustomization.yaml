@@ -4,6 +4,7 @@
 resources:
 - bases/ziti.alialjaffer.com_ziticonnections.yaml
 - bases/ziti.alialjaffer.com_zitiservices.yaml
+- bases/ziti.alialjaffer.com_zitiidentities.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

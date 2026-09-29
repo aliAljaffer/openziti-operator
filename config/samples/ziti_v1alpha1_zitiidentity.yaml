@@ -1,0 +1,8 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: backend
+  namespace: default
+spec:
+  connectionRef: default
+  roleAttributes: [team-a]
