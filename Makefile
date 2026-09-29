@@ -273,6 +273,18 @@ HELM_CHART_DIR ?= charts/chart
 ## Additional arguments to pass to helm commands
 HELM_EXTRA_ARGS ?=
 
+.PHONY: chart-crds
+chart-crds: manifests ## Copy the generated CRDs into the Helm chart.
+	hack/sync-chart-crds.sh
+
+.PHONY: docs
+docs: manifests ## Generate the CRD reference in docs/reference.
+	hack/gen-crd-docs.py
+
+.PHONY: docs-check
+docs-check: ## Fail when docs/reference is out of date.
+	hack/gen-crd-docs.py --check
+
 .PHONY: install-helm
 install-helm: ## Install the latest version of Helm.
 	@command -v $(HELM) >/dev/null 2>&1 || { \

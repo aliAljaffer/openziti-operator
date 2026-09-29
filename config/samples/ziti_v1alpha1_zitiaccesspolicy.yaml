@@ -1,4 +1,4 @@
-apiVersion: ziti.alialjaffer.com/v1alpha1
+apiVersion: alialjaffer.ziti/v1alpha1
 kind: ZitiAccessPolicy
 metadata:
   name: team-a

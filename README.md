@@ -13,12 +13,12 @@ It drives the Ziti Edge Management API. It does not install or run the Ziti cont
 | `ZitiIdentity` | `ztid` | namespace | Creates, adopts, or observes an identity. Enrolls it and renews its certificate. |
 | `ZitiAccessPolicy` | `ztap` | namespace | One Dial policy and an optional edge router policy. |
 
-Annotate a Kubernetes Service with `ziti.alialjaffer.com/expose: "true"` and the operator creates a `ZitiApp` for it.
+Annotate a Kubernetes Service with `alialjaffer.ziti/expose: "true"` and the operator creates a `ZitiApp` for it.
 
 ## First app
 
 ```yaml
-apiVersion: ziti.alialjaffer.com/v1alpha1
+apiVersion: alialjaffer.ziti/v1alpha1
 kind: ZitiApp
 metadata: {name: billing, namespace: team-a}
 spec:
@@ -33,12 +33,19 @@ spec:
 
 `kubectl get ztapp` shows `Hosted`, `Dialable`, `RoutePath`, and `Ready`.
 
+```sh
+kubectl get ziti -A            # every kind in one list (the category "ziti")
+kubectl explain ztapp.spec     # field help, also for nested fields: ztapp.spec.expose.ports
+```
+
 ## More
 
 - [Install](docs/install.md)
 - [First app](docs/first-app.md)
 - [Role scope](docs/role-scope.md)
 - [Existing Ziti resources: Adopt and Observe](docs/existing-resources.md)
+- Resource reference: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md)
+- [Conditions and reasons (troubleshooting)](docs/conditions.md)
 - [Audit a network](docs/audit.md)
 - [Operations: metrics, sweeper, high availability](docs/operations.md)
 - [Uninstall](docs/uninstall.md)

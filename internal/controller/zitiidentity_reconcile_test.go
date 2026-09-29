@@ -589,3 +589,22 @@ func (h hideSecrets) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	}
 	return h.Client.Get(ctx, key, obj, opts...)
 }
+
+func TestIdentityOutsideSecretNamespacesWritesNothing(t *testing.T) {
+	e := setupIdentity(t)
+	e.r.SecretNamespaces = []string{"other"}
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondSynced); c.Reason != "SecretNamespaceNotAllowed" {
+		t.Errorf("synced = %+v", c)
+	}
+	for _, c := range e.zc.Calls {
+		if !strings.HasPrefix(c, "list") {
+			t.Errorf("wrote to Ziti: %s", c)
+		}
+	}
+	e.r.SecretNamespaces = []string{"other", "team-a"}
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondSynced); c.Status != metav1.ConditionTrue {
+		t.Errorf("listed namespace: %+v", c)
+	}
+}

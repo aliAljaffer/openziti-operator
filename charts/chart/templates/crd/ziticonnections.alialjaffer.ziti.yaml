@@ -1,13 +1,18 @@
----
+{{- if .Values.crd.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: ziticonnections.ziti.alialjaffer.com
+  name: ziticonnections.alialjaffer.ziti
 spec:
-  group: ziti.alialjaffer.com
+  group: alialjaffer.ziti
   names:
+    categories:
+    - ziti
     kind: ZitiConnection
     listKind: ZitiConnectionList
     plural: ziticonnections
@@ -102,7 +107,8 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               auth:
-                description: ConnectionAuth sets exactly one of updb and cert.
+                description: auth is how the operator logs in. Set exactly one of
+                  updb and cert.
                 properties:
                   cert:
                     description: |-
@@ -110,10 +116,14 @@ spec:
                       The certificate must belong to a Ziti identity that may call the Edge Management API.
                     properties:
                       secretRef:
+                        description: secretRef names the Secret with the keys tls.crt
+                          and tls.key.
                         properties:
                           name:
+                            description: name of the Secret.
                             type: string
                           namespace:
+                            description: namespace of the Secret.
                             type: string
                         required:
                         - name
@@ -127,10 +137,14 @@ spec:
                       from the Secret.
                     properties:
                       secretRef:
+                        description: secretRef names the Secret with the keys username
+                          and password.
                         properties:
                           name:
+                            description: name of the Secret.
                             type: string
                           namespace:
+                            description: namespace of the Secret.
                             type: string
                         required:
                         - name
@@ -144,14 +158,21 @@ spec:
                 - message: set exactly one of updb and cert
                   rule: has(self.updb) != has(self.cert)
               caBundle:
+                description: caBundle holds the CA certificates that sign the controller
+                  certificate.
                 properties:
                   configMapRef:
+                    description: configMapRef names the ConfigMap that holds the CA
+                      certificates.
                     properties:
                       key:
+                        description: key in the ConfigMap that holds the PEM certificates.
                         type: string
                       name:
+                        description: name of the ConfigMap.
                         type: string
                       namespace:
+                        description: namespace of the ConfigMap.
                         type: string
                     required:
                     - key
@@ -182,6 +203,8 @@ spec:
                 minItems: 1
                 type: array
               managementUrl:
+                description: managementUrl is the Edge Management API URL, for example
+                  https://controller:443/edge/management/v1.
                 pattern: ^https://
                 type: string
               roleScope:
@@ -270,3 +293,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}

@@ -42,9 +42,9 @@ type ZitiConnectionReconciler struct {
 	Clients ClientProvider
 }
 
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonnections,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonnections/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonnections/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets;configmaps,verbs=get;list;watch
 
 func (r *ZitiConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

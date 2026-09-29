@@ -27,3 +27,7 @@ jobs:
         run: |
           go mod tidy
           make test
+
+      - name: Check generated docs
+        run: |
+          make docs-check

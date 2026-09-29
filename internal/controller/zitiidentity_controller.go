@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -67,13 +68,15 @@ type ZitiIdentityReconciler struct {
 	Enroll func(jwt string) ([]byte, error)
 	// Extend renews the client certificate in identity.json. Nil uses ziti.ExtendCert.
 	Extend func(identityJSON []byte, authenticatorID string) ([]byte, error)
+	// SecretNamespaces are the namespaces where the operator may use Secrets. Empty means every namespace.
+	SecretNamespaces []string
 	// RenewBefore overrides the renewal window. Zero means the smaller of 30 days and a third of the certificate lifetime.
 	RenewBefore time.Duration
 }
 
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -94,6 +97,9 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	conn, zc, err := connect(ctx, r.Client, r.Clients, id.Spec.ConnectionRef)
 	if err == nil {
 		err = namespaceAllowed(ctx, r.Client, conn, id.Namespace)
+	}
+	if err == nil && len(r.SecretNamespaces) > 0 && !slices.Contains(r.SecretNamespaces, id.Namespace) && id.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
+		err = &specError{"SecretNamespaceNotAllowed", fmt.Sprintf("the operator may not use Secrets in namespace %q, add it to rbac.secretNamespaces (--secret-namespaces)", id.Namespace)}
 	}
 	if err == nil {
 		err = r.sync(ctx, &id, conn, zc)

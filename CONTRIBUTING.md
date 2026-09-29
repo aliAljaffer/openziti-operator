@@ -33,3 +33,15 @@ docker run -d --name ziti -p 1280:1280 openziti/ziti-cli:2.0.4 \
 
 - Do not add organization names, hostnames, IDs, or addresses to code, tests, or docs.
 - The operator changes only entities that carry its `ziti-operator-uid` tag.
+
+## Generated files
+
+After you change an API type, run:
+
+```sh
+make manifests generate   # CRDs, RBAC, deepcopy
+make chart-crds           # copy the CRDs into the Helm chart
+make docs                 # docs/reference from the CRDs
+```
+
+CI fails when the chart CRDs or `docs/reference` are out of date. Run the chart checks with `hack/test-chart.sh`. Preview the wiki with `hack/gen-wiki.py <dir>`.

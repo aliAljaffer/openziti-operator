@@ -29,28 +29,37 @@ const (
 )
 
 type ConfigMapKeyRef struct {
+	// namespace of the ConfigMap.
 	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Key       string `json:"key"`
+	// name of the ConfigMap.
+	Name string `json:"name"`
+	// key in the ConfigMap that holds the PEM certificates.
+	Key string `json:"key"`
 }
 
 type SecretRef struct {
+	// namespace of the Secret.
 	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
+	// name of the Secret.
+	Name string `json:"name"`
 }
 
+// CABundle points to the certificates that sign the Ziti controller certificate.
 type CABundle struct {
+	// configMapRef names the ConfigMap that holds the CA certificates.
 	ConfigMapRef ConfigMapKeyRef `json:"configMapRef"`
 }
 
 // UpdbAuth reads the keys "username" and "password" from the Secret.
 type UpdbAuth struct {
+	// secretRef names the Secret with the keys username and password.
 	SecretRef SecretRef `json:"secretRef"`
 }
 
 // CertAuth reads the keys "tls.crt" and "tls.key" from the Secret, the format cert-manager writes.
 // The certificate must belong to a Ziti identity that may call the Edge Management API.
 type CertAuth struct {
+	// secretRef names the Secret with the keys tls.crt and tls.key.
 	SecretRef SecretRef `json:"secretRef"`
 }
 
@@ -65,10 +74,15 @@ type ConnectionAuth struct {
 
 // ZitiConnectionSpec defines how the operator reaches a Ziti Edge Management API.
 type ZitiConnectionSpec struct {
+	// managementUrl is the Edge Management API URL, for example https://controller:443/edge/management/v1.
 	// +kubebuilder:validation:Pattern=`^https://`
-	ManagementURL string         `json:"managementUrl"`
-	CABundle      CABundle       `json:"caBundle"`
-	Auth          ConnectionAuth `json:"auth"`
+	ManagementURL string `json:"managementUrl"`
+
+	// caBundle holds the CA certificates that sign the controller certificate.
+	CABundle CABundle `json:"caBundle"`
+
+	// auth is how the operator logs in. Set exactly one of updb and cert.
+	Auth ConnectionAuth `json:"auth"`
 
 	// clusterId isolates operators that share one Ziti network, for example staging and production.
 	// +kubebuilder:default=default
@@ -108,7 +122,7 @@ type ZitiConnectionStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=ztconn
+// +kubebuilder:resource:scope=Cluster,shortName=ztconn,categories=ziti
 // +kubebuilder:printcolumn:name="URL",type=string,JSONPath=".spec.managementUrl"
 // +kubebuilder:printcolumn:name="Connected",type=string,JSONPath=".status.conditions[?(@.type=='Connected')].status"
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".status.controllerVersion"

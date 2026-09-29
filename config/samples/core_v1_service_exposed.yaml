@@ -5,8 +5,8 @@ metadata:
   name: web
   namespace: default
   annotations:
-    ziti.alialjaffer.com/expose: "true"
-    ziti.alialjaffer.com/allow-groups: team-a
+    alialjaffer.ziti/expose: "true"
+    alialjaffer.ziti/allow-groups: team-a
 spec:
   selector: {app: web}
   ports:

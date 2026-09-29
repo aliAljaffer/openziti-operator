@@ -44,9 +44,9 @@ type ZitiAccessPolicyReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiaccesspolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiaccesspolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiaccesspolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiaccesspolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiaccesspolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiaccesspolicies/finalizers,verbs=update
 
 func (r *ZitiAccessPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var ap zitiv1alpha1.ZitiAccessPolicy

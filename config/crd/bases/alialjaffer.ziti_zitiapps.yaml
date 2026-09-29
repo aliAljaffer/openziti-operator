@@ -1,16 +1,15 @@
-{{- if .Values.crd.enabled }}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    {{- if .Values.crd.keep }}
-    "helm.sh/resource-policy": keep
-    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiapps.ziti.alialjaffer.com
+  name: zitiapps.alialjaffer.ziti
 spec:
-  group: ziti.alialjaffer.com
+  group: alialjaffer.ziti
   names:
+    categories:
+    - ziti
     kind: ZitiApp
     listKind: ZitiAppList
     plural: zitiapps
@@ -89,9 +88,14 @@ spec:
                 type: object
               connectionRef:
                 default: default
+                description: connectionRef is the name of the ZitiConnection to use.
+                  It defaults to "default".
                 type: string
               deletionPolicy:
                 default: Delete
+                description: |-
+                  deletionPolicy Delete removes the Ziti entities when this resource is deleted.
+                  Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
                 enum:
                 - Delete
                 - Orphan
@@ -104,7 +108,7 @@ spec:
                   type: string
                 type: array
               expose:
-                description: expose, targets, and allow are ignored or optional when
+                description: expose is how clients reach the app. It is required unless
                   managementPolicy is Observe.
                 properties:
                   addresses:
@@ -320,4 +324,3 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}

@@ -5,7 +5,7 @@
 1. Apply this file.
 
    ```yaml
-   apiVersion: ziti.alialjaffer.com/v1alpha1
+   apiVersion: alialjaffer.ziti/v1alpha1
    kind: ZitiApp
    metadata: {name: billing, namespace: team-a}
    spec:
@@ -28,6 +28,8 @@
    ```sh
    kubectl -n team-a get ztapp billing -o wide
    ```
+
+Field help is built in: `kubectl explain ztapp.spec.targets`. The full field list is in the [ZitiApp reference](reference/ZitiApp.md).
 
 ## Keys
 
@@ -67,11 +69,11 @@ Add annotations to the Service. The operator creates a `ZitiApp` that the Servic
 
 | Annotation | Meaning |
 |---|---|
-| `ziti.alialjaffer.com/expose` | `"true"` to publish. Required. |
-| `ziti.alialjaffer.com/allow-groups`, `allow-identities` | Who may connect. Comma separated. |
-| `ziti.alialjaffer.com/addresses` | Default `<service>.<namespace>.svc`. |
-| `ziti.alialjaffer.com/ports` | Default: the Service ports. Ranges allowed. |
-| `ziti.alialjaffer.com/protocols` | Default: from the Service ports. |
-| `ziti.alialjaffer.com/name`, `connection`, `member-of`, `entry-routers`, `hosted-by` | Same as the `ZitiApp` keys. |
+| `alialjaffer.ziti/expose` | `"true"` to publish. Required. |
+| `alialjaffer.ziti/allow-groups`, `allow-identities` | Who may connect. Comma separated. |
+| `alialjaffer.ziti/addresses` | Default `<service>.<namespace>.svc`. |
+| `alialjaffer.ziti/ports` | Default: the Service ports. Ranges allowed. |
+| `alialjaffer.ziti/protocols` | Default: from the Service ports. |
+| `alialjaffer.ziti/name`, `connection`, `member-of`, `entry-routers`, `hosted-by` | Same as the `ZitiApp` keys. |
 
 Deleting the Service deletes the app and every Ziti entity it created.

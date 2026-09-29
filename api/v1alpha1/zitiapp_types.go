@@ -99,6 +99,7 @@ type Allow struct {
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.expose) && has(self.targets) && size(self.targets) > 0)",message="expose and targets are required unless managementPolicy is Observe"
 type ZitiAppSpec struct {
+	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
@@ -116,12 +117,14 @@ type ZitiAppSpec struct {
 	// +optional
 	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
 
+	// deletionPolicy Delete removes the Ziti entities when this resource is deleted.
+	// Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
 	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
-	// expose, targets, and allow are ignored or optional when managementPolicy is Observe.
+	// expose is how clients reach the app. It is required unless managementPolicy is Observe.
 	// +optional
 	Expose Expose `json:"expose,omitzero"`
 
@@ -182,7 +185,7 @@ type ZitiAppStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=ztapp
+// +kubebuilder:resource:shortName=ztapp,categories=ziti
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Hosted",type=string,JSONPath=".status.conditions[?(@.type=='Hosted')].status"

@@ -25,6 +25,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode == oldSelf.enrollmentMode",message="enrollmentMode is immutable"
 type ZitiIdentitySpec struct {
+	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
@@ -98,7 +99,7 @@ type ZitiIdentityStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=ztid
+// +kubebuilder:resource:shortName=ztid,categories=ziti
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"

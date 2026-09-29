@@ -230,10 +230,11 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.ZitiIdentityReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Clients:  clients,
-		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Clients:          clients,
+		Recorder:         mgr.GetEventRecorderFor("ziti-operator"),
+		SecretNamespaces: splitList(secretNamespaces),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitiidentity")
 		os.Exit(1)
@@ -285,6 +286,16 @@ func main() {
 }
 
 // secretCache limits the Secret informer to labeled Secrets, and to the given namespaces when set.
+func splitList(v string) []string {
+	var out []string
+	for _, s := range strings.Split(v, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func secretCache(namespaces string) cache.ByObject {
 	byObject := cache.ByObject{Label: labels.SelectorFromSet(labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue})}
 	for _, ns := range strings.Split(namespaces, ",") {

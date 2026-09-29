@@ -3,7 +3,7 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.16.0
-domain: alialjaffer.com
+domain: ziti
 layout:
 - go.kubebuilder.io/v4
 plugins:
@@ -16,8 +16,8 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: alialjaffer.com
-  group: ziti
+  domain: ziti
+  group: alialjaffer
   kind: ZitiConnection
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -25,8 +25,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: alialjaffer.com
-  group: ziti
+  domain: ziti
+  group: alialjaffer
   kind: ZitiApp
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -34,8 +34,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: alialjaffer.com
-  group: ziti
+  domain: ziti
+  group: alialjaffer
   kind: ZitiIdentity
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -43,8 +43,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: alialjaffer.com
-  group: ziti
+  domain: ziti
+  group: alialjaffer
   kind: ZitiAccessPolicy
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1

@@ -24,6 +24,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 type ZitiAccessPolicySpec struct {
+	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
@@ -50,6 +51,8 @@ type ZitiAccessPolicySpec struct {
 	// +optional
 	EdgeRouters []string `json:"edgeRouters,omitempty"`
 
+	// deletionPolicy Delete removes the Ziti entities when this resource is deleted.
+	// Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
 	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
@@ -80,7 +83,7 @@ type ZitiAccessPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=ztap
+// +kubebuilder:resource:shortName=ztap,categories=ziti
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Identities",type=integer,JSONPath=".status.identities"
 // +kubebuilder:printcolumn:name="Services",type=integer,JSONPath=".status.services"

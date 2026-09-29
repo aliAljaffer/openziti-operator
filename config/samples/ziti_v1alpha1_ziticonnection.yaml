@@ -1,4 +1,4 @@
-apiVersion: ziti.alialjaffer.com/v1alpha1
+apiVersion: alialjaffer.ziti/v1alpha1
 kind: ZitiConnection
 metadata:
   name: default
