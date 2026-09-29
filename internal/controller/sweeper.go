@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,8 +28,8 @@ const (
 
 // sweepKinds is every kind the operator creates. Order matters for delete: policies before services before configs.
 var sweepKinds = []ziti.Kind{
-	ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies,
-	ziti.Services, ziti.Configs, ziti.Identities,
+	ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.AuthPolicies,
+	ziti.Services, ziti.Configs, ziti.ExternalJWTSigners, ziti.CertificateAuthorities, ziti.Identities,
 }
 
 // OrphanSweeper finds Ziti entities that carry this cluster's tag but belong to a resource that no longer exists.
@@ -135,28 +136,30 @@ func patchTags(ctx context.Context, zc ziti.Client, kind ziti.Kind, e ziti.Entit
 	return zc.Patch(ctx, kind, e.ID(), ziti.Entity{"tags": tags})
 }
 
+// ownerLists has one empty list per kind that owns Ziti entities. Add every new owner kind here, or the sweeper
+// would take its entities for orphans.
+func ownerLists() []client.ObjectList {
+	return []client.ObjectList{
+		&zitiv1.ZitiAppList{}, &zitiv1.ZitiIdentityList{}, &zitiv1.ZitiAccessPolicyList{},
+		&zitiv1.ZitiJwtSignerList{}, &zitiv1.ZitiCAList{},
+		&zitiv1.ZitiConfigList{}, &zitiv1.ZitiServiceList{}, &zitiv1.ZitiServicePolicyList{},
+		&zitiv1.ZitiEdgeRouterPolicyList{}, &zitiv1.ZitiServiceEdgeRouterPolicyList{},
+	}
+}
+
 func (s *OrphanSweeper) liveOwners(ctx context.Context) (map[types.UID]bool, error) {
 	live := map[types.UID]bool{}
-	var apps zitiv1.ZitiAppList
-	if err := s.Reader.List(ctx, &apps); err != nil {
-		return nil, err
-	}
-	for _, o := range apps.Items {
-		live[o.UID] = true
-	}
-	var ids zitiv1.ZitiIdentityList
-	if err := s.Reader.List(ctx, &ids); err != nil {
-		return nil, err
-	}
-	for _, o := range ids.Items {
-		live[o.UID] = true
-	}
-	var aps zitiv1.ZitiAccessPolicyList
-	if err := s.Reader.List(ctx, &aps); err != nil {
-		return nil, err
-	}
-	for _, o := range aps.Items {
-		live[o.UID] = true
+	for _, list := range ownerLists() {
+		if err := s.Reader.List(ctx, list); err != nil {
+			return nil, err
+		}
+		items, err := apimeta.ExtractList(list)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			live[item.(client.Object).GetUID()] = true
+		}
 	}
 	return live, nil
 }

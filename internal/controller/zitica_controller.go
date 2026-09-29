@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -40,6 +41,9 @@ import (
 )
 
 const CondVerified = "Verified"
+
+// caResync is short because the operator cannot watch the Secret of a cert-manager issuer. A rotated CA is found within this time.
+const caResync = 2 * time.Minute
 
 var caKinds = []ziti.Kind{ziti.CertificateAuthorities}
 
@@ -80,7 +84,7 @@ func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	var next ctrl.Result
 	switch {
 	case err == nil && ca.Status.Verified:
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(caResync)
 	case err == nil:
 		next.RequeueAfter = jitter(pendingRecheck)
 	case errors.As(err, &se):

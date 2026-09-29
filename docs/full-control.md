@@ -1,0 +1,120 @@
+# Full control: one resource per Ziti object
+
+`ZitiApp` publishes an app and creates everything it needs. Use the one-to-one kinds when you know OpenZiti and want to manage each object yourself.
+
+| Kind | Short name | Ziti object |
+|---|---|---|
+| `ZitiConfig` | `ztcfg` | config |
+| `ZitiService` | `ztsvc` | service |
+| `ZitiServicePolicy` | `ztsp` | service policy (Dial or Bind) |
+| `ZitiEdgeRouterPolicy` | `zterp` | edge router policy |
+| `ZitiServiceEdgeRouterPolicy` | `ztserp` | service edge router policy |
+
+The keys are the Ziti keys, in camelCase. There are no derived objects and no defaults beyond Ziti's own. Every kind is namespaced.
+
+## Names
+
+The name in Ziti is `zitiName`, or `<namespace>.<name>` without it. `zitiName`, `deletionPolicy`, and the `type` of a config or a service policy cannot change after creation. If an object with that name already exists in Ziti and this operator does not own it, the resource shows `NameConflict` and nothing is written.
+
+## Roles
+
+Role fields (`identityRoles`, `serviceRoles`, `edgeRouterRoles`, `postureCheckRoles`) take three forms:
+
+| Form | Meaning | Namespaced scope | Global scope |
+|---|---|---|---|
+| `#attribute` | every entity with that role attribute | becomes `#<namespace>.attribute` | passes through |
+| `#all` | every entity | rejected | allowed |
+| `@name` | one entity, by name | rejected | the operator looks up the ID |
+
+Ziti wants IDs in `@` roles. You write the name and the operator resolves it on every sync, so a recreated identity keeps working. See [role scope](role-scope.md).
+
+`roleAttributes` on a `ZitiService` follow the same scope. `configs` on a `ZitiService` are names of Ziti configs, for example the `zitiName` of a `ZitiConfig`.
+
+## Order does not matter
+
+Apply the resources in any order. A resource that names an object that does not exist yet shows `Ready=False` with reason `TargetNotFound` and is checked again after 30 seconds. It becomes ready when the object appears.
+
+## Example: an app with your own policies
+
+```yaml
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiConfig
+metadata: {name: web-intercept, namespace: team-a}
+spec:
+  zitiName: web-intercept
+  type: intercept.v1
+  data:
+    protocols: [tcp]
+    addresses: [web.example.com]
+    portRanges: [{low: 80, high: 80}]
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiConfig
+metadata: {name: web-host, namespace: team-a}
+spec:
+  zitiName: web-host
+  type: host.v2
+  data:
+    terminators:
+      - {address: 10.0.0.5, port: 8443, protocol: tcp}
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiService
+metadata: {name: web, namespace: team-a}
+spec:
+  zitiName: web.example.com
+  configs: [web-intercept, web-host]
+  roleAttributes: [web]
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiServicePolicy
+metadata: {name: web-bind, namespace: team-a}
+spec:
+  zitiName: web-bind
+  type: Bind
+  identityRoles: ["@router-a"]
+  serviceRoles: ["@web.example.com"]
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiServicePolicy
+metadata: {name: web-dial, namespace: team-a}
+spec:
+  zitiName: web-dial
+  type: Dial
+  identityRoles: ["#staff"]
+  serviceRoles: ["#web"]
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiServiceEdgeRouterPolicy
+metadata: {name: web-serp, namespace: team-a}
+spec:
+  zitiName: web-serp
+  serviceRoles: ["#web"]
+  edgeRouterRoles: ["@router-a"]
+---
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiEdgeRouterPolicy
+metadata: {name: web-erp, namespace: team-a}
+spec:
+  zitiName: web-erp
+  identityRoles: ["#staff"]
+  edgeRouterRoles: ["@router-a"]
+```
+
+The `@router-a` role selects the identity of the router that hosts the service. A router in tunnel mode has an identity with the same name as the router. The bind policy and the service edge router policy must both include the hosting router, or the service gets no terminator.
+
+Everything with `@` roles needs `roleScope: Global` on the connection. With `Namespaced` scope, use `#attribute` roles.
+
+## Terminators
+
+There is no `ZitiTerminator`. The hosting router creates the terminators from the host config, one for each entry in `terminators` of a `host.v2` config. A terminator has no name that the operator could own, so it is not a resource.
+
+## Mixing with ZitiApp
+
+The kinds can live side by side. An entity is owned by one resource only. If a `ZitiApp` and a `ZitiService` want the same Ziti name, the second one shows `NameConflict`.
+
+## Limits
+
+- No `Adopt` or `Observe`. To watch an existing service, use a `ZitiApp` with `managementPolicy: Observe`.
+- Deleting a resource deletes the Ziti object, unless `deletionPolicy: Orphan`.
+- Tested: the whole example above, applied in one go, created a service that a client reached through Ziti.

@@ -99,7 +99,7 @@ Sign a certificate with that common name using the CA key, and send it as plain 
 ## Renewal
 
 - Workload certificates: cert-manager renews them. Nothing else happens, because the common name stays the same.
-- CA certificate: Ziti cannot change the certificate of a CA. When the certificate in the Secret changes, the operator deletes the CA in Ziti, creates it again, and verifies it again. `signWithSecretKey` makes this automatic. Without it, the CA is `Ready=False` until you verify it by hand. Identities matched by `externalId` keep working.
+- CA certificate: Ziti cannot change the certificate of a CA. When the certificate in the Secret changes, the operator finds it within about two minutes, deletes the CA in Ziti, creates it again, and verifies it again. `signWithSecretKey` makes this automatic. Without it, the CA is `Ready=False` until you verify it by hand. Identities matched by `externalId` keep working.
 
 ## Options
 
@@ -119,6 +119,6 @@ Sign a certificate with that common name using the CA key, and send it as plain 
 
 ## Limits
 
-- Tested: the operator registers and verifies the CA, and the Ziti client API accepts a certificate of the CA for the matching identity and rejects a name without an identity. A fresh certificate with the same name logs in each time.
+- Tested with cert-manager in a cluster: the operator registers and verifies the CA. A certificate that cert-manager issued logs in as the identity, and a request without a certificate is rejected. A reissued workload certificate (new key) logs in with no operator action. After cert-manager rotates the CA, the operator replaces the CA in Ziti, verifies it again, and a certificate from the new CA logs in.
 - Not tested: a Ziti tunneler or SDK that uses the certificate and key directly. Check that your client supports certificate login with an external CA.
 - The operator does not create the cert-manager objects for you.

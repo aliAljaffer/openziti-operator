@@ -12,6 +12,7 @@ It drives the Ziti Edge Management API. It does not install or run the Ziti cont
 | `ZitiApp` | `ztapp` | namespace | Publishes an app: configs, service, bind, router and dial policies. |
 | `ZitiIdentity` | `ztid` | namespace | Creates, adopts, or observes an identity. Enrolls it and renews its certificate. |
 | `ZitiAccessPolicy` | `ztap` | namespace | One Dial policy and an optional edge router policy. |
+| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy` | `ztcfg`, `ztsvc`, `ztsp`, `zterp`, `ztserp` | namespace | One resource per Ziti object, for full control. See [Full control](docs/full-control.md). |
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. Lets service accounts log in. |
 
@@ -48,6 +49,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields: ztapp.spec.
 - [Existing Ziti resources: Adopt and Observe](docs/existing-resources.md)
 - [Log in with a service account token](docs/service-account-tokens.md)
 - [Use a cert-manager CA](docs/cert-manager.md)
+- [Full control: one resource per Ziti object](docs/full-control.md)
 - Resource reference: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiCA](docs/reference/ZitiCA.md)
 - [Conditions and reasons (troubleshooting)](docs/conditions.md)
 - [Audit a network](docs/audit.md)

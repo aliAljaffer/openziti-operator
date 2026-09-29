@@ -24,6 +24,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
 | `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
 | | `Ready` | Same as `Synced`. |
+| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy` | `Synced` | The Ziti object exists and matches the spec. |
+| | `Ready` | Same as `Synced`. |
 | `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
 | | `Verified` | Ziti accepted the proof that you control the CA. |
 | | `Ready` | Same as `Verified`. |
@@ -40,6 +42,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 |---|---|---|
 | `InvalidSpec` | The operator rejected a value. Examples: a malformed port range, a router outside `hostingRouters`, `#all` or `@id` roles under `Namespaced`, an unknown auth policy. | Read the message and fix the spec. Nothing was created. |
 | `NameConflict` | An entity with the wanted name exists in Ziti and this operator does not own it. | Set another `zitiName`. Or use `managementPolicy: Adopt` (identities) or `Observe`. Or remove the old entity. |
+| `TargetNotFound` | A one-to-one kind names a Ziti object that does not exist yet: a role target (`@name`), or a config of a `ZitiService`. | Create it. The operator checks again after 30 seconds. |
 | `NotFound` | `Adopt` or `Observe` found no entity named `zitiName`. | Fix `zitiName`, or create the entity in Ziti. |
 | `ZitiRejected` | Ziti answered with a 4xx error. The message has the Ziti error. | Fix the spec. The operator retries in about 10 minutes. |
 | `Error` | A temporary error such as a network failure or a 5xx answer. | None. The operator retries with backoff. |

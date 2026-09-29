@@ -11,7 +11,8 @@ description: Use when you add a kind, add or change a spec or status field, chan
 2. New kind: run `kubebuilder create api --group alialjaffer --version v1alpha1 --kind <Kind> --resource --controller --namespaced`. Delete the stub test it makes.
 3. Add markers: `+kubebuilder:default`, `Enum`, `Minimum`, `MaxLength`, printer columns, `resource:shortName=...,categories=ziti`.
 4. Put mapping logic in `internal/desired/` as a pure function with a table test. Keep the reconciler thin.
-5. Reconcile with `entitySet` (create, update, prune, release) for entities the CR owns.
+5. Reconcile with `entitySet` (create, update, prune, release) for entities the CR owns. A kind that maps to exactly one Ziti object needs only a builder: add it to `internal/controller/entity_controllers.go` and the shared `entityReconciler` does the rest.
+5a. **Register every new owner kind in the orphan sweeper** (`ownerLists` and `sweepKinds` in `internal/controller/sweeper.go`) and in its test. Without it, `--orphan-policy=delete` deletes the live entities of the new kind.
 6. Set conditions with `setCond` and `markFailed`. Use a `specError{reason, message}` for a spec problem. It sets the status and retries slowly.
 7. Run `make manifests generate chart-sync docs`. Commit the generated files.
 8. Add a sample to `config/samples/` and validate it: `kubectl apply --dry-run=server -k config/samples`.

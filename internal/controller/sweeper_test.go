@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -25,7 +26,19 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	}
 	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: zitiv1.ZitiConnectionSpec{ClusterID: "prod"}}
 	app := &zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "n", UID: "live-uid"}}
-	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(conn, app).Build()
+	// One live owner of every other kind. Their entities must never count as orphans.
+	owners := []client.Object{
+		&zitiv1.ZitiIdentity{ObjectMeta: metav1.ObjectMeta{Name: "i", Namespace: "n", UID: "live-identity"}},
+		&zitiv1.ZitiAccessPolicy{ObjectMeta: metav1.ObjectMeta{Name: "ap", Namespace: "n", UID: "live-accesspolicy"}},
+		&zitiv1.ZitiJwtSigner{ObjectMeta: metav1.ObjectMeta{Name: "sg", UID: "live-signer"}},
+		&zitiv1.ZitiCA{ObjectMeta: metav1.ObjectMeta{Name: "ca", UID: "live-ca"}},
+		&zitiv1.ZitiConfig{ObjectMeta: metav1.ObjectMeta{Name: "cfg", Namespace: "n", UID: "live-config"}},
+		&zitiv1.ZitiService{ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "n", UID: "live-service"}},
+		&zitiv1.ZitiServicePolicy{ObjectMeta: metav1.ObjectMeta{Name: "sp", Namespace: "n", UID: "live-servicepolicy"}},
+		&zitiv1.ZitiEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "erp", Namespace: "n", UID: "live-erp"}},
+		&zitiv1.ZitiServiceEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "serp", Namespace: "n", UID: "live-serp"}},
+	}
+	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(owners, conn, app)...).Build()
 	zc := ziti.NewFake()
 
 	tags := func(cluster, uid string, extra ...string) map[string]any {
@@ -41,6 +54,13 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	zc.Put(ziti.Identities, ziti.Entity{"id": "adopted", "name": "adopted", "tags": tags("prod", "dead-uid", desired.TagAdopted, "true", "owner", "human")})
 	zc.Put(ziti.Services, ziti.Entity{"id": "other-cluster", "name": "other-cluster", "tags": tags("staging", "dead-uid")})
 	zc.Put(ziti.Services, ziti.Entity{"id": "hand-made", "name": "hand-made", "tags": map[string]any{"owner": "human"}})
+	for kind, uid := range map[ziti.Kind]string{
+		ziti.ExternalJWTSigners: "live-signer", ziti.AuthPolicies: "live-signer", ziti.CertificateAuthorities: "live-ca",
+		ziti.Configs: "live-config", ziti.ServicePolicies: "live-servicepolicy", ziti.EdgeRouterPolicies: "live-erp",
+		ziti.ServiceEdgeRouterPolicies: "live-serp", ziti.Identities: "live-identity",
+	} {
+		zc.Put(kind, ziti.Entity{"id": "live-" + string(kind), "name": "live-" + string(kind), "tags": tags("prod", uid)})
+	}
 
 	return &OrphanSweeper{Reader: k, Clients: staticProvider{zc}, Policy: policy}, zc
 }
@@ -70,6 +90,12 @@ func TestSweeperDeleteRemovesOrphansOnly(t *testing.T) {
 	s, zc := sweepSetup(t, OrphanDelete)
 	if err := s.SweepAll(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+	for _, kind := range []ziti.Kind{ziti.ExternalJWTSigners, ziti.AuthPolicies, ziti.CertificateAuthorities, ziti.Configs, ziti.ServicePolicies,
+		ziti.EdgeRouterPolicies, ziti.ServiceEdgeRouterPolicies, ziti.Identities} {
+		if _, ok := zc.Objects[kind]["live-"+string(kind)]; !ok {
+			t.Errorf("the live %s entity was deleted", kind)
+		}
 	}
 	for _, id := range []string{"live", "other-cluster", "hand-made"} {
 		if _, ok := zc.Objects[ziti.Services][id]; !ok {
