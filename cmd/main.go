@@ -62,6 +62,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var zitiRequestsPerSecond float64
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -86,6 +87,7 @@ func main() {
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
+	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10, "Rate limit for calls to the Ziti Edge Management API.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -182,16 +184,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	clients := &controller.SecretClientProvider{Reader: mgr.GetAPIReader(), RequestsPerSecond: zitiRequestsPerSecond}
 	if err := (&controller.ZitiConnectionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Clients: clients,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "ziticonnection")
 		os.Exit(1)
 	}
 	if err := (&controller.ZitiServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Clients:  clients,
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitiservice")
 		os.Exit(1)

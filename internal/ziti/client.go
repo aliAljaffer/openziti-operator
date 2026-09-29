@@ -43,6 +43,7 @@ func (e Entity) Tags() map[string]any {
 }
 
 type Client interface {
+	Version(ctx context.Context) (string, error)
 	List(ctx context.Context, kind Kind, filter string) ([]Entity, error)
 	Create(ctx context.Context, kind Kind, body Entity) (string, error)
 	Update(ctx context.Context, kind Kind, id string, body Entity) error
@@ -244,4 +245,18 @@ func (c *REST) Delete(ctx context.Context, kind Kind, id string) error {
 		return nil
 	}
 	return err
+}
+
+func (c *REST) Version(ctx context.Context) (string, error) {
+	env, err := c.do(ctx, http.MethodGet, "version", nil, nil)
+	if err != nil {
+		return "", err
+	}
+	var d struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(env.Data, &d); err != nil {
+		return "", err
+	}
+	return d.Version, nil
 }

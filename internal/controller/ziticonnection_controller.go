@@ -18,43 +18,66 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 )
 
-// ZitiConnectionReconciler reconciles a ZitiConnection object
+const (
+	ConditionConnected = "Connected"
+	connectionResync   = 10 * time.Minute
+	connectionRetry    = time.Minute
+)
+
 type ZitiConnectionReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme  *runtime.Scheme
+	Clients ClientProvider
 }
 
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets;configmaps,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ZitiConnection object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.25.0/pkg/reconcile
 func (r *ZitiConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	var conn zitiv1alpha1.ZitiConnection
+	if err := r.Get(ctx, req.NamespacedName, &conn); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	before := conn.Status.DeepCopy()
 
-	// TODO(user): your logic here
+	cond := metav1.Condition{Type: ConditionConnected, ObservedGeneration: conn.Generation}
+	after := connectionResync
+	zc, err := r.Clients.For(ctx, &conn)
+	var version string
+	if err == nil {
+		version, err = zc.Version(ctx)
+	}
+	if err != nil {
+		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "ConnectionFailed", err.Error()
+		after = connectionRetry
+	} else {
+		cond.Status, cond.Reason = metav1.ConditionTrue, "Connected"
+		conn.Status.ControllerVersion = version
+	}
+	meta.SetStatusCondition(&conn.Status.Conditions, cond)
 
-	return ctrl.Result{}, nil
+	if !equality.Semantic.DeepEqual(before, &conn.Status) {
+		if err := r.Status().Update(ctx, &conn); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{RequeueAfter: after}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *ZitiConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiConnection{}).

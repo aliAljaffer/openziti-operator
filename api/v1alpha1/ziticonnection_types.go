@@ -29,8 +29,9 @@ const (
 )
 
 type ConfigMapKeyRef struct {
-	Name string `json:"name"`
-	Key  string `json:"key"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Key       string `json:"key"`
 }
 
 type SecretRef struct {

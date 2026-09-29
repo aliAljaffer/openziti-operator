@@ -22,7 +22,7 @@ func (a *stubAuth) Authenticate(*url.URL) (*rest_model.CurrentAPISessionDetail, 
 	tok := "t" + string(rune('0'+a.logins.Add(1)))
 	return &rest_model.CurrentAPISessionDetail{APISessionDetail: rest_model.APISessionDetail{Token: &tok}}, nil
 }
-func (a *stubAuth) BuildHttpClient() (*http.Client, error)         { return a.hc, nil }
+func (a *stubAuth) BuildHttpClient() (*http.Client, error)           { return a.hc, nil }
 func (a *stubAuth) SetInfo(*rest_model.EnvInfo, *rest_model.SdkInfo) {}
 
 const identityJSON = `{"data":[{"id":"i1","name":"u","enrollment":{"ott":{"jwt":"SECRET-JWT","token":"SECRET-TOKEN","expiresAt":"2030-01-01T00:00:00Z"}}}],"meta":{"pagination":{"totalCount":1}}}`

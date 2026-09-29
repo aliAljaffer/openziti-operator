@@ -15,10 +15,11 @@ import (
 // Fake supports filters of the form `field="v"` and `field in ["a","b"]`, joined by " and ".
 // Fields are top-level keys or tags.<key>.
 type Fake struct {
-	mu      sync.Mutex
-	next    int
-	Objects map[Kind]map[string]Entity
-	Calls   []string
+	VersionString string
+	mu            sync.Mutex
+	next          int
+	Objects       map[Kind]map[string]Entity
+	Calls         []string
 }
 
 var _ Client = (*Fake)(nil)
@@ -157,3 +158,5 @@ func mustJSON(v any) []byte {
 	b, _ := json.Marshal(v)
 	return b
 }
+
+func (f *Fake) Version(context.Context) (string, error) { return f.VersionString, nil }
