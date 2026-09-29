@@ -97,7 +97,11 @@ type ZitiConnectionStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=ztconn
+// +kubebuilder:printcolumn:name="URL",type=string,JSONPath=".spec.managementUrl"
+// +kubebuilder:printcolumn:name="Connected",type=string,JSONPath=".status.conditions[?(@.type=='Connected')].status"
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".status.controllerVersion"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // ZitiConnection is the Schema for the ziticonnections API
 type ZitiConnection struct {

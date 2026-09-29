@@ -143,6 +143,14 @@ type ZitiServiceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=ztsvc
+// +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
+// +kubebuilder:printcolumn:name="Hosted",type=string,JSONPath=".status.conditions[?(@.type=='Hosted')].status"
+// +kubebuilder:printcolumn:name="Dialable",type=string,JSONPath=".status.conditions[?(@.type=='Dialable')].status"
+// +kubebuilder:printcolumn:name="RoutePath",type=string,JSONPath=".status.conditions[?(@.type=='RoutePath')].status"
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
+// +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // ZitiService is the Schema for the zitiservices API
 type ZitiService struct {

@@ -11,10 +11,25 @@ spec:
     kind: ZitiConnection
     listKind: ZitiConnectionList
     plural: ziticonnections
+    shortNames:
+    - ztconn
     singular: ziticonnection
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.managementUrl
+      name: URL
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Connected')].status
+      name: Connected
+      type: string
+    - jsonPath: .status.controllerVersion
+      name: Version
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ZitiConnection is the Schema for the ziticonnections API
