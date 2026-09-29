@@ -54,9 +54,14 @@ rules:
   - zitiaccesspolicies
   - zitiapps
   - ziticas
+  - ziticonfigs
   - ziticonnections
+  - zitiedgerouterpolicies
   - zitiidentities
   - zitijwtsigners
+  - zitiserviceedgerouterpolicies
+  - zitiservicepolicies
+  - zitiservices
   verbs:
   - create
   - delete
@@ -71,9 +76,14 @@ rules:
   - zitiaccesspolicies/finalizers
   - zitiapps/finalizers
   - ziticas/finalizers
+  - ziticonfigs/finalizers
   - ziticonnections/finalizers
+  - zitiedgerouterpolicies/finalizers
   - zitiidentities/finalizers
   - zitijwtsigners/finalizers
+  - zitiserviceedgerouterpolicies/finalizers
+  - zitiservicepolicies/finalizers
+  - zitiservices/finalizers
   verbs:
   - update
 - apiGroups:
@@ -82,9 +92,14 @@ rules:
   - zitiaccesspolicies/status
   - zitiapps/status
   - ziticas/status
+  - ziticonfigs/status
   - ziticonnections/status
+  - zitiedgerouterpolicies/status
   - zitiidentities/status
   - zitijwtsigners/status
+  - zitiserviceedgerouterpolicies/status
+  - zitiservicepolicies/status
+  - zitiservices/status
   verbs:
   - get
   - patch

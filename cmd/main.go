@@ -294,6 +294,10 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitica")
 		os.Exit(1)
 	}
+	if err := controller.SetupEntityControllers(mgr, clients); err != nil {
+		setupLog.Error(err, "Failed to create the controllers of the one-to-one kinds")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

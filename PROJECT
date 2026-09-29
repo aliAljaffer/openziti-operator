@@ -70,4 +70,44 @@ resources:
   kind: ZitiCA
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiConfig
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiService
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiServicePolicy
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiEdgeRouterPolicy
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiServiceEdgeRouterPolicy
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

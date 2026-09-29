@@ -22,6 +22,21 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the ziti-operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- zitiserviceedgerouterpolicy_admin_role.yaml
+- zitiserviceedgerouterpolicy_editor_role.yaml
+- zitiserviceedgerouterpolicy_viewer_role.yaml
+- zitiedgerouterpolicy_admin_role.yaml
+- zitiedgerouterpolicy_editor_role.yaml
+- zitiedgerouterpolicy_viewer_role.yaml
+- zitiservicepolicy_admin_role.yaml
+- zitiservicepolicy_editor_role.yaml
+- zitiservicepolicy_viewer_role.yaml
+- zitiservice_admin_role.yaml
+- zitiservice_editor_role.yaml
+- zitiservice_viewer_role.yaml
+- ziticonfig_admin_role.yaml
+- ziticonfig_editor_role.yaml
+- ziticonfig_viewer_role.yaml
 - zitica_admin_role.yaml
 - zitica_editor_role.yaml
 - zitica_viewer_role.yaml

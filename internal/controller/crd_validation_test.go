@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -336,4 +337,84 @@ var _ = Describe("ZitiCA", func() {
 		Entry("unknown parser", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Parser = "CUT" }, "Unsupported value"),
 		Entry("negative index", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Index = -1 }, "greater than or equal to 0"),
 	)
+})
+
+var _ = Describe("one-to-one kinds", func() {
+	meta := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name, Namespace: "default"} }
+
+	It("ZitiConfig keeps the data body, applies defaults, and fixes type, zitiName, and deletionPolicy", func() {
+		cfg := &zitiv1.ZitiConfig{ObjectMeta: meta("cfg-case"), Spec: zitiv1.ZitiConfigSpec{
+			EntitySpec: zitiv1.EntitySpec{ZitiName: "a"}, Type: "host.v2",
+			Data: apiextensionsv1.JSON{Raw: []byte(`{"terminators":[{"address":"10.0.0.5","port":8443,"protocol":"tcp"}]}`)},
+		}}
+		Expect(k8sClient.Create(ctx, cfg)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, cfg) })
+		Expect(cfg.Spec.ConnectionRef).To(Equal("default"))
+		Expect(cfg.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+		Expect(string(cfg.Spec.Data.Raw)).To(ContainSubstring(`"terminators":[{"address":"10.0.0.5"`))
+
+		for want, mut := range map[string]func(*zitiv1.ZitiConfigSpec){
+			"zitiName is immutable":       func(s *zitiv1.ZitiConfigSpec) { s.ZitiName = "b" },
+			"deletionPolicy is immutable": func(s *zitiv1.ZitiConfigSpec) { s.DeletionPolicy = zitiv1.DeletionPolicyOrphan },
+			"type is immutable":           func(s *zitiv1.ZitiConfigSpec) { s.Type = "host.v1" },
+		} {
+			var cur zitiv1.ZitiConfig
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "cfg-case"}, &cur)).To(Succeed())
+			mut(&cur.Spec)
+			Expect(k8sClient.Update(ctx, &cur)).To(MatchError(ContainSubstring(want)))
+		}
+	})
+
+	It("ZitiConfig rejects data that is not an object and a missing type", func() {
+		bad := &zitiv1.ZitiConfig{ObjectMeta: meta("cfg-bad"), Spec: zitiv1.ZitiConfigSpec{Type: "host.v1", Data: apiextensionsv1.JSON{Raw: []byte(`[1,2]`)}}}
+		Expect(k8sClient.Create(ctx, bad)).To(MatchError(ContainSubstring("data")))
+		noType := &zitiv1.ZitiConfig{ObjectMeta: meta("cfg-notype"), Spec: zitiv1.ZitiConfigSpec{Data: apiextensionsv1.JSON{Raw: []byte(`{}`)}}}
+		Expect(k8sClient.Create(ctx, noType)).To(MatchError(ContainSubstring("type")))
+	})
+
+	It("ZitiService applies defaults and rejects a negative idle time", func() {
+		svc := &zitiv1.ZitiService{ObjectMeta: meta("svc-case")}
+		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
+		Expect(svc.Spec.TerminatorStrategy).To(Equal("smartrouting"))
+		Expect(*svc.Spec.EncryptionRequired).To(BeTrue())
+		bad := &zitiv1.ZitiService{ObjectMeta: meta("svc-bad"), Spec: zitiv1.ZitiServiceSpec{MaxIdleTimeMillis: -1}}
+		Expect(k8sClient.Create(ctx, bad)).To(MatchError(ContainSubstring("greater than or equal to 0")))
+	})
+
+	It("ZitiServicePolicy needs a type and roles, and fixes the type", func() {
+		mk := func(mut func(*zitiv1.ZitiServicePolicySpec)) *zitiv1.ZitiServicePolicy {
+			p := &zitiv1.ZitiServicePolicy{ObjectMeta: meta("sp-case"), Spec: zitiv1.ZitiServicePolicySpec{Type: "Dial", IdentityRoles: []string{"#a"}, ServiceRoles: []string{"#b"}}}
+			if mut != nil {
+				mut(&p.Spec)
+			}
+			return p
+		}
+		Expect(k8sClient.Create(ctx, mk(func(s *zitiv1.ZitiServicePolicySpec) { s.Type = "Both" }))).To(MatchError(ContainSubstring("Unsupported value")))
+		Expect(k8sClient.Create(ctx, mk(func(s *zitiv1.ZitiServicePolicySpec) { s.IdentityRoles = nil }))).To(MatchError(ContainSubstring("identityRoles")))
+		Expect(k8sClient.Create(ctx, mk(func(s *zitiv1.ZitiServicePolicySpec) { s.ServiceRoles = nil }))).To(MatchError(ContainSubstring("serviceRoles")))
+		Expect(k8sClient.Create(ctx, mk(func(s *zitiv1.ZitiServicePolicySpec) { s.Semantic = "SomeOf" }))).To(MatchError(ContainSubstring("Unsupported value")))
+		p := mk(nil)
+		Expect(k8sClient.Create(ctx, p)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, p) })
+		Expect(p.Spec.Semantic).To(Equal("AnyOf"))
+		p.Spec.Type = "Bind"
+		Expect(k8sClient.Update(ctx, p)).To(MatchError(ContainSubstring("type is immutable")))
+	})
+
+	It("router policies need their roles and default the semantic", func() {
+		Expect(k8sClient.Create(ctx, &zitiv1.ZitiEdgeRouterPolicy{ObjectMeta: meta("erp-bad"), Spec: zitiv1.ZitiEdgeRouterPolicySpec{IdentityRoles: []string{"#a"}}})).
+			To(MatchError(ContainSubstring("edgeRouterRoles")))
+		erp := &zitiv1.ZitiEdgeRouterPolicy{ObjectMeta: meta("erp-case"), Spec: zitiv1.ZitiEdgeRouterPolicySpec{IdentityRoles: []string{"#a"}, EdgeRouterRoles: []string{"#all"}}}
+		Expect(k8sClient.Create(ctx, erp)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, erp) })
+		Expect(erp.Spec.Semantic).To(Equal("AnyOf"))
+
+		Expect(k8sClient.Create(ctx, &zitiv1.ZitiServiceEdgeRouterPolicy{ObjectMeta: meta("serp-bad"), Spec: zitiv1.ZitiServiceEdgeRouterPolicySpec{ServiceRoles: []string{"#a"}}})).
+			To(MatchError(ContainSubstring("edgeRouterRoles")))
+		serp := &zitiv1.ZitiServiceEdgeRouterPolicy{ObjectMeta: meta("serp-case"), Spec: zitiv1.ZitiServiceEdgeRouterPolicySpec{ServiceRoles: []string{"#a"}, EdgeRouterRoles: []string{"#all"}}}
+		Expect(k8sClient.Create(ctx, serp)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, serp) })
+		Expect(serp.Spec.Semantic).To(Equal("AnyOf"))
+	})
 })

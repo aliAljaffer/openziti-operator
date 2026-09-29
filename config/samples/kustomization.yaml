@@ -6,4 +6,9 @@ resources:
 - ziti_v1alpha1_zitiaccesspolicy.yaml
 - alialjaffer_v1alpha1_zitijwtsigner.yaml
 - alialjaffer_v1alpha1_zitica.yaml
+- alialjaffer_v1alpha1_ziticonfig.yaml
+- alialjaffer_v1alpha1_zitiservice.yaml
+- alialjaffer_v1alpha1_zitiservicepolicy.yaml
+- alialjaffer_v1alpha1_zitiedgerouterpolicy.yaml
+- alialjaffer_v1alpha1_zitiserviceedgerouterpolicy.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

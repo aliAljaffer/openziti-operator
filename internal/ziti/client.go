@@ -38,6 +38,7 @@ const (
 	Authenticators            Kind = "authenticators"
 	ExternalJWTSigners        Kind = "external-jwt-signers"
 	CertificateAuthorities    Kind = "cas"
+	PostureChecks             Kind = "posture-checks"
 )
 
 type Entity map[string]any
