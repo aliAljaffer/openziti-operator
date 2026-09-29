@@ -1,0 +1,13 @@
+# Annotating a Service is enough. The operator creates a ZitiApp that the Service owns.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: default
+  annotations:
+    ziti.alialjaffer.com/expose: "true"
+    ziti.alialjaffer.com/allow-groups: team-a
+spec:
+  selector: {app: web}
+  ports:
+    - {name: https, port: 443}

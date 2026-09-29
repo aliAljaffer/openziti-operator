@@ -1,9 +1,17 @@
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiConnection
 metadata:
-  labels:
-    app.kubernetes.io/name: ziti-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: ziticonnection-sample
+  name: default
 spec:
-  # TODO(user): Add fields here
+  managementUrl: https://ziti-controller-mgmt.ziti.svc:443/edge/management/v1
+  caBundle:
+    configMapRef: {namespace: ziti-operator-system, name: ziti-root-ca, key: ca.crt}
+  auth:
+    updb:
+      secretRef: {namespace: ziti-operator-system, name: ziti-operator-credential}
+  # Certificate login instead. The Secret has tls.crt and tls.key, for example from cert-manager.
+  # auth:
+  #   cert:
+  #     secretRef: {namespace: ziti-operator-system, name: ziti-operator-cert}
+  roleScope: Namespaced
+  hostingRouters: [router-a]
