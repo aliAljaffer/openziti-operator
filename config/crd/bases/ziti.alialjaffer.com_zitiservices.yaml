@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiservices.ziti.k8s.openziti.io
+  name: zitiservices.ziti.alialjaffer.com
 spec:
-  group: ziti.k8s.openziti.io
+  group: ziti.alialjaffer.com
   names:
     kind: ZitiService
     listKind: ZitiServiceList
@@ -149,6 +149,9 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: more than one intercept protocol requires host.forwardProtocol
+              rule: '!has(self.intercept.protocols) || size(self.intercept.protocols)
+                < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)'
           status:
             description: status defines the observed state of ZitiService
             properties:

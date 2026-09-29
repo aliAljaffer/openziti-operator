@@ -33,9 +33,9 @@ type ZitiServiceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=ziti.k8s.openziti.io,resources=zitiservices,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.k8s.openziti.io,resources=zitiservices/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.k8s.openziti.io,resources=zitiservices/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

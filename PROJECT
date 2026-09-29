@@ -3,7 +3,7 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.16.0
-domain: k8s.openziti.io
+domain: alialjaffer.com
 layout:
 - go.kubebuilder.io/v4
 projectName: ziti-operator
@@ -12,7 +12,7 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: k8s.openziti.io
+  domain: alialjaffer.com
   group: ziti
   kind: ZitiConnection
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
@@ -21,7 +21,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: k8s.openziti.io
+  domain: alialjaffer.com
   group: ziti
   kind: ZitiService
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1

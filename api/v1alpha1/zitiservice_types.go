@@ -77,6 +77,7 @@ type Access struct {
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+// +kubebuilder:validation:XValidation:rule="!has(self.intercept.protocols) || size(self.intercept.protocols) < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)",message="more than one intercept protocol requires host.forwardProtocol"
 type ZitiServiceSpec struct {
 	// +kubebuilder:default=default
 	// +optional

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: ziticonnections.ziti.k8s.openziti.io
+  name: ziticonnections.ziti.alialjaffer.com
 spec:
-  group: ziti.k8s.openziti.io
+  group: ziti.alialjaffer.com
   names:
     kind: ZitiConnection
     listKind: ZitiConnectionList

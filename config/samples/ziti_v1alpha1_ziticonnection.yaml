@@ -1,4 +1,4 @@
-apiVersion: ziti.k8s.openziti.io/v1alpha1
+apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiConnection
 metadata:
   labels:
