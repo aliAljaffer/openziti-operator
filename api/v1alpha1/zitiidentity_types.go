@@ -23,6 +23,7 @@ import (
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+// +kubebuilder:validation:XValidation:rule="self.enrollmentMode == oldSelf.enrollmentMode",message="enrollmentMode is immutable"
 type ZitiIdentitySpec struct {
 	// +kubebuilder:default=default
 	// +optional
@@ -42,16 +43,30 @@ type ZitiIdentitySpec struct {
 	// +optional
 	AuthPolicy string `json:"authPolicy,omitempty"`
 
-	// secretName receives the enrollment JWT under the key "enrollment.jwt". It defaults to the CR name.
+	// secretName receives "enrollment.jwt" or "identity.json", by enrollmentMode. It defaults to the CR name.
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	SecretName string `json:"secretName,omitempty"`
+
+	// enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
+	// OperatorEnrolled makes the operator enroll and write identity.json to the Secret.
+	// +kubebuilder:default=JwtOnly
+	// +kubebuilder:validation:Enum=JwtOnly;OperatorEnrolled
+	// +optional
+	EnrollmentMode EnrollmentMode `json:"enrollmentMode,omitempty"`
 
 	// +kubebuilder:default=Delete
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
+
+type EnrollmentMode string
+
+const (
+	EnrollmentJWTOnly  EnrollmentMode = "JwtOnly"
+	EnrollmentOperator EnrollmentMode = "OperatorEnrolled"
+)
 
 type ZitiIdentityStatus struct {
 	// +optional

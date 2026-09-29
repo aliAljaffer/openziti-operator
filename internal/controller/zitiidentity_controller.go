@@ -44,6 +44,7 @@ import (
 
 const (
 	SecretKeyJWT      = "enrollment.jwt"
+	SecretKeyIdentity = "identity.json"
 	defaultAuthPolicy = "Default"
 	enrollmentTTL     = 24 * time.Hour
 	pendingRecheck    = time.Minute
@@ -54,6 +55,8 @@ type ZitiIdentityReconciler struct {
 	Scheme   *runtime.Scheme
 	Clients  ClientProvider
 	Recorder record.EventRecorder
+	// Enroll turns an enrollment JWT into identity.json. Nil uses ziti.EnrollOTT.
+	Enroll func(jwt string) ([]byte, error)
 }
 
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
@@ -194,13 +197,57 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	// The identity list shows a non-empty authenticators map after enrollment.
 	auth, _ := zid["authenticators"].(map[string]any)
 	id.Status.Enrolled = len(auth) > 0
-	if id.Status.Enrolled {
+	operator := id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentOperator
+
+	switch {
+	case id.Status.Enrolled && operator:
+		var secret corev1.Secret
+		err := r.Get(ctx, r.secretKey(id), &secret)
+		if client.IgnoreNotFound(err) != nil {
+			return err
+		}
+		if len(secret.Data[SecretKeyIdentity]) > 0 {
+			id.Status.EnrollmentExpiresAt = nil
+			setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+			return nil
+		}
+		// The private key exists only in identity.json. Without it the identity is unusable, so start over.
+		if err := zc.Delete(ctx, ziti.Identities, zid.ID()); err != nil {
+			return err
+		}
+		r.Recorder.Eventf(id, "Warning", "IdentityFileLost", "identity is enrolled but Secret has no %s, deleted identity to enroll again", SecretKeyIdentity)
+		id.Status.ZitiID, id.Status.Enrolled = "", false
+		setIdentityCond(id, CondReady, false, "", "IdentityFileLost", "identity file was lost, enrolling again")
+		return nil
+	case id.Status.Enrolled:
 		id.Status.EnrollmentExpiresAt = nil
 		setIdentityCond(id, CondReady, true, "Enrolled", "", "")
 		return r.dropJWT(ctx, id)
 	}
+
 	setIdentityCond(id, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
-	return r.publishJWT(ctx, id, zc)
+	jwt, err := r.currentEnrollmentJWT(ctx, id, zc)
+	if err != nil {
+		return err
+	}
+	if !operator {
+		return r.writeSecret(ctx, id, SecretKeyJWT, []byte(jwt))
+	}
+	enroll := r.Enroll
+	if enroll == nil {
+		enroll = ziti.EnrollOTT
+	}
+	file, err := enroll(jwt)
+	if err != nil {
+		return fmt.Errorf("enroll identity: %w", err)
+	}
+	if err := r.writeSecret(ctx, id, SecretKeyIdentity, file); err != nil {
+		return err
+	}
+	r.Recorder.Eventf(id, "Normal", "Enrolled", "enrolled identity %s", name)
+	id.Status.Enrolled, id.Status.EnrollmentExpiresAt = true, nil
+	setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+	return nil
 }
 
 func (r *ZitiIdentityReconciler) secretKey(id *zitiv1alpha1.ZitiIdentity) types.NamespacedName {
@@ -211,10 +258,11 @@ func (r *ZitiIdentityReconciler) secretKey(id *zitiv1alpha1.ZitiIdentity) types.
 	return types.NamespacedName{Namespace: id.Namespace, Name: n}
 }
 
-func (r *ZitiIdentityReconciler) publishJWT(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) error {
+// currentEnrollmentJWT returns the JWT of a valid enrollment. It replaces expired ones.
+func (r *ZitiIdentityReconciler) currentEnrollmentJWT(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) (string, error) {
 	enrollments, err := zc.List(ctx, ziti.Enrollments, fmt.Sprintf(`identity="%s"`, id.Status.ZitiID))
 	if err != nil {
-		return err
+		return "", err
 	}
 	var current ziti.Entity
 	for _, e := range enrollments {
@@ -224,7 +272,7 @@ func (r *ZitiIdentityReconciler) publishJWT(ctx context.Context, id *zitiv1alpha
 			continue
 		}
 		if err := zc.Delete(ctx, ziti.Enrollments, e.ID()); err != nil {
-			return err
+			return "", err
 		}
 		r.Recorder.Eventf(id, "Normal", "EnrollmentExpired", "deleted expired enrollment")
 	}
@@ -235,11 +283,11 @@ func (r *ZitiIdentityReconciler) publishJWT(ctx context.Context, id *zitiv1alpha
 			"expiresAt":  time.Now().Add(enrollmentTTL).UTC().Format(time.RFC3339),
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 		r.Recorder.Eventf(id, "Normal", "EnrollmentCreated", "created enrollment")
 		if enrollments, err = zc.List(ctx, ziti.Enrollments, fmt.Sprintf(`identity="%s"`, id.Status.ZitiID)); err != nil {
-			return err
+			return "", err
 		}
 		for _, e := range enrollments {
 			if e.ID() == newID {
@@ -247,39 +295,43 @@ func (r *ZitiIdentityReconciler) publishJWT(ctx context.Context, id *zitiv1alpha
 			}
 		}
 		if current == nil {
-			return fmt.Errorf("enrollment %s not found after create", newID)
+			return "", fmt.Errorf("enrollment %s not found after create", newID)
 		}
 	}
 	jwt, _ := current["jwt"].(string)
 	if jwt == "" {
-		return errors.New("enrollment has no jwt")
+		return "", errors.New("enrollment has no jwt")
 	}
 	if exp, err := time.Parse(time.RFC3339, fmt.Sprint(current["expiresAt"])); err == nil {
 		id.Status.EnrollmentExpiresAt = &metav1.Time{Time: exp}
 	}
 
+	return jwt, nil
+}
+
+func (r *ZitiIdentityReconciler) writeSecret(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, dataKey string, value []byte) error {
 	var secret corev1.Secret
 	key := r.secretKey(id)
-	err = r.Get(ctx, key, &secret)
+	err := r.Get(ctx, key, &secret)
 	switch {
 	case apierrors.IsNotFound(err):
 		secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}}
 		if err := controllerutil.SetControllerReference(id, &secret, r.Scheme); err != nil {
 			return err
 		}
-		secret.Data = map[string][]byte{SecretKeyJWT: []byte(jwt)}
+		secret.Data = map[string][]byte{dataKey: value}
 		return r.Create(ctx, &secret)
 	case err != nil:
 		return err
 	case !metav1.IsControlledBy(&secret, id):
 		return &specError{"SecretConflict", fmt.Sprintf("Secret %s exists and is not owned by this ZitiIdentity", key.Name)}
-	case string(secret.Data[SecretKeyJWT]) == jwt:
+	case string(secret.Data[dataKey]) == string(value):
 		return nil
 	}
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
-	secret.Data[SecretKeyJWT] = []byte(jwt)
+	secret.Data[dataKey] = value
 	return r.Update(ctx, &secret)
 }
 

@@ -75,6 +75,15 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              enrollmentMode:
+                default: JwtOnly
+                description: |-
+                  enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
+                  OperatorEnrolled makes the operator enroll and write identity.json to the Secret.
+                enum:
+                - JwtOnly
+                - OperatorEnrolled
+                type: string
               roleAttributes:
                 description: roleAttributes follow the connection roleScope, like
                   ZitiService roleAttributes.
@@ -82,8 +91,8 @@ spec:
                   type: string
                 type: array
               secretName:
-                description: secretName receives the enrollment JWT under the key
-                  "enrollment.jwt". It defaults to the CR name.
+                description: secretName receives "enrollment.jwt" or "identity.json",
+                  by enrollmentMode. It defaults to the CR name.
                 maxLength: 253
                 type: string
               zitiName:
@@ -98,6 +107,8 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: enrollmentMode is immutable
+              rule: self.enrollmentMode == oldSelf.enrollmentMode
           status:
             description: status defines the observed state of ZitiIdentity
             properties:

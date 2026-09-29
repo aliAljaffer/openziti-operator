@@ -4,12 +4,13 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -225,8 +226,72 @@ func TestIdentityDelete(t *testing.T) {
 		if n := len(e.zc.Objects[ziti.Identities]); n != want {
 			t.Errorf("%s: identities = %d, want %d", policy, n, want)
 		}
-		if err := e.k.Get(t.Context(), e.key, &zitiv1.ZitiIdentity{}); !errors.IsNotFound(err) {
+		if err := e.k.Get(t.Context(), e.key, &zitiv1.ZitiIdentity{}); !kerrors.IsNotFound(err) {
 			t.Errorf("%s: CR still exists: %v", policy, err)
 		}
+	}
+}
+
+func operatorEnv(t *testing.T) *idEnv {
+	t.Helper()
+	e := setupIdentity(t)
+	z := e.get(t)
+	z.Spec.EnrollmentMode = zitiv1.EnrollmentOperator
+	if err := e.k.Update(t.Context(), z); err != nil {
+		t.Fatal(err)
+	}
+	e.r.Enroll = func(jwt string) ([]byte, error) { return []byte(`{"from":"` + jwt + `"}`), nil }
+	return e
+}
+
+func TestOperatorEnrolledWritesIdentityFileOnly(t *testing.T) {
+	e := operatorEnv(t)
+	e.reconcile(t)
+
+	z := e.get(t)
+	s := e.secret(t)
+	if len(s.Data) != 1 || len(s.Data[SecretKeyIdentity]) == 0 {
+		t.Fatalf("secret keys = %v", s.Data)
+	}
+	if !z.Status.Enrolled || condStatusOf(z, CondReady) != metav1.ConditionTrue {
+		t.Errorf("status = %+v", z.Status)
+	}
+	raw, _ := json.Marshal(z.Status)
+	if strings.Contains(string(raw), "jwt-") {
+		t.Error("jwt leaked into status")
+	}
+}
+
+func TestOperatorEnrolledRecoversLostIdentityFile(t *testing.T) {
+	e := operatorEnv(t)
+	e.reconcile(t)
+	e.identity()["authenticators"] = map[string]any{"cert": map[string]any{"id": "a1"}}
+	first := e.identity().ID()
+	if err := e.k.Delete(t.Context(), e.secret(t)); err != nil {
+		t.Fatal(err)
+	}
+
+	e.reconcile(t)
+	if got := e.get(t); got.Status.Enrolled || findCond(got, CondReady).Reason != "IdentityFileLost" {
+		t.Fatalf("status = %+v", got.Status)
+	}
+	if len(e.zc.Objects[ziti.Identities]) != 0 {
+		t.Fatal("identity not deleted")
+	}
+
+	e.reconcile(t)
+	if e.identity().ID() == first || len(e.secret(t).Data[SecretKeyIdentity]) == 0 || !e.get(t).Status.Enrolled {
+		t.Error("identity not enrolled again")
+	}
+}
+
+func TestOperatorEnrollFailureIsReported(t *testing.T) {
+	e := operatorEnv(t)
+	e.r.Enroll = func(string) ([]byte, error) { return nil, errors.New("boom") }
+	if _, err := e.r.Reconcile(t.Context(), ctrl.Request{NamespacedName: e.key}); err == nil {
+		t.Fatal("want error")
+	}
+	if z := e.get(t); z.Status.Enrolled || findCond(z, CondReady).Reason != "Error" {
+		t.Errorf("status = %+v", z.Status)
 	}
 }
