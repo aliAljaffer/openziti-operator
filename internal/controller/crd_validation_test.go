@@ -6,11 +6,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/desired"
 )
 
 var _ = Describe("CRD validation", func() {
@@ -141,5 +146,53 @@ var _ = Describe("CRD validation", func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ap-case"}, ap)).To(Succeed())
 		ap.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
 		Expect(k8sClient.Update(ctx, ap)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
+	})
+})
+
+var _ = Describe("Service exposure", func() {
+	It("creates a ZitiApp the API server accepts, follows annotation changes, and removes it", func() {
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "expose-case", Namespace: "default", Annotations: map[string]string{
+				desired.AnnExpose: "true", desired.AnnPorts: "443, 8000-8005", desired.AnnAllowGroups: "staff",
+				desired.AnnAllowIdentites: "alice", desired.AnnEntryRouters: "edge-1",
+			}},
+			Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		}
+		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
+
+		r := &ServiceReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Recorder: record.NewFakeRecorder(10)}
+		key := types.NamespacedName{Namespace: "default", Name: "expose-case"}
+		reconcile := func() {
+			_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		reconcile()
+		var app zitiv1.ZitiApp
+		Expect(k8sClient.Get(ctx, key, &app)).To(Succeed())
+		Expect(app.Spec.Expose.Ports).To(HaveLen(2))
+		Expect(app.Spec.ConnectionRef).To(Equal("default"))
+		Expect(app.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+		Expect(metav1.IsControlledBy(&app, svc)).To(BeTrue())
+
+		reconcile()
+		Expect(k8sClient.Get(ctx, key, &app)).To(Succeed())
+		version := app.ResourceVersion
+		reconcile()
+		Expect(k8sClient.Get(ctx, key, &app)).To(Succeed())
+		Expect(app.ResourceVersion).To(Equal(version), "an unchanged Service must not rewrite the ZitiApp")
+
+		Expect(k8sClient.Get(ctx, key, svc)).To(Succeed())
+		svc.Annotations[desired.AnnAllowGroups] = "staff,ops"
+		Expect(k8sClient.Update(ctx, svc)).To(Succeed())
+		reconcile()
+		Expect(k8sClient.Get(ctx, key, &app)).To(Succeed())
+		Expect(app.Spec.Allow.Groups).To(Equal([]string{"staff", "ops"}))
+
+		svc.Annotations[desired.AnnExpose] = "false"
+		Expect(k8sClient.Update(ctx, svc)).To(Succeed())
+		reconcile()
+		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, key, &app))).To(BeTrue(), "the ZitiApp must be deleted")
 	})
 })
