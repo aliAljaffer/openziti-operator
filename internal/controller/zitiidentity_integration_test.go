@@ -39,14 +39,19 @@ func TestIdentityAgainstRealController(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	wc := &writeCounter{Client: real}
 	e := setupIdentity(t)
-	e.r.Clients = staticProvider{real}
+	e.r.Clients = staticProvider{wc}
 	e.reconcile(t)
 	z := e.get(t)
 	if z.Status.ZitiID == "" || z.Status.Enrolled || z.Status.EnrollmentExpiresAt == nil || len(e.secret(t).Data[SecretKeyJWT]) < 20 {
 		t.Fatalf("after create: %+v", z.Status)
 	}
+	wc.writes = nil
 	e.reconcile(t)
+	if len(wc.writes) != 0 {
+		t.Fatalf("second reconcile wrote: %v", wc.writes)
+	}
 
 	z = e.get(t)
 	z.Spec.RoleAttributes = []string{"web", "db"}

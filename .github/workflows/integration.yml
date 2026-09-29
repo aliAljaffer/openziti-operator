@@ -1,0 +1,45 @@
+name: Integration Tests
+
+on:
+  push:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  integration:
+    permissions:
+      contents: read
+    name: Real Ziti controller
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Start a Ziti controller and router
+        run: |
+          docker run -d --name ziti -p 1280:1280 -p 3022:3022 openziti/ziti-cli:2.0.4 \
+            edge quickstart --ctrl-address localhost --ctrl-port 1280 \
+            --router-address localhost --password admin123
+          for i in $(seq 1 60); do
+            curl -ksf https://localhost:1280/edge/client/v1/version >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs ziti
+          exit 1
+
+      - name: Run integration tests
+        env:
+          ZITI_MGMT_URL: https://localhost:1280/edge/management/v1
+          ZITI_USERNAME: admin
+          ZITI_PASSWORD: admin123
+        run: |
+          sleep 20
+          go test -tags integration -count=1 ./internal/...

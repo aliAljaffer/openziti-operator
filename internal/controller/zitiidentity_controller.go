@@ -158,6 +158,13 @@ func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.
 	return r.Update(ctx, id)
 }
 
+// comparable drops the identity type. Ziti sets it once at creation and returns it as an object, not as a string.
+func comparable(body ziti.Entity) ziti.Entity {
+	c := maps.Clone(body)
+	delete(c, "type")
+	return c
+}
+
 func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "true" }
 
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
@@ -193,7 +200,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	switch {
 	case len(existing) > 0:
 		zid = existing[0]
-		if mode != zitiv1alpha1.ManagementObserve && !desired.Matches(body, zid) {
+		if mode != zitiv1alpha1.ManagementObserve && !desired.Matches(comparable(body), zid) {
 			if isAdopted(zid) {
 				err = zc.Patch(ctx, ziti.Identities, zid.ID(), ziti.Entity{"roleAttributes": body["roleAttributes"], "authPolicyId": body["authPolicyId"]})
 			} else {

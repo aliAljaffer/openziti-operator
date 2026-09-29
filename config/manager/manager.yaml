@@ -21,7 +21,7 @@ spec:
     matchLabels:
       control-plane: controller-manager
       app.kubernetes.io/name: ziti-operator
-  replicas: 1
+  replicas: 2
   template:
     metadata:
       annotations:

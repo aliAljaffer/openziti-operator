@@ -24,6 +24,16 @@ func (w *writeCounter) Create(ctx context.Context, k ziti.Kind, b ziti.Entity) (
 	return w.Client.Create(ctx, k, b)
 }
 
+func (w *writeCounter) Patch(ctx context.Context, k ziti.Kind, id string, b ziti.Entity) error {
+	w.writes = append(w.writes, "patch "+string(k))
+	return w.Client.Patch(ctx, k, id, b)
+}
+
+func (w *writeCounter) Delete(ctx context.Context, k ziti.Kind, id string) error {
+	w.writes = append(w.writes, "delete "+string(k))
+	return w.Client.Delete(ctx, k, id)
+}
+
 func (w *writeCounter) Update(ctx context.Context, k ziti.Kind, id string, b ziti.Entity) error {
 	w.writes = append(w.writes, "update "+string(k))
 	return w.Client.Update(ctx, k, id, b)

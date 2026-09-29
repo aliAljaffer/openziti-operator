@@ -66,6 +66,7 @@ func main() {
 	var enableHTTP2 bool
 	var zitiRequestsPerSecond float64
 	var orphanPolicy string
+	var leaderElectionNamespace string
 	var orphanInterval time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -92,6 +93,8 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10, "Rate limit for calls to the Ziti Edge Management API.")
+	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
+		"Namespace of the leader election Lease. Only needed when the manager runs outside a cluster.")
 	flag.StringVar(&orphanPolicy, "orphan-policy", string(controller.OrphanReport),
 		"What to do with Ziti entities of this cluster whose owner resource is gone: report or delete.")
 	flag.DurationVar(&orphanInterval, "orphan-sweep-interval", time.Hour, "How often to look for orphaned Ziti entities.")
@@ -172,12 +175,13 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "2c7d47cb.alialjaffer.com",
+		Scheme:                  scheme,
+		Metrics:                 metricsServerOptions,
+		WebhookServer:           webhookServer,
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        "2c7d47cb.alialjaffer.com",
+		LeaderElectionNamespace: leaderElectionNamespace,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
