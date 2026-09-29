@@ -21,38 +21,119 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type DeletionPolicy string
 
-// ZitiServiceSpec defines the desired state of ZitiService
-type ZitiServiceSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+const (
+	DeletionPolicyDelete DeletionPolicy = "Delete"
+	DeletionPolicyOrphan DeletionPolicy = "Orphan"
+)
 
-	// foo is an example field of ZitiService. Edit zitiservice_types.go to remove/update
+type Intercept struct {
+	// +kubebuilder:validation:MinItems=1
+	Addresses []string `json:"addresses"`
+
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Minimum=1
+	// +kubebuilder:validation:items:Maximum=65535
+	Ports []int32 `json:"ports"`
+
+	// +kubebuilder:default={tcp}
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Enum=tcp;udp
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	Protocols []string `json:"protocols,omitempty"`
 }
 
-// ZitiServiceStatus defines the observed state of ZitiService.
+type ServiceRef struct {
+	Name string `json:"name"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port"`
+}
+
+// Host sets the target. Set exactly one of serviceRef and address.
+// +kubebuilder:validation:XValidation:rule="has(self.serviceRef) != has(self.address)",message="set exactly one of serviceRef and address"
+// +kubebuilder:validation:XValidation:rule="has(self.address) == has(self.port)",message="port is required with address"
+type Host struct {
+	// +optional
+	ServiceRef *ServiceRef `json:"serviceRef,omitempty"`
+	// +optional
+	Address string `json:"address,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// forwardProtocol true hosts every protocol in intercept.protocols. False hosts only the first one.
+	// +optional
+	ForwardProtocol bool `json:"forwardProtocol,omitempty"`
+}
+
+type Access struct {
+	// identityRoles creates a Dial policy for this service when set.
+	// +optional
+	IdentityRoles []string `json:"identityRoles,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
+// +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+type ZitiServiceSpec struct {
+	// +kubebuilder:default=default
+	// +optional
+	ConnectionRef string `json:"connectionRef,omitempty"`
+
+	// zitiName defaults to <namespace>.<name>.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1000
+	// +optional
+	ZitiName string `json:"zitiName,omitempty"`
+
+	// +optional
+	RoleAttributes []string `json:"roleAttributes,omitempty"`
+
+	// +kubebuilder:default=Delete
+	// +kubebuilder:validation:Enum=Delete;Orphan
+	// +optional
+	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
+
+	Intercept Intercept `json:"intercept"`
+	Host      Host      `json:"host"`
+
+	// hostingRouter must be in the connection's hostingRouters. It defaults to the first entry.
+	// +optional
+	HostingRouter string `json:"hostingRouter,omitempty"`
+
+	// edgeRouters are extra entry routers. The hosting router is always included.
+	// +optional
+	EdgeRouters []string `json:"edgeRouters,omitempty"`
+
+	// +optional
+	Access Access `json:"access,omitempty"`
+}
+
+type EntityIDs struct {
+	Service   string `json:"service,omitempty"`
+	Intercept string `json:"intercept,omitempty"`
+	Host      string `json:"host,omitempty"`
+	Bind      string `json:"bind,omitempty"`
+	SERP      string `json:"serp,omitempty"`
+	Dial      string `json:"dial,omitempty"`
+}
+
+type Terminator struct {
+	Router string `json:"router"`
+}
+
 type ZitiServiceStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +optional
+	ZitiName string `json:"zitiName,omitempty"`
+	// +optional
+	IDs EntityIDs `json:"ids,omitzero"`
+	// +optional
+	Terminators []Terminator `json:"terminators,omitempty"`
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-
-	// conditions represent the current state of the ZitiService resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

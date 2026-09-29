@@ -1,7 +1,7 @@
 //go:build integration
 
-// Usage: ZITI_MGMT_URL=https://host:port/edge/management/v1 ZITI_USERNAME=... ZITI_PASSWORD=... \
-//   [ZITI_CA_FILE=ca.pem] go test -tags integration ./internal/ziti/
+//	Usage: ZITI_MGMT_URL=https://host:port/edge/management/v1 ZITI_USERNAME=... ZITI_PASSWORD=... \
+//	  [ZITI_CA_FILE=ca.pem] go test -tags integration ./internal/ziti/
 package ziti
 
 import (

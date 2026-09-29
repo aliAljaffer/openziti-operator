@@ -21,38 +21,73 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type RoleScope string
 
-// ZitiConnectionSpec defines the desired state of ZitiConnection
-type ZitiConnectionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+const (
+	RoleScopeNamespaced RoleScope = "Namespaced"
+	RoleScopeGlobal     RoleScope = "Global"
+)
 
-	// foo is an example field of ZitiConnection. Edit ziticonnection_types.go to remove/update
-	// +optional
-	Foo *string `json:"foo,omitempty"`
+type ConfigMapKeyRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
-// ZitiConnectionStatus defines the observed state of ZitiConnection.
+type SecretRef struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+}
+
+type CABundle struct {
+	ConfigMapRef ConfigMapKeyRef `json:"configMapRef"`
+}
+
+// UpdbAuth reads the keys "username" and "password" from the Secret.
+type UpdbAuth struct {
+	SecretRef SecretRef `json:"secretRef"`
+}
+
+type ConnectionAuth struct {
+	Updb UpdbAuth `json:"updb"`
+}
+
+// ZitiConnectionSpec defines how the operator reaches a Ziti Edge Management API.
+type ZitiConnectionSpec struct {
+	// +kubebuilder:validation:Pattern=`^https://`
+	ManagementURL string         `json:"managementUrl"`
+	CABundle      CABundle       `json:"caBundle"`
+	Auth          ConnectionAuth `json:"auth"`
+
+	// clusterId isolates operators that share one Ziti network, for example staging and production.
+	// +kubebuilder:default=default
+	// +kubebuilder:validation:Pattern=`^[a-z]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	ClusterID string `json:"clusterId,omitempty"`
+
+	// roleScope Namespaced rewrites "#attr" to "#<namespace>.attr". Global passes roles through unchanged.
+	// +kubebuilder:default=Namespaced
+	// +kubebuilder:validation:Enum=Namespaced;Global
+	// +optional
+	RoleScope RoleScope `json:"roleScope,omitempty"`
+
+	// allowedNamespaces selects the namespaces that may use this connection. Empty selects all.
+	// +optional
+	AllowedNamespaces *metav1.LabelSelector `json:"allowedNamespaces,omitempty"`
+
+	// hostingRouters are the router names a ZitiService may bind through. The first entry is the default.
+	// +kubebuilder:validation:MinItems=1
+	HostingRouters []string `json:"hostingRouters"`
+
+	// defaultEdgeRouters are router names added to every service edge router policy.
+	// +optional
+	DefaultEdgeRouters []string `json:"defaultEdgeRouters,omitempty"`
+}
+
 type ZitiConnectionStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +optional
+	ControllerVersion string `json:"controllerVersion,omitempty"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-
-	// conditions represent the current state of the ZitiConnection resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
 	// +listType=map
 	// +listMapKey=type
 	// +optional
