@@ -50,11 +50,12 @@ const (
 	CondDialable      = "Dialable"
 	CondRoutePath     = "RoutePath"
 	CondReady         = "Ready"
+	CondAccess        = "AccessResolved"
 	serviceResync     = 10 * time.Minute
 	maxConcurrentSvcs = 2
 )
 
-var deleteOrder = []ziti.Kind{ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.Services, ziti.Configs}
+var deleteOrder = []ziti.Kind{ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Services, ziti.Configs}
 
 type ZitiAppReconciler struct {
 	client.Client
@@ -179,6 +180,7 @@ type syncResult struct {
 	ids         zitiv1alpha1.EntityIDs
 	terminators []zitiv1alpha1.Terminator
 	report      check.ServiceReport
+	missing     []string
 }
 
 func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) (*syncResult, error) {
@@ -207,24 +209,39 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	for _, t := range configTypes {
 		typeIDs[t.Name()] = t.ID()
 	}
-	for _, n := range []string{"intercept.v1", "host.v1"} {
+	for _, n := range []string{"intercept.v1", "host.v2"} {
 		if typeIDs[n] == "" {
 			return nil, fmt.Errorf("config type %s not found in Ziti", n)
 		}
 	}
 
-	icBody := b.InterceptConfig(typeIDs["intercept.v1"])
-	hcBody, err := b.HostConfig(typeIDs["host.v1"])
+	identityIDs, err := r.identityIDs(ctx, zc, svc.Spec.Allow.Identities)
+	if err != nil {
+		return nil, err
+	}
+	allowed, missing, err := b.AllowedRoles(identityIDs)
+	if err != nil {
+		return nil, &specError{"InvalidSpec", err.Error()}
+	}
+
+	icBody, err := b.InterceptConfig(typeIDs["intercept.v1"])
+	if err != nil {
+		return nil, &specError{"InvalidSpec", err.Error()}
+	}
+	hcBody, err := b.HostConfig(typeIDs["host.v2"])
 	if err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
 	if _, err := b.Service("", ""); err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
-	for _, f := range []func(string) (ziti.Entity, error){b.Bind, b.SERP, b.Dial} {
+	for _, f := range []func(string) (ziti.Entity, error){b.Bind, b.SERP} {
 		if _, err := f(""); err != nil {
 			return nil, &specError{"InvalidSpec", err.Error()}
 		}
+	}
+	if _, err := b.ERP(allowed); err != nil {
+		return nil, &specError{"InvalidSpec", err.Error()}
 	}
 
 	set, err := newEntitySet(ctx, zc, r.Recorder, svc, svc.UID, deleteOrder)
@@ -252,8 +269,13 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	if ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
 		return nil, err
 	}
-	if dial, _ := b.Dial(ids.Service); dial != nil {
+	if dial := b.Dial(ids.Service, allowed); dial != nil {
 		if ids.Dial, err = ensure(ctx, ziti.ServicePolicies, dial); err != nil {
+			return nil, err
+		}
+	}
+	if erp, _ := b.ERP(allowed); erp != nil {
+		if ids.ERP, err = ensure(ctx, ziti.EdgeRouterPolicies, erp); err != nil {
 			return nil, err
 		}
 	}
@@ -262,9 +284,31 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		return nil, err
 	}
 
-	return r.observe(ctx, zc, name, ids, routers, configTypes, []ziti.Entity{
+	out, err := r.observe(ctx, zc, name, ids, routers, configTypes, []ziti.Entity{
 		withID(icBody, ids.Intercept), withID(hcBody, ids.Host),
 	}, withID(svcBody, ids.Service))
+	if out != nil {
+		out.missing = missing
+	}
+	return out, err
+}
+
+// identityIDs maps the wanted identity names to Ziti ids. Names Ziti does not know are left out.
+func (r *ZitiAppReconciler) identityIDs(ctx context.Context, zc ziti.Client, names []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(names) == 0 {
+		return out, nil
+	}
+	all, err := zc.List(ctx, ziti.Identities, "")
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range all {
+		if slices.Contains(names, e.Name()) {
+			out[e.Name()] = e.ID()
+		}
+	}
+	return out, nil
 }
 
 // observeExisting reports on a service that was created outside this operator. It never writes to Ziti.
@@ -299,7 +343,7 @@ func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client,
 		switch typeNames[fmt.Sprint(c["configTypeId"])] {
 		case "intercept.v1":
 			ids.Intercept = c.ID()
-		case "host.v1":
+		case "host.v1", "host.v2":
 			ids.Host = c.ID()
 		}
 	}
@@ -399,6 +443,12 @@ func applyResult(svc *zitiv1alpha1.ZitiApp, o *syncResult) {
 		all = append(all, f.Message)
 	}
 	setCond(&svc.Status.Conditions, svc.Generation, CondReady, ready, "Ready", "NotReady", strings.Join(all, "; "))
+	if len(svc.Spec.Allow.Identities) > 0 || len(o.missing) > 0 {
+		setCond(&svc.Status.Conditions, svc.Generation, CondAccess, len(o.missing) == 0, "Resolved", "IdentityNotFound",
+			"identities not found in Ziti: "+strings.Join(o.missing, ", "))
+	} else {
+		meta.RemoveStatusCondition(&svc.Status.Conditions, CondAccess)
+	}
 }
 
 func reasonOr(r, def string) string {

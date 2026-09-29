@@ -4,6 +4,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,10 +54,10 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiApp)) *env {
 		Spec: zitiv1.ZitiAppSpec{
 			ConnectionRef:  "default",
 			ZitiName:       "app.example.com",
-			RoleAttributes: []string{"tenant"},
+			MemberOf:       []string{"tenant"},
 			DeletionPolicy: zitiv1.DeletionPolicyDelete,
-			Intercept:      zitiv1.Intercept{Addresses: []string{"app.example.com"}, Ports: []int32{443}, Protocols: []string{"tcp"}},
-			Host:           zitiv1.Host{Address: "10.0.0.5", Port: 8443},
+			Expose:         zitiv1.Expose{Addresses: []string{"app.example.com"}, Ports: []intstr.IntOrString{intstr.FromInt32(443)}, Protocols: []string{"tcp"}},
+			Targets:        []zitiv1.Target{{Address: "10.0.0.5", Port: 8443}},
 		},
 	}
 	if mut != nil {
@@ -66,7 +68,7 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiApp)) *env {
 
 	zc := ziti.NewFake()
 	zc.Put(ziti.ConfigTypes, ziti.Entity{"name": "intercept.v1"})
-	zc.Put(ziti.ConfigTypes, ziti.Entity{"name": "host.v1"})
+	zc.Put(ziti.ConfigTypes, ziti.Entity{"name": "host.v2"})
 	zc.Put(ziti.EdgeRouters, ziti.Entity{"id": "id-main", "name": "r-main", "isOnline": true})
 
 	return &env{
@@ -170,13 +172,13 @@ func TestRevertsDriftedEntity(t *testing.T) {
 }
 
 func TestDialPolicyAddedAndRemoved(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Allow.Groups = []string{"staff"} })
 	e.reconcile(t)
 	if e.count(ziti.ServicePolicies) != 2 || e.get(t).Status.IDs.Dial == "" {
 		t.Fatal("dial policy missing")
 	}
 	s := e.get(t)
-	s.Spec.Access.IdentityRoles = nil
+	s.Spec.Allow = zitiv1.Allow{}
 	if err := e.k.Update(t.Context(), s); err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +238,7 @@ func TestOrphanKeepsEntities(t *testing.T) {
 }
 
 func TestInvalidSpecDoesNotCreateAnything(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.HostingRouter = "r-other" })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.HostedBy = "r-other" })
 	e.reconcile(t)
 	if e.count(ziti.Configs)+e.count(ziti.Services) != 0 {
 		t.Errorf("created entities for an invalid spec: %v", e.zc.Calls)
@@ -248,7 +250,7 @@ func TestInvalidSpecDoesNotCreateAnything(t *testing.T) {
 }
 
 func TestHealthyServiceIsReady(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Allow.Groups = []string{"staff"} })
 	e.reconcile(t)
 	svcID := e.get(t).Status.IDs.Service
 	e.zc.Put(ziti.Terminators, ziti.Entity{"serviceId": svcID, "routerId": "id-main"})
@@ -269,7 +271,7 @@ func TestHealthyServiceIsReady(t *testing.T) {
 func TestObserveReadsExistingServiceWithoutWriting(t *testing.T) {
 	e := setup(t, func(s *zitiv1.ZitiApp) {
 		s.Spec.ManagementPolicy = zitiv1.ManagementObserve
-		s.Spec.Intercept, s.Spec.Host = zitiv1.Intercept{}, zitiv1.Host{}
+		s.Spec.Expose, s.Spec.Targets = zitiv1.Expose{}, nil
 	})
 	e.reconcile(t)
 	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondSynced); c == nil || c.Reason != "NotFound" {
@@ -306,5 +308,107 @@ func TestObserveReadsExistingServiceWithoutWriting(t *testing.T) {
 	}
 	if len(s.Finalizers) != 0 {
 		t.Errorf("finalizers = %v", s.Finalizers)
+	}
+}
+
+func TestAllowResolvesIdentityNamesFromOutsideKubernetes(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
+		s.Spec.Allow = zitiv1.Allow{Groups: []string{"staff"}, Identities: []string{"alice", "ghost"}}
+	})
+	e.zc.Put(ziti.Identities, ziti.Entity{"id": "id-alice", "name": "alice"})
+	e.reconcile(t)
+
+	var dial ziti.Entity
+	for _, p := range e.zc.Objects[ziti.ServicePolicies] {
+		if p.Name() == "app.example.com-dial" {
+			dial = p
+		}
+	}
+	if dial == nil {
+		t.Fatal("dial policy missing")
+	}
+	got, _ := json.Marshal(dial["identityRoles"])
+	if string(got) != `["#staff","@id-alice"]` && string(got) != `["@id-alice","#staff"]` {
+		t.Errorf("identityRoles = %s", got)
+	}
+	c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondAccess)
+	if c == nil || c.Status != metav1.ConditionFalse || c.Reason != "IdentityNotFound" || !strings.Contains(c.Message, "ghost") {
+		t.Fatalf("AccessResolved = %+v", c)
+	}
+
+	e.zc.Put(ziti.Identities, ziti.Entity{"id": "id-ghost", "name": "ghost"})
+	e.reconcile(t)
+	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondAccess); c == nil || c.Status != metav1.ConditionTrue {
+		t.Errorf("AccessResolved after the identity appeared = %+v", c)
+	}
+	dial = nil
+	for _, p := range e.zc.Objects[ziti.ServicePolicies] {
+		if p.Name() == "app.example.com-dial" {
+			dial = p
+		}
+	}
+	if roles := dial["identityRoles"].([]any); len(roles) != 3 {
+		t.Errorf("identityRoles = %v", roles)
+	}
+}
+
+func TestEntryRoutersCreateAndRemoveClientRouterPolicy(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
+		s.Spec.Allow.Groups = []string{"staff"}
+		s.Spec.EntryRouters = []string{"r-main"}
+	})
+	e.reconcile(t)
+	if e.count(ziti.EdgeRouterPolicies) != 1 || e.get(t).Status.IDs.ERP == "" {
+		t.Fatalf("erp missing: %v", e.zc.Calls)
+	}
+	for _, p := range e.zc.Objects[ziti.EdgeRouterPolicies] {
+		if p.Name() != "app.example.com-erp" {
+			t.Errorf("erp name = %q", p.Name())
+		}
+	}
+	s := e.get(t)
+	s.Spec.EntryRouters = nil
+	if err := e.k.Update(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if e.count(ziti.EdgeRouterPolicies) != 0 {
+		t.Error("erp not removed")
+	}
+}
+
+func TestManyTargetsAndPortRangesReachZiti(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
+		s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(443), intstr.FromString("8000-8005")}
+		s.Spec.Targets = []zitiv1.Target{{Address: "10.0.0.5"}, {Address: "10.0.0.6", Cost: 5}}
+	})
+	e.reconcile(t)
+	var host, icpt ziti.Entity
+	for _, c := range e.zc.Objects[ziti.Configs] {
+		if strings.HasSuffix(c.Name(), "-host.v2") {
+			host = c
+		} else {
+			icpt = c
+		}
+	}
+	terms := host["data"].(map[string]any)["terminators"].([]any)
+	if len(terms) != 2 {
+		t.Fatalf("terminators = %v", terms)
+	}
+	if ranges := icpt["data"].(map[string]any)["portRanges"].([]any); len(ranges) != 2 {
+		t.Errorf("portRanges = %v", ranges)
+	}
+	e.zc.Calls = nil
+	e.reconcile(t)
+	if w := e.writes(); len(w) != 0 {
+		t.Errorf("second reconcile wrote: %v", w)
+	}
+}
+
+func TestBadPortRangeIsInvalidSpec(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromString("9000-8000")} })
+	e.reconcile(t)
+	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondReady); c == nil || c.Reason != "InvalidSpec" || e.count(ziti.Configs) != 0 {
+		t.Errorf("ready = %+v", c)
 	}
 }

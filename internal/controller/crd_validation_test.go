@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 )
@@ -17,8 +18,8 @@ var _ = Describe("CRD validation", func() {
 		s := &zitiv1.ZitiApp{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 			Spec: zitiv1.ZitiAppSpec{
-				Intercept: zitiv1.Intercept{Addresses: []string{"app.example.com"}, Ports: []int32{443}},
-				Host:      zitiv1.Host{Address: "10.0.0.5", Port: 8443},
+				Expose:  zitiv1.Expose{Addresses: []string{"app.example.com"}, Ports: []intstr.IntOrString{intstr.FromInt32(443)}},
+				Targets: []zitiv1.Target{{Address: "10.0.0.5", Port: 8443}},
 			},
 		}
 		if mut != nil {
@@ -37,30 +38,32 @@ var _ = Describe("CRD validation", func() {
 			}
 			Expect(err).To(MatchError(ContainSubstring(wantErr)))
 		},
-		Entry("valid address host", nil, ""),
-		Entry("valid serviceRef host", func(s *zitiv1.ZitiAppSpec) {
-			s.Host = zitiv1.Host{ServiceRef: &zitiv1.ServiceRef{Name: "web", Port: 80}}
+		Entry("valid address target", nil, ""),
+		Entry("valid kubernetesService target", func(s *zitiv1.ZitiAppSpec) {
+			s.Targets = []zitiv1.Target{{KubernetesService: "web", Port: 80}}
 		}, ""),
-		Entry("serviceRef and address", func(s *zitiv1.ZitiAppSpec) {
-			s.Host.ServiceRef = &zitiv1.ServiceRef{Name: "web", Port: 80}
-		}, "set exactly one of serviceRef and address"),
-		Entry("no host target", func(s *zitiv1.ZitiAppSpec) { s.Host = zitiv1.Host{} }, "intercept and host are required"),
-		Entry("observe needs no intercept or host", func(s *zitiv1.ZitiAppSpec) {
+		Entry("several targets", func(s *zitiv1.ZitiAppSpec) {
+			s.Targets = []zitiv1.Target{{Address: "10.0.0.5"}, {Address: "10.0.0.6", Port: 8443, Cost: 10}}
+		}, ""),
+		Entry("port and range", func(s *zitiv1.ZitiAppSpec) {
+			s.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(443), intstr.FromString("8000-8005"), intstr.FromString("22")}
+		}, ""),
+		Entry("address and kubernetesService", func(s *zitiv1.ZitiAppSpec) { s.Targets[0].KubernetesService = "web" }, "set exactly one of address and kubernetesService"),
+		Entry("target without address", func(s *zitiv1.ZitiAppSpec) { s.Targets = []zitiv1.Target{{Port: 80}} }, "set exactly one of address and kubernetesService"),
+		Entry("kubernetesService without port", func(s *zitiv1.ZitiAppSpec) {
+			s.Targets = []zitiv1.Target{{KubernetesService: "web"}}
+		}, "port is required with kubernetesService"),
+		Entry("no targets", func(s *zitiv1.ZitiAppSpec) { s.Targets = nil }, "expose and targets are required"),
+		Entry("target port out of range", func(s *zitiv1.ZitiAppSpec) { s.Targets[0].Port = 70000 }, "less than or equal to 65535"),
+		Entry("port out of range", func(s *zitiv1.ZitiAppSpec) { s.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(70000)} }, "a port is 1-65535"),
+		Entry("port zero", func(s *zitiv1.ZitiAppSpec) { s.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(0)} }, "a port is 1-65535"),
+		Entry("observe needs no expose or targets", func(s *zitiv1.ZitiAppSpec) {
 			s.ManagementPolicy = zitiv1.ManagementObserve
-			s.Intercept, s.Host = zitiv1.Intercept{}, zitiv1.Host{}
+			s.Expose, s.Targets = zitiv1.Expose{}, nil
 		}, ""),
-		Entry("adopt is not allowed for services", func(s *zitiv1.ZitiAppSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
-		Entry("address without port", func(s *zitiv1.ZitiAppSpec) { s.Host.Port = 0 }, "port is required with address"),
-		Entry("port out of range", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Ports = []int32{70000} }, "less than or equal to 65535"),
-		Entry("no addresses", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Addresses = nil }, "addresses"),
-		Entry("two protocols without forwardProtocol", func(s *zitiv1.ZitiAppSpec) {
-			s.Intercept.Protocols = []string{"tcp", "udp"}
-		}, "requires host.forwardProtocol"),
-		Entry("two protocols with forwardProtocol", func(s *zitiv1.ZitiAppSpec) {
-			s.Intercept.Protocols = []string{"tcp", "udp"}
-			s.Host.ForwardProtocol = true
-		}, ""),
-		Entry("unknown protocol", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Protocols = []string{"icmp"} }, "Unsupported value"),
+		Entry("adopt is not allowed for apps", func(s *zitiv1.ZitiAppSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
+		Entry("no addresses", func(s *zitiv1.ZitiAppSpec) { s.Expose.Addresses = nil }, "addresses"),
+		Entry("unknown protocol", func(s *zitiv1.ZitiAppSpec) { s.Expose.Protocols = []string{"icmp"} }, "Unsupported value"),
 		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiAppSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
 	)
 
@@ -69,7 +72,7 @@ var _ = Describe("CRD validation", func() {
 		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
 		Expect(svc.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
-		Expect(svc.Spec.Intercept.Protocols).To(Equal([]string{"tcp"}))
+		Expect(svc.Spec.Expose.Protocols).To(Equal([]string{"tcp"}))
 
 		svc.Spec.ZitiName = "b.example.com"
 		Expect(k8sClient.Update(ctx, svc)).To(MatchError(ContainSubstring("zitiName is immutable")))

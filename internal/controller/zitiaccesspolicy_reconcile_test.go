@@ -228,3 +228,5 @@ func TestAllowedNamespacesIsEnforced(t *testing.T) {
 		}
 	}
 }
+
+func typesName(name string) types.NamespacedName { return types.NamespacedName{Name: name} }

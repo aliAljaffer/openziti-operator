@@ -246,36 +246,68 @@ func (g *Graph) configOf(svc ziti.Entity, typeName string) (ziti.Entity, bool) {
 	return nil, false
 }
 
+// hostConfig finds the host.v2 or host.v1 config of a service.
+func (g *Graph) hostConfig(svc ziti.Entity) (ziti.Entity, string, bool) {
+	for _, typeName := range []string{"host.v2", "host.v1"} {
+		if c, ok := g.configOf(svc, typeName); ok {
+			return c, typeName, true
+		}
+	}
+	return nil, "", false
+}
+
 func (g *Graph) protocolFindings(svc ziti.Entity) []Finding {
 	name := str(svc, "name")
 	icpt, iok := g.configOf(svc, "intercept.v1")
-	host, hok := g.configOf(svc, "host.v1")
+	host, hostType, hok := g.hostConfig(svc)
 	var out []Finding
 	if !iok {
 		out = append(out, Finding{MissingConfig, name, "no intercept.v1 config"})
 	}
 	if !hok {
-		out = append(out, Finding{MissingConfig, name, "no host.v1 config"})
+		out = append(out, Finding{MissingConfig, name, "no host.v1 or host.v2 config"})
 	}
 	if !iok || !hok {
 		return out
 	}
 	hostData, _ := host["data"].(map[string]any)
 	icptData, _ := icpt["data"].(map[string]any)
-	allowed := hostProtocols(hostData)
+	allowed := hostProtocols(hostType, hostData)
 	if allowed == nil {
 		return out
 	}
 	for _, p := range anyStrings(icptData["protocols"]) {
 		if !slices.Contains(allowed, p) {
-			out = append(out, Finding{ProtocolMismatch, name, "intercept captures " + p + " but host.v1 does not allow it"})
+			out = append(out, Finding{ProtocolMismatch, name, "intercept captures " + p + " but " + hostType + " does not allow it"})
 		}
 	}
 	return out
 }
 
-// hostProtocols returns nil when host.v1 allows every protocol.
-func hostProtocols(d map[string]any) []string {
+// hostProtocols returns nil when the host config allows every protocol.
+// For host.v2 it returns the union over all terminators.
+func hostProtocols(typeName string, d map[string]any) []string {
+	if typeName != "host.v2" {
+		return terminatorProtocols(d)
+	}
+	var union []string
+	terms, _ := d["terminators"].([]any)
+	for _, t := range terms {
+		td, _ := t.(map[string]any)
+		p := terminatorProtocols(td)
+		if p == nil {
+			return nil
+		}
+		for _, x := range p {
+			if !slices.Contains(union, x) {
+				union = append(union, x)
+			}
+		}
+	}
+	return union
+}
+
+func terminatorProtocols(d map[string]any) []string {
 	if fwd, _ := d["forwardProtocol"].(bool); fwd {
 		if a := anyStrings(d["allowedProtocols"]); len(a) > 0 {
 			return a

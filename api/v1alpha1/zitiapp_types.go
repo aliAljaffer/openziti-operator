@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type ManagementPolicy string
@@ -36,15 +37,20 @@ const (
 	DeletionPolicyOrphan DeletionPolicy = "Orphan"
 )
 
-type Intercept struct {
+// Expose is how clients reach the app.
+type Expose struct {
+	// addresses are the hostnames, IPs, or CIDRs clients dial.
 	// +kubebuilder:validation:MinItems=1
 	Addresses []string `json:"addresses"`
 
+	// ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
+	// The operator checks range syntax and reports InvalidSpec.
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:items:Minimum=1
-	// +kubebuilder:validation:items:Maximum=65535
-	Ports []int32 `json:"ports"`
+	// +kubebuilder:validation:MaxItems=16
+	// +kubebuilder:validation:items:XValidation:rule="type(self) != int || (self >= 1 && self <= 65535)",message="a port is 1-65535"
+	Ports []intstr.IntOrString `json:"ports"`
 
+	// protocols the clients may use. The targets always accept the same protocols.
 	// +kubebuilder:default={tcp}
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:items:Enum=tcp;udp
@@ -52,54 +58,56 @@ type Intercept struct {
 	Protocols []string `json:"protocols,omitempty"`
 }
 
-type ServiceRef struct {
-	Name string `json:"name"`
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	Port int32 `json:"port"`
-}
-
-// Host sets the target. Set exactly one of serviceRef and address.
-// +kubebuilder:validation:XValidation:rule="has(self.serviceRef) != has(self.address)",message="set exactly one of serviceRef and address"
-// +kubebuilder:validation:XValidation:rule="has(self.address) == has(self.port)",message="port is required with address"
-type Host struct {
-	// +optional
-	ServiceRef *ServiceRef `json:"serviceRef,omitempty"`
+// Target is one place the app runs. Set exactly one of address and kubernetesService.
+// +kubebuilder:validation:XValidation:rule="has(self.address) != has(self.kubernetesService)",message="set exactly one of address and kubernetesService"
+// +kubebuilder:validation:XValidation:rule="!has(self.kubernetesService) || has(self.port)",message="port is required with kubernetesService"
+type Target struct {
+	// address is an IP or hostname the hosting router can reach.
 	// +optional
 	Address string `json:"address,omitempty"`
+
+	// kubernetesService is a Service name in this namespace.
+	// +optional
+	KubernetesService string `json:"kubernetesService,omitempty"`
+
+	// port on the target. Without it, the port the client dialed is used.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
-	// forwardProtocol true hosts every protocol in intercept.protocols. False hosts only the first one.
+	// cost ranks targets. Ziti prefers the lowest cost. Targets with equal cost share the load.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
 	// +optional
-	ForwardProtocol bool `json:"forwardProtocol,omitempty"`
+	Cost int32 `json:"cost,omitempty"`
 }
 
-type Access struct {
-	// identityRoles creates a Dial policy for this service when set.
+// Allow says who may connect. Groups and identities are combined.
+type Allow struct {
+	// groups are identity role attributes. Every identity with one of them may connect.
 	// +optional
-	IdentityRoles []string `json:"identityRoles,omitempty"`
+	Groups []string `json:"groups,omitempty"`
+
+	// identities are names of identities in Ziti. They may exist outside Kubernetes.
+	// A name that does not exist yet is reported in the AccessResolved condition.
+	// +optional
+	Identities []string `json:"identities,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.intercept) || !has(self.intercept.protocols) || size(self.intercept.protocols) < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)",message="more than one intercept protocol requires host.forwardProtocol"
-// +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.intercept) && has(self.host))",message="intercept and host are required unless managementPolicy is Observe"
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.expose) && has(self.targets) && size(self.targets) > 0)",message="expose and targets are required unless managementPolicy is Observe"
 type ZitiAppSpec struct {
 	// +kubebuilder:default=default
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
 
-	// zitiName defaults to <namespace>.<name>.
+	// zitiName is the service name in Ziti. It defaults to <namespace>.<name>.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
-
-	// +optional
-	RoleAttributes []string `json:"roleAttributes,omitempty"`
 
 	// managementPolicy Manage creates and updates the Ziti entities. Observe only reads the existing service
 	// named zitiName and reports its status. It never writes to Ziti.
@@ -113,22 +121,33 @@ type ZitiAppSpec struct {
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
-	// intercept and host are ignored when managementPolicy is Observe.
+	// expose, targets, and allow are ignored or optional when managementPolicy is Observe.
 	// +optional
-	Intercept Intercept `json:"intercept,omitzero"`
-	// +optional
-	Host Host `json:"host,omitzero"`
+	Expose Expose `json:"expose,omitzero"`
 
-	// hostingRouter must be in the connection's hostingRouters. It defaults to the first entry.
+	// targets are the places the app runs. Each one becomes a terminator in Ziti.
+	// +kubebuilder:validation:MaxItems=16
 	// +optional
-	HostingRouter string `json:"hostingRouter,omitempty"`
+	Targets []Target `json:"targets,omitempty"`
 
-	// edgeRouters are extra entry routers. The hosting router is always included.
+	// allow creates a Dial policy for this app.
 	// +optional
-	EdgeRouters []string `json:"edgeRouters,omitempty"`
+	Allow Allow `json:"allow,omitempty"`
 
+	// memberOf are groups the app belongs to. Existing policies that grant access to a group apply to it.
+	// Groups follow the connection roleScope.
 	// +optional
-	Access Access `json:"access,omitempty"`
+	MemberOf []string `json:"memberOf,omitempty"`
+
+	// hostedBy is the router that runs the targets. It must be in the connection hostingRouters.
+	// It defaults to the first entry.
+	// +optional
+	HostedBy string `json:"hostedBy,omitempty"`
+
+	// entryRouters are the routers clients connect through. The hosting router is always allowed for the app.
+	// When set, an edge router policy gives the allowed identities access to them.
+	// +optional
+	EntryRouters []string `json:"entryRouters,omitempty"`
 }
 
 type EntityIDs struct {
@@ -138,6 +157,7 @@ type EntityIDs struct {
 	Bind      string `json:"bind,omitempty"`
 	SERP      string `json:"serp,omitempty"`
 	Dial      string `json:"dial,omitempty"`
+	ERP       string `json:"erp,omitempty"`
 }
 
 type Terminator struct {

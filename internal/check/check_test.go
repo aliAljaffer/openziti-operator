@@ -181,3 +181,26 @@ func TestLoadAndAudit(t *testing.T) {
 		t.Errorf("findings = %v", got)
 	}
 }
+
+func TestHostV2ProtocolCheck(t *testing.T) {
+	build := func(allowed []any) *Graph {
+		return &Graph{
+			ConfigTypes: []ziti.Entity{{"id": "ti", "name": "intercept.v1"}, {"id": "th2", "name": "host.v2"}},
+			Configs: []ziti.Entity{
+				{"id": "ci", "configTypeId": "ti", "data": map[string]any{"protocols": []any{"tcp", "udp"}}},
+				{"id": "ch", "configTypeId": "th2", "data": map[string]any{"terminators": []any{
+					map[string]any{"forwardProtocol": true, "allowedProtocols": allowed},
+					map[string]any{"protocol": "tcp"},
+				}}},
+			},
+		}
+	}
+	svc := ziti.Entity{"id": "s", "name": "s", "configs": []any{"ci", "ch"}}
+	fs := build([]any{"tcp"}).protocolFindings(svc)
+	if len(fs) != 1 || fs[0].Code != ProtocolMismatch {
+		t.Errorf("tcp only hosts: %v", fs)
+	}
+	if fs := build([]any{"tcp", "udp"}).protocolFindings(svc); len(fs) != 0 {
+		t.Errorf("one terminator allows udp: %v", fs)
+	}
+}

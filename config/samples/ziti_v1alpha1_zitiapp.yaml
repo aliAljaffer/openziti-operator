@@ -1,9 +1,19 @@
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiApp
 metadata:
-  labels:
-    app.kubernetes.io/name: ziti-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: zitiapp-sample
+  name: billing
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  zitiName: billing.example.com
+  expose:
+    addresses: [billing.example.com]
+    ports: [443, "8000-8005"]
+    protocols: [tcp]
+  targets:
+    - address: 10.0.0.5
+    - address: 10.0.0.6
+      cost: 10
+  allow:
+    groups: [team-a]
+    identities: [alice]
+  entryRouters: [edge-1]

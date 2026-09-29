@@ -67,11 +67,19 @@ spec:
           spec:
             description: spec defines the desired state of ZitiApp
             properties:
-              access:
+              allow:
+                description: allow creates a Dial policy for this app.
                 properties:
-                  identityRoles:
-                    description: identityRoles creates a Dial policy for this service
-                      when set.
+                  groups:
+                    description: groups are identity role attributes. Every identity
+                      with one of them may connect.
+                    items:
+                      type: string
+                    type: array
+                  identities:
+                    description: |-
+                      identities are names of identities in Ziti. They may exist outside Kubernetes.
+                      A name that does not exist yet is reported in the AccessResolved condition.
                     items:
                       type: string
                     type: array
@@ -85,70 +93,44 @@ spec:
                 - Delete
                 - Orphan
                 type: string
-              edgeRouters:
-                description: edgeRouters are extra entry routers. The hosting router
-                  is always included.
+              entryRouters:
+                description: |-
+                  entryRouters are the routers clients connect through. The hosting router is always allowed for the app.
+                  When set, an edge router policy gives the allowed identities access to them.
                 items:
                   type: string
                 type: array
-              host:
-                description: Host sets the target. Set exactly one of serviceRef and
-                  address.
-                properties:
-                  address:
-                    type: string
-                  forwardProtocol:
-                    description: forwardProtocol true hosts every protocol in intercept.protocols.
-                      False hosts only the first one.
-                    type: boolean
-                  port:
-                    format: int32
-                    maximum: 65535
-                    minimum: 1
-                    type: integer
-                  serviceRef:
-                    properties:
-                      name:
-                        type: string
-                      port:
-                        format: int32
-                        maximum: 65535
-                        minimum: 1
-                        type: integer
-                    required:
-                    - name
-                    - port
-                    type: object
-                type: object
-                x-kubernetes-validations:
-                - message: set exactly one of serviceRef and address
-                  rule: has(self.serviceRef) != has(self.address)
-                - message: port is required with address
-                  rule: has(self.address) == has(self.port)
-              hostingRouter:
-                description: hostingRouter must be in the connection's hostingRouters.
-                  It defaults to the first entry.
-                type: string
-              intercept:
-                description: intercept and host are ignored when managementPolicy
-                  is Observe.
+              expose:
+                description: expose, targets, and allow are ignored or optional when
+                  managementPolicy is Observe.
                 properties:
                   addresses:
+                    description: addresses are the hostnames, IPs, or CIDRs clients
+                      dial.
                     items:
                       type: string
                     minItems: 1
                     type: array
                   ports:
+                    description: |-
+                      ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
+                      The operator checks range syntax and reports InvalidSpec.
                     items:
-                      format: int32
-                      maximum: 65535
-                      minimum: 1
-                      type: integer
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      x-kubernetes-int-or-string: true
+                      x-kubernetes-validations:
+                      - message: a port is 1-65535
+                        rule: type(self) != int || (self >= 1 && self <= 65535)
+                    maxItems: 16
                     minItems: 1
                     type: array
                   protocols:
                     default:
                     - tcp
+                    description: protocols the clients may use. The targets always
+                      accept the same protocols.
                     items:
                       enum:
                       - tcp
@@ -160,6 +142,11 @@ spec:
                 - addresses
                 - ports
                 type: object
+              hostedBy:
+                description: |-
+                  hostedBy is the router that runs the targets. It must be in the connection hostingRouters.
+                  It defaults to the first entry.
+                type: string
               managementPolicy:
                 default: Manage
                 description: |-
@@ -169,12 +156,52 @@ spec:
                 - Manage
                 - Observe
                 type: string
-              roleAttributes:
+              memberOf:
+                description: |-
+                  memberOf are groups the app belongs to. Existing policies that grant access to a group apply to it.
+                  Groups follow the connection roleScope.
                 items:
                   type: string
                 type: array
+              targets:
+                description: targets are the places the app runs. Each one becomes
+                  a terminator in Ziti.
+                items:
+                  description: Target is one place the app runs. Set exactly one of
+                    address and kubernetesService.
+                  properties:
+                    address:
+                      description: address is an IP or hostname the hosting router
+                        can reach.
+                      type: string
+                    cost:
+                      description: cost ranks targets. Ziti prefers the lowest cost.
+                        Targets with equal cost share the load.
+                      format: int32
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    kubernetesService:
+                      description: kubernetesService is a Service name in this namespace.
+                      type: string
+                    port:
+                      description: port on the target. Without it, the port the client
+                        dialed is used.
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                  type: object
+                  x-kubernetes-validations:
+                  - message: set exactly one of address and kubernetesService
+                    rule: has(self.address) != has(self.kubernetesService)
+                  - message: port is required with kubernetesService
+                    rule: '!has(self.kubernetesService) || has(self.port)'
+                maxItems: 16
+                type: array
               zitiName:
-                description: zitiName defaults to <namespace>.<name>.
+                description: zitiName is the service name in Ziti. It defaults to
+                  <namespace>.<name>.
                 maxLength: 1000
                 minLength: 1
                 type: string
@@ -185,13 +212,10 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
-            - message: more than one intercept protocol requires host.forwardProtocol
-              rule: '!has(self.intercept) || !has(self.intercept.protocols) || size(self.intercept.protocols)
-                < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)'
-            - message: intercept and host are required unless managementPolicy is
+            - message: expose and targets are required unless managementPolicy is
                 Observe
-              rule: self.managementPolicy == 'Observe' || (has(self.intercept) &&
-                has(self.host))
+              rule: self.managementPolicy == 'Observe' || (has(self.expose) && has(self.targets)
+                && size(self.targets) > 0)
           status:
             description: status defines the observed state of ZitiApp
             properties:
@@ -259,6 +283,8 @@ spec:
                   bind:
                     type: string
                   dial:
+                    type: string
+                  erp:
                     type: string
                   host:
                     type: string
