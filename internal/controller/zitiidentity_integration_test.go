@@ -185,3 +185,61 @@ func TestAdoptAgainstRealController(t *testing.T) {
 		t.Fatalf("after release: %v", got)
 	}
 }
+
+func TestCertificateRenewalAgainstRealController(t *testing.T) {
+	mgmt := os.Getenv("ZITI_MGMT_URL")
+	if mgmt == "" {
+		t.Skip("ZITI_MGMT_URL not set")
+	}
+	u, _ := url.Parse(mgmt)
+	pool, err := rest_util.GetControllerWellKnownCaPool("https://" + u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := rest_util.NewAuthenticatorUpdb(os.Getenv("ZITI_USERNAME"), os.Getenv("ZITI_PASSWORD"))
+	auth.RootCas = pool
+	real, err := ziti.NewREST(mgmt, auth, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e := setupIdentity(t)
+	e.r.Clients = staticProvider{real}
+	z := e.get(t)
+	z.Spec.EnrollmentMode = zitiv1.EnrollmentOperator
+	if err := e.k.Update(t.Context(), z); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	t.Cleanup(func() {
+		ctx := context.Background()
+		var cr zitiv1.ZitiIdentity
+		_ = e.k.Get(ctx, e.key, &cr)
+		_ = e.k.Delete(ctx, &cr)
+		_, _ = e.r.Reconcile(ctx, ctrl.Request{NamespacedName: e.key})
+	})
+
+	first := e.secret(t).Data[SecretKeyIdentity]
+	_, firstEnd, _ := ziti.CertValidity(first)
+
+	time.Sleep(2 * time.Second)
+	e.r.RenewBefore = 400 * 24 * time.Hour
+	e.reconcile(t)
+	second := e.secret(t).Data[SecretKeyIdentity]
+	_, secondEnd, err := ziti.CertValidity(second)
+	if err != nil || string(first) == string(second) || !secondEnd.After(firstEnd) {
+		t.Fatalf("identity file not renewed: %v %v %v", firstEnd, secondEnd, err)
+	}
+	if got := e.get(t); !got.Status.Enrolled || condStatusOf(got, CondReady) != "True" {
+		t.Fatalf("status = %+v", got.Status)
+	}
+
+	// the renewed file must still authenticate
+	auths, _ := real.List(t.Context(), ziti.Authenticators, `identity="`+e.get(t).Status.ZitiID+`"`)
+	if len(auths) != 1 {
+		t.Fatalf("authenticators = %v", auths)
+	}
+	if _, err := ziti.ExtendCert(second, auths[0].ID()); err != nil {
+		t.Fatalf("renewed identity file does not authenticate: %v", err)
+	}
+}

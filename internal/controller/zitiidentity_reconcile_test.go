@@ -471,3 +471,88 @@ func TestIdentityObserveNeverWrites(t *testing.T) {
 		t.Errorf("identity changed: %v", got)
 	}
 }
+
+func TestOperatorRenewsCertificateAutomatically(t *testing.T) {
+	e := operatorEnv(t)
+	e.reconcile(t)
+	iden := e.identity()
+	iden["authenticators"] = map[string]any{"cert": map[string]any{"id": "a1"}}
+	e.zc.Put(ziti.Authenticators, ziti.Entity{"identity": iden.ID(), "method": "cert", "certPem": certPEM(t, time.Now().Add(10*24*time.Hour))})
+
+	// identity.json in the Secret holds a certificate that expires in 10 days
+	old := identityJSONWithCert(t, time.Now().Add(-355*24*time.Hour), time.Now().Add(10*24*time.Hour))
+	s := e.secret(t)
+	s.Data[SecretKeyIdentity] = old
+	if err := e.k.Update(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+	var gotAuth string
+	e.r.Extend = func(file []byte, authID string) ([]byte, error) {
+		gotAuth = authID
+		return identityJSONWithCert(t, time.Now(), time.Now().Add(365*24*time.Hour)), nil
+	}
+
+	e.reconcile(t)
+	if gotAuth == "" {
+		t.Fatal("certificate was not renewed")
+	}
+	_, na, err := ziti.CertValidity(e.secret(t).Data[SecretKeyIdentity])
+	if err != nil || time.Until(na) < 300*24*time.Hour {
+		t.Errorf("secret holds the old certificate: %v %v", na, err)
+	}
+
+	gotAuth = ""
+	e.reconcile(t)
+	if gotAuth != "" {
+		t.Error("renewed again while the certificate is fresh")
+	}
+}
+
+func TestOperatorRenewalFailureKeepsFileAndRejectedCertRecreates(t *testing.T) {
+	e := operatorEnv(t)
+	e.reconcile(t)
+	iden := e.identity()
+	first := iden.ID()
+	iden["authenticators"] = map[string]any{"cert": map[string]any{"id": "a1"}}
+	e.zc.Put(ziti.Authenticators, ziti.Entity{"identity": first, "method": "cert", "certPem": certPEM(t, time.Now().Add(10*24*time.Hour))})
+	old := identityJSONWithCert(t, time.Now().Add(-355*24*time.Hour), time.Now().Add(10*24*time.Hour))
+	s := e.secret(t)
+	s.Data[SecretKeyIdentity] = old
+	if err := e.k.Update(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+
+	e.r.Extend = func([]byte, string) ([]byte, error) { return nil, errors.New("controller down") }
+	e.reconcile(t)
+	if string(e.secret(t).Data[SecretKeyIdentity]) != string(old) {
+		t.Error("failed renewal changed the Secret")
+	}
+	if z := e.get(t); !z.Status.Enrolled || findCond(z, CondCertValid).Reason != "ExpiresSoon" {
+		t.Errorf("status = %+v", z.Status)
+	}
+
+	e.r.Extend = func([]byte, string) ([]byte, error) { return nil, &ziti.APIError{Status: 401} }
+	e.reconcile(t)
+	if len(e.zc.Objects[ziti.Identities]) != 0 || findCond(e.get(t), CondReady).Reason != "IdentityFileLost" {
+		t.Fatalf("rejected certificate did not trigger recreate: %+v", e.get(t).Status)
+	}
+}
+
+func identityJSONWithCert(t *testing.T, notBefore, notAfter time.Time) []byte {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), NotBefore: notBefore, NotAfter: notAfter}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, _ := x509.MarshalECPrivateKey(key)
+	out, _ := json.Marshal(map[string]any{"ztAPI": "https://ctrl", "id": map[string]string{
+		"cert": "pem:" + string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})),
+		"key":  "pem:" + string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})),
+	}})
+	return out
+}

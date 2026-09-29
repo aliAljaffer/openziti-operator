@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"strings"
 	"time"
 
@@ -61,6 +62,10 @@ type ZitiIdentityReconciler struct {
 	Recorder record.EventRecorder
 	// Enroll turns an enrollment JWT into identity.json. Nil uses ziti.EnrollOTT.
 	Enroll func(jwt string) ([]byte, error)
+	// Extend renews the client certificate in identity.json. Nil uses ziti.ExtendCert.
+	Extend func(identityJSON []byte, authenticatorID string) ([]byte, error)
+	// RenewBefore overrides the renewal window. Zero means the smaller of 30 days and a third of the certificate lifetime.
+	RenewBefore time.Duration
 }
 
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
@@ -260,16 +265,23 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 			return err
 		}
 		if len(secret.Data[SecretKeyIdentity]) > 0 {
-			id.Status.EnrollmentExpiresAt = nil
-			setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
-			return r.trackCert(ctx, id, zc)
+			renewErr := r.renewIfDue(ctx, id, zc, &secret)
+			if !errors.Is(renewErr, errCertRejected) {
+				if renewErr != nil {
+					return renewErr
+				}
+				id.Status.EnrollmentExpiresAt = nil
+				setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
+				return r.trackCert(ctx, id, zc)
+			}
 		}
-		// The private key exists only in identity.json. Without it the identity is unusable, so start over.
+		// The private key exists only in identity.json. Without a working copy the identity is unusable, so start over.
 		if err := zc.Delete(ctx, ziti.Identities, zid.ID()); err != nil {
 			return err
 		}
-		r.Recorder.Eventf(id, "Warning", "IdentityFileLost", "identity is enrolled but Secret has no %s, deleted identity to enroll again", SecretKeyIdentity)
-		id.Status.ZitiID, id.Status.Enrolled = "", false
+		r.Recorder.Eventf(id, "Warning", "IdentityFileLost", "identity file is missing or its certificate is rejected, deleted identity to enroll again")
+		id.Status.ZitiID, id.Status.Enrolled, id.Status.CertNotAfter = "", false, nil
+		meta.RemoveStatusCondition(&id.Status.Conditions, CondCertValid)
 		setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "IdentityFileLost", "identity file was lost, enrolling again")
 		return nil
 	case id.Status.Enrolled:
@@ -323,6 +335,58 @@ func (r *ZitiIdentityReconciler) observeIdentity(ctx context.Context, id *zitiv1
 			id.Status.EnrollmentExpiresAt = &metav1.Time{Time: exp}
 		}
 	}
+	return nil
+}
+
+var errCertRejected = errors.New("controller rejected the identity certificate")
+
+// renewIfDue extends the client certificate when little of its lifetime is left, then stores the new identity.json.
+// Ziti rejects the old certificate once the new one is verified, so the Secret write must succeed.
+// A failed renewal is only reported. trackCert keeps warning until the certificate expires.
+func (r *ZitiIdentityReconciler) renewIfDue(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client, secret *corev1.Secret) error {
+	file := secret.Data[SecretKeyIdentity]
+	notBefore, notAfter, err := ziti.CertValidity(file)
+	if err != nil {
+		return nil
+	}
+	window := min(certWarnBefore, notAfter.Sub(notBefore)/3)
+	if r.RenewBefore > 0 {
+		window = r.RenewBefore
+	}
+	if time.Until(notAfter) > window {
+		return nil
+	}
+	auths, err := zc.List(ctx, ziti.Authenticators, fmt.Sprintf(`identity="%s" and method="cert"`, id.Status.ZitiID))
+	if err != nil {
+		return err
+	}
+	if len(auths) == 0 {
+		return nil
+	}
+	extend := r.Extend
+	if extend == nil {
+		extend = ziti.ExtendCert
+	}
+	next, err := extend(file, auths[0].ID())
+	if err != nil {
+		var ae *ziti.APIError
+		if errors.As(err, &ae) && ae.Status == http.StatusUnauthorized {
+			return errCertRejected
+		}
+		r.Recorder.Eventf(id, "Warning", "RenewalFailed", "could not renew certificate: %v", err)
+		return nil
+	}
+	for attempt := 0; ; attempt++ {
+		if err = r.writeSecret(ctx, id, SecretKeyIdentity, next); err == nil {
+			break
+		}
+		if attempt == 2 {
+			return fmt.Errorf("store renewed identity file: %w", err)
+		}
+		time.Sleep(time.Second << attempt)
+	}
+	secret.Data[SecretKeyIdentity] = next
+	r.Recorder.Eventf(id, "Normal", "CertificateRenewed", "renewed client certificate")
 	return nil
 }
 
