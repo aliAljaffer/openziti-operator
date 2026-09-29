@@ -273,9 +273,9 @@ HELM_CHART_DIR ?= charts/chart
 ## Additional arguments to pass to helm commands
 HELM_EXTRA_ARGS ?=
 
-.PHONY: chart-crds
-chart-crds: manifests ## Copy the generated CRDs into the Helm chart.
-	hack/sync-chart-crds.sh
+.PHONY: chart-sync
+chart-sync: manifests ## Copy the generated CRDs and RBAC rules into the Helm chart.
+	hack/sync-chart.sh
 
 .PHONY: docs
 docs: manifests ## Generate the CRD reference in docs/reference.

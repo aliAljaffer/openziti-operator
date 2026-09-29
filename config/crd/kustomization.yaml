@@ -6,6 +6,7 @@ resources:
 - bases/alialjaffer.ziti_zitiapps.yaml
 - bases/alialjaffer.ziti_zitiidentities.yaml
 - bases/alialjaffer.ziti_zitiaccesspolicies.yaml
+- bases/alialjaffer.ziti_zitijwtsigners.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

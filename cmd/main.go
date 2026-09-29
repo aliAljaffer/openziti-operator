@@ -42,6 +42,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	alialjafferv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
@@ -56,6 +57,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(zitiv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(alialjafferv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -267,6 +269,21 @@ func main() {
 		os.Exit(1)
 	}
 	ctrlmetrics.Registry.MustRegister(&controller.ConditionCollector{Reader: mgr.GetClient()})
+	clusterKeys, err := controller.NewClusterKeys(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "Failed to create the cluster key reader")
+		os.Exit(1)
+	}
+	if err := (&controller.ZitiJwtSignerReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Clients:  clients,
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+		Keys:     clusterKeys,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "zitijwtsigner")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

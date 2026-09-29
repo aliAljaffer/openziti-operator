@@ -40,7 +40,7 @@ After you change an API type, run:
 
 ```sh
 make manifests generate   # CRDs, RBAC, deepcopy
-make chart-crds           # copy the CRDs into the Helm chart
+make chart-sync           # copy the CRDs and RBAC rules into the Helm chart
 make docs                 # docs/reference from the CRDs
 ```
 

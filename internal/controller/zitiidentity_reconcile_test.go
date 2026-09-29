@@ -608,3 +608,86 @@ func TestIdentityOutsideSecretNamespacesWritesNothing(t *testing.T) {
 		t.Errorf("listed namespace: %+v", c)
 	}
 }
+
+func setSpec(t *testing.T, e *idEnv, mut func(*zitiv1.ZitiIdentitySpec)) {
+	t.Helper()
+	z := e.get(t)
+	mut(&z.Spec)
+	if err := e.k.Update(t.Context(), z); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIdentityNoneCreatesWithoutEnrollmentAndUsesTheServiceAccount(t *testing.T) {
+	e := setupIdentity(t)
+	setSpec(t, e, func(s *zitiv1.ZitiIdentitySpec) {
+		s.EnrollmentMode, s.AuthPolicy, s.ServiceAccount = zitiv1.EnrollmentNone, "Default", "web"
+	})
+	e.reconcile(t)
+
+	body := e.identity()
+	if body["externalId"] != "system:serviceaccount:team-a:web" {
+		t.Errorf("externalId = %v", body["externalId"])
+	}
+	if len(e.zc.Objects[ziti.Enrollments]) != 0 {
+		t.Error("None must not create an enrollment")
+	}
+	if _, err := e.secretOrNil(t); err == nil {
+		t.Error("None must not create a Secret")
+	}
+	z := e.get(t)
+	if c := findCond(z, CondReady); c.Status != metav1.ConditionTrue || c.Reason != "TokenLogin" {
+		t.Errorf("ready = %+v", c)
+	}
+	if z.Status.Enrolled || z.Status.EnrollmentExpiresAt != nil || z.Status.CertNotAfter != nil {
+		t.Errorf("status = %+v", z.Status)
+	}
+
+	e.zc.Calls = nil
+	e.reconcile(t)
+	for _, c := range e.zc.Calls {
+		if !strings.HasPrefix(c, "list") {
+			t.Errorf("second reconcile wrote: %s", c)
+		}
+	}
+}
+
+func TestIdentityExternalIDNeedsGlobalScope(t *testing.T) {
+	e := setupIdentity(t)
+	setSpec(t, e, func(s *zitiv1.ZitiIdentitySpec) {
+		s.EnrollmentMode, s.AuthPolicy, s.ExternalID = zitiv1.EnrollmentNone, "Default", "someone@idp"
+	})
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondSynced); c.Reason != "InvalidSpec" || !strings.Contains(c.Message, "roleScope Global") {
+		t.Errorf("namespaced: %+v", c)
+	}
+	if len(e.zc.Objects[ziti.Identities]) != 0 {
+		t.Error("nothing may be created for an invalid spec")
+	}
+
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Spec.RoleScope = zitiv1.RoleScopeGlobal
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if e.identity()["externalId"] != "someone@idp" {
+		t.Errorf("global: %v", e.identity())
+	}
+}
+
+func TestIdentityAdoptWithExternalIDPatchesIt(t *testing.T) {
+	e := setupIdentity(t)
+	setSpec(t, e, func(s *zitiv1.ZitiIdentitySpec) {
+		s.ManagementPolicy, s.EnrollmentMode, s.AuthPolicy, s.ServiceAccount = zitiv1.ManagementAdopt, zitiv1.EnrollmentNone, "Default", "web"
+	})
+	id := handMade(e, map[string]any{"owner": "human"})
+	e.reconcile(t)
+	got := e.zc.Objects[ziti.Identities][id]
+	if got["externalId"] != "system:serviceaccount:team-a:web" || got["externalId"] == "ext-1" || got.Tags()["owner"] != "human" {
+		t.Errorf("adopted identity = %v", got)
+	}
+}

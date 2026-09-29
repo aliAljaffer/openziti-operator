@@ -1,6 +1,6 @@
 # ADR 0002: Kubernetes service account tokens as Ziti identities
 
-Date: 2026-09-29. Status: spike done, not built.
+Date: 2026-09-29. Status: built. See `docs/service-account-tokens.md`.
 
 ## Question
 
@@ -26,10 +26,16 @@ Tested on controller v2.0.4 with a real token from a Talos cluster (`kubectl cre
 
 ## Decision
 
-Do not build it in v0.1.0. Record the recipe. When built, the smallest useful pieces are:
+Built after the first release work, as these pieces:
 
 1. `ZitiIdentity.spec.externalId`, so an identity can carry the service account subject.
 2. An enrollment mode with no enrollment (`None`), so no JWT or `identity.json` is created.
 3. Admins create the signer and the auth policy by hand, or a later `ZitiExternalJwtSigner` kind creates them. `spec.authPolicy` already names an auth policy.
 
 Workloads still need a Ziti client (SDK or tunneler) that presents the token. The operator does not provide one.
+
+## Result of building it
+
+- `ZitiJwtSigner` (cluster-scoped) creates the signer and an auth policy. `ZitiIdentity` got `serviceAccount`, `externalId`, and `enrollmentMode: None`.
+- Ziti allows one signer per issuer, so several signers cannot cover a key rotation. With `keys.kubernetes` the operator picks the key named in the header of its own token and updates the signer at the next sync. `keys.jwksEndpoint` follows rotation at once.
+- The Ziti controller returns `certPem` with an extra newline. The comparison trims whitespace.

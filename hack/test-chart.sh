@@ -51,4 +51,8 @@ for crd in config/crd/bases/*.yaml; do
   have=$(helm template t "$chart" -n ns --show-only "templates/crd/$name.yaml" 2>&1 | yq -o=json -I=0 '.spec' | sed 's/[[:space:]]//g')
   check "CRD in the chart matches config/crd/bases: $name" '[ "$want" = "$have" ]'
 done
+rules() { yq -o=json -I=0 '[.rules[] | {"g": ((.apiGroups // []) | sort), "r": ((.resources // []) | sort), "u": ((.nonResourceURLs // []) | sort), "v": (.verbs | sort)}] | sort_by(. | tostring)'; }
+want=$(yq 'select(.kind=="ClusterRole")' config/rbac/role.yaml | rules)
+have=$(helm template t "$chart" -n ns --show-only templates/rbac/manager-role.yaml | rules)
+check "manager RBAC in the chart matches config/rbac/role.yaml" '[ -n "$want" ] && [ "$want" = "$have" ]'
 exit $fail

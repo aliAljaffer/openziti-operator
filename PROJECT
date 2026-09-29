@@ -54,4 +54,12 @@ resources:
   kind: Service
   path: k8s.io/api/core/v1
   version: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: ziti
+  group: alialjaffer
+  kind: ZitiJwtSigner
+  path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

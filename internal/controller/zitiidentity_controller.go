@@ -108,7 +108,7 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var se *specError
 	var next ctrl.Result
 	switch {
-	case err == nil && id.Status.Enrolled:
+	case err == nil && (id.Status.Enrolled || id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentNone):
 		next.RequeueAfter = jitter(serviceResync)
 	case err == nil:
 		next.RequeueAfter = jitter(pendingRecheck)
@@ -211,7 +211,11 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		zid = existing[0]
 		if mode != zitiv1alpha1.ManagementObserve && !desired.Matches(comparable(body), zid) {
 			if isAdopted(zid) {
-				err = zc.Patch(ctx, ziti.Identities, zid.ID(), ziti.Entity{"roleAttributes": body["roleAttributes"], "authPolicyId": body["authPolicyId"]})
+				patch := ziti.Entity{"roleAttributes": body["roleAttributes"], "authPolicyId": body["authPolicyId"]}
+				if ext, ok := body["externalId"]; ok {
+					patch["externalId"] = ext
+				}
+				err = zc.Patch(ctx, ziti.Identities, zid.ID(), patch)
 			} else {
 				err = zc.Update(ctx, ziti.Identities, zid.ID(), body)
 			}
@@ -228,7 +232,10 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		if len(clash) > 0 {
 			return &specError{"NameConflict", fmt.Sprintf("identity %q already exists and is not managed by this operator, use managementPolicy Adopt or Observe", name)}
 		}
-		create := ziti.Entity{"enrollment": map[string]any{"ott": true}}
+		create := ziti.Entity{}
+		if id.Spec.EnrollmentMode != zitiv1alpha1.EnrollmentNone {
+			create["enrollment"] = map[string]any{"ott": true}
+		}
 		maps.Copy(create, body)
 		newID, err := zc.Create(ctx, ziti.Identities, create)
 		if err != nil {
@@ -249,11 +256,15 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 			if owner, _ := zid.Tags()[desired.TagUID].(string); owner != "" {
 				return &specError{"NameConflict", fmt.Sprintf("identity %q is already managed by another ZitiIdentity", name)}
 			}
-			err := zc.Patch(ctx, ziti.Identities, zid.ID(), ziti.Entity{
+			patch := ziti.Entity{
 				"roleAttributes": body["roleAttributes"],
 				"authPolicyId":   body["authPolicyId"],
 				"tags":           desired.AdoptTags(conn, id, zid.Tags()),
-			})
+			}
+			if ext, ok := body["externalId"]; ok {
+				patch["externalId"] = ext
+			}
+			err := zc.Patch(ctx, ziti.Identities, zid.ID(), patch)
 			if err != nil {
 				return err
 			}
@@ -269,6 +280,13 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	id.Status.Enrolled = len(auth) > 0
 	operator := id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentOperator
 
+	if id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentNone {
+		// The identity logs in with a token. There is nothing to enroll, no Secret, and no certificate.
+		id.Status.Enrolled, id.Status.EnrollmentExpiresAt, id.Status.CertNotAfter = false, nil, nil
+		meta.RemoveStatusCondition(&id.Status.Conditions, CondCertValid)
+		setCond(&id.Status.Conditions, id.Generation, CondReady, true, "TokenLogin", "", "")
+		return nil
+	}
 	if mode == zitiv1alpha1.ManagementObserve {
 		return r.observeIdentity(ctx, id, zc)
 	}

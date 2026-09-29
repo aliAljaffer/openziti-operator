@@ -368,6 +368,9 @@ func subset(want, got any) bool {
 			}
 		}
 		return true
+	case string:
+		g, ok := got.(string)
+		return ok && strings.TrimSpace(w) == strings.TrimSpace(g)
 	default:
 		return reflect.DeepEqual(want, got)
 	}

@@ -22,6 +22,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | `ZitiIdentity` | `Synced` | The identity exists and matches the spec. |
 | | `Ready` | The identity is enrolled and its certificate is valid. |
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
+| `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
+| | `Ready` | Same as `Synced`. |
 | `ZitiAccessPolicy` | `Synced` | The Dial policy (and the edge router policy) exist and match. |
 | | `Ready` | The Dial policy selects at least one identity and one service. |
 
@@ -41,6 +43,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `NamespaceNotAllowed` | The connection's `allowedNamespaces` excludes this namespace. | Label the namespace, or change the selector. |
 | `InvalidConnection` | The `allowedNamespaces` selector on the connection is invalid. | Fix the `ZitiConnection`. |
 | `SecretConflict` | A Secret with the wanted name exists and this `ZitiIdentity` does not own it. | Set another `secretName`. |
+| `KeyAmbiguous` | `ZitiJwtSigner` with `keys.kubernetes`: the cluster publishes several keys and the operator cannot tell which one signs tokens (it has no token to compare, or none matches). | Run the operator in the cluster, or use `keys.jwksEndpoint`. |
 | `SecretNamespaceNotAllowed` | The operator runs with `--secret-namespaces` (chart value `rbac.secretNamespaces`) and this namespace is not in it. | Add the namespace to the list. |
 
 ## Reasons on `Hosted`, `Dialable`, and `RoutePath`
@@ -64,6 +67,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `PendingEnrollment` | The identity is not enrolled yet. With `JwtOnly`, the enrollment JWT is in the Secret. |
 | `IdentityFileLost` | The Secret has no working `identity.json`. The operator deleted the Ziti identity and enrolls a new one. Its Ziti ID changes. |
 | `CertExpired` | The client certificate expired. |
+| `TokenLogin` (true) | `enrollmentMode: None`. The identity logs in with a token. There is nothing to enroll. |
 
 `CertificateValid` is `False` with reason `ExpiresSoon` (fewer than 30 days left) or `Expired`. `OperatorEnrolled` identities renew on their own. With `JwtOnly`, the workload must renew or re-enroll.
 

@@ -207,3 +207,89 @@ var _ = Describe("Service exposure", func() {
 		Expect(apierrors.IsNotFound(k8sClient.Get(ctx, key, &app))).To(BeTrue(), "the ZitiApp must be deleted")
 	})
 })
+
+var _ = Describe("ZitiJwtSigner and token identities", func() {
+	signer := func(mut func(*zitiv1.ZitiJwtSignerSpec)) *zitiv1.ZitiJwtSigner {
+		sg := &zitiv1.ZitiJwtSigner{
+			ObjectMeta: metav1.ObjectMeta{Name: "signer-case"},
+			Spec:       zitiv1.ZitiJwtSignerSpec{Audience: "ziti", Keys: zitiv1.SignerKeys{Kubernetes: &zitiv1.KubernetesKeys{}}},
+		}
+		if mut != nil {
+			mut(&sg.Spec)
+		}
+		return sg
+	}
+
+	DescribeTable("ZitiJwtSigner create",
+		func(mut func(*zitiv1.ZitiJwtSignerSpec), wantErr string) {
+			sg := signer(mut)
+			err := k8sClient.Create(ctx, sg)
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, signer(nil)) })
+			if wantErr == "" {
+				Expect(err).NotTo(HaveOccurred())
+				return
+			}
+			Expect(err).To(MatchError(ContainSubstring(wantErr)))
+		},
+		Entry("kubernetes keys", nil, ""),
+		Entry("jwksEndpoint keys", func(s *zitiv1.ZitiJwtSignerSpec) {
+			s.Keys = zitiv1.SignerKeys{JwksEndpoint: &zitiv1.JwksEndpoint{URL: "https://idp.example/keys", Issuer: "https://idp.example"}}
+		}, ""),
+		Entry("no key source", func(s *zitiv1.ZitiJwtSignerSpec) { s.Keys = zitiv1.SignerKeys{} }, "set exactly one of kubernetes and jwksEndpoint"),
+		Entry("two key sources", func(s *zitiv1.ZitiJwtSignerSpec) {
+			s.Keys.JwksEndpoint = &zitiv1.JwksEndpoint{URL: "https://idp.example/keys", Issuer: "i"}
+		}, "set exactly one of kubernetes and jwksEndpoint"),
+		Entry("http jwks url", func(s *zitiv1.ZitiJwtSignerSpec) {
+			s.Keys = zitiv1.SignerKeys{JwksEndpoint: &zitiv1.JwksEndpoint{URL: "http://idp.example/keys", Issuer: "i"}}
+		}, "should match"),
+		Entry("empty audience", func(s *zitiv1.ZitiJwtSignerSpec) { s.Audience = "" }, "audience"),
+		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiJwtSignerSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
+	)
+
+	It("applies defaults to a signer and keeps zitiName and deletionPolicy fixed", func() {
+		sg := signer(func(s *zitiv1.ZitiJwtSignerSpec) { s.ZitiName = "a" })
+		Expect(k8sClient.Create(ctx, sg)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, sg) })
+		Expect(sg.Spec.ClaimsProperty).To(Equal("sub"))
+		Expect(*sg.Spec.UseExternalID).To(BeTrue())
+		Expect(*sg.Spec.CreateAuthPolicy).To(BeTrue())
+		Expect(sg.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+		Expect(sg.Spec.ConnectionRef).To(Equal("default"))
+
+		sg.Spec.ZitiName = "b"
+		Expect(k8sClient.Update(ctx, sg)).To(MatchError(ContainSubstring("zitiName is immutable")))
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "signer-case"}, sg)).To(Succeed())
+		sg.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
+		Expect(k8sClient.Update(ctx, sg)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
+	})
+
+	DescribeTable("ZitiIdentity token login rules",
+		func(mut func(*zitiv1.ZitiIdentitySpec), wantErr string) {
+			id := &zitiv1.ZitiIdentity{ObjectMeta: metav1.ObjectMeta{Name: "token-case", Namespace: "default"}}
+			mut(&id.Spec)
+			err := k8sClient.Create(ctx, id)
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, id) })
+			if wantErr == "" {
+				Expect(err).NotTo(HaveOccurred())
+				return
+			}
+			Expect(err).To(MatchError(ContainSubstring(wantErr)))
+		},
+		Entry("None with a service account and an auth policy", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.AuthPolicy, s.ServiceAccount = zitiv1.EnrollmentNone, "k8s", "web"
+		}, ""),
+		Entry("None with an external id and an auth policy", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.AuthPolicy, s.ExternalID = zitiv1.EnrollmentNone, "idp", "someone"
+		}, ""),
+		Entry("None without an auth policy", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.ServiceAccount = zitiv1.EnrollmentNone, "web"
+		}, "enrollmentMode None needs authPolicy"),
+		Entry("None without a subject", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.AuthPolicy = zitiv1.EnrollmentNone, "k8s"
+		}, "enrollmentMode None needs authPolicy"),
+		Entry("service account and external id together", func(s *zitiv1.ZitiIdentitySpec) {
+			s.ServiceAccount, s.ExternalID = "web", "someone"
+		}, "set only one of serviceAccount and externalId"),
+		Entry("JwtOnly with a service account", func(s *zitiv1.ZitiIdentitySpec) { s.ServiceAccount = "web" }, ""),
+	)
+})

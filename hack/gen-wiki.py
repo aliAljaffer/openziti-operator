@@ -16,6 +16,7 @@ PAGES = {
     "README.md": "Home",
     "docs/install.md": "Installation",
     "docs/first-app.md": "Your-First-App",
+    "docs/service-account-tokens.md": "Service-Account-Tokens",
     "docs/role-scope.md": "Role-Scope",
     "docs/existing-resources.md": "Existing-Resources",
     "docs/audit.md": "Audit",
@@ -29,7 +30,7 @@ PAGES = {
     "CONTRIBUTING.md": "Contributing",
     "SECURITY.md": "Security",
 }
-for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiAccessPolicy"):
+for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiAccessPolicy", "ZitiJwtSigner"):
     PAGES[f"docs/reference/{kind}.md"] = kind
 
 LINK = re.compile(r"\]\(((?:\.\./|\./)*(?:docs/|reference/|adr/)*)([A-Za-z0-9_.-]+\.md)(#[^)]*)?\)")
@@ -41,12 +42,14 @@ SIDEBAR = """**[Home](Home)**
 - [Your first app](Your-First-App)
 - [Role scope](Role-Scope)
 - [Existing Ziti resources](Existing-Resources)
+- [Service account tokens](Service-Account-Tokens)
 
 **Resource reference**
 - [ZitiConnection](ZitiConnection)
 - [ZitiApp](ZitiApp)
 - [ZitiIdentity](ZitiIdentity)
 - [ZitiAccessPolicy](ZitiAccessPolicy)
+- [ZitiJwtSigner](ZitiJwtSigner)
 
 **Run it**
 - [Conditions and reasons](Conditions-and-Reasons)

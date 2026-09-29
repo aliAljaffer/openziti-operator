@@ -17,7 +17,7 @@ The operator drives the OpenZiti Edge Management API from Kubernetes resources. 
 | `internal/check/` | Pure graph checks. The same code feeds status conditions and `cmd/audit` |
 | `internal/ziti/` | REST client, fake client, enrollment, certificate extend |
 | `cmd/main.go`, `cmd/audit/` | Manager and the read-only audit command |
-| `charts/chart/` | Helm chart. CRD copies come from `make chart-crds` |
+| `charts/chart/` | Helm chart. CRD copies come from `make chart-sync` |
 | `docs/` | Guides. `docs/reference/` is generated |
 | `hack/` | Chart tests, docs and wiki generators, hygiene check |
 
@@ -26,7 +26,7 @@ The operator drives the OpenZiti Edge Management API from Kubernetes resources. 
 | Task | Command |
 |---|---|
 | Regenerate CRDs, RBAC, deepcopy | `make manifests generate` |
-| Copy CRDs into the chart | `make chart-crds` |
+| Copy CRDs into the chart | `make chart-sync` |
 | Regenerate the reference docs | `make docs` |
 | Unit and envtest tests | `make test` (about 40 seconds, run it in the background) |
 | Chart checks | `hack/test-chart.sh` |

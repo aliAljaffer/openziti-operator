@@ -34,7 +34,7 @@ Each line was tested against a real controller. Test a new assumption the same w
 ## External JWT signers
 
 - Path is `/external-jwt-signers`. Fields: `issuer`, `audience`, `claimsProperty`, `useExternalId`, and `certPem` with `kid` or `jwksEndpoint`.
-- The `issuer` must be unique across signers, and so must the certificate fingerprint. One signer per issuer. Key rotation needs a `jwksEndpoint`.
+- The `issuer` must be unique across signers, and so must the certificate fingerprint. One signer per issuer, so several signers cannot cover a key rotation. Follow rotation with a `jwksEndpoint`, or update the one signer when the key changes.
 - The controller returns `certPem` with an extra trailing newline.
 - An auth policy allows a signer with `primary.extJwt.allowed=true` and `allowedSigners=[<signer id>]`. Identities match the token claim to `externalId`. An identity may have no enrollment.
 - Log in with `POST /edge/client/v1/authenticate?method=ext-jwt` and `Authorization: Bearer <token>`.

@@ -95,9 +95,17 @@ spec:
                 description: |-
                   enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
                   OperatorEnrolled makes the operator enroll and write identity.json to the Secret.
+                  None creates an identity without enrollment. It logs in with a token, so authPolicy is required.
                 enum:
                 - JwtOnly
                 - OperatorEnrolled
+                - None
+                type: string
+              externalId:
+                description: |-
+                  externalId is the value that a token claim must match to log in as this identity, for an identity provider
+                  other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject.
+                maxLength: 1000
                 type: string
               managementPolicy:
                 default: Manage
@@ -121,6 +129,12 @@ spec:
                   by enrollmentMode. It defaults to the CR name.
                 maxLength: 253
                 type: string
+              serviceAccount:
+                description: |-
+                  serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity.
+                  It sets externalId to system:serviceaccount:<namespace>:<name>. Needs a ZitiJwtSigner and an authPolicy that allows it.
+                maxLength: 253
+                type: string
               zitiName:
                 description: zitiName defaults to <namespace>.<name>.
                 maxLength: 1000
@@ -135,6 +149,12 @@ spec:
               rule: self.deletionPolicy == oldSelf.deletionPolicy
             - message: enrollmentMode is immutable
               rule: self.enrollmentMode == oldSelf.enrollmentMode
+            - message: set only one of serviceAccount and externalId
+              rule: '!(has(self.serviceAccount) && has(self.externalId))'
+            - message: enrollmentMode None needs authPolicy and serviceAccount or
+                externalId
+              rule: self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount)
+                || has(self.externalId)))
           status:
             description: status defines the observed state of ZitiIdentity
             properties:

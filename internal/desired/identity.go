@@ -3,6 +3,7 @@
 package desired
 
 import (
+	"fmt"
 	"strings"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -26,14 +27,37 @@ func Identity(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection, authPolicyID
 	if err != nil {
 		return nil, err
 	}
-	return ziti.Entity{
+	e := ziti.Entity{
 		"name":           IdentityName(id),
 		"type":           "Default",
 		"isAdmin":        false,
 		"roleAttributes": attrs,
 		"authPolicyId":   authPolicyID,
 		"tags":           ownerTags(conn, "ZitiIdentity", &id.ObjectMeta),
-	}, nil
+	}
+	ext, err := ExternalID(id, conn)
+	if err != nil {
+		return nil, err
+	}
+	if ext != "" {
+		e["externalId"] = ext
+	}
+	return e, nil
+}
+
+// ExternalID returns the value a token claim must match. serviceAccount is safe in every scope. A free externalId
+// can name any subject, so it needs roleScope Global.
+func ExternalID(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection) (string, error) {
+	switch {
+	case id.Spec.ServiceAccount != "":
+		return "system:serviceaccount:" + id.Namespace + ":" + id.Spec.ServiceAccount, nil
+	case id.Spec.ExternalID != "":
+		if conn.Spec.RoleScope != zitiv1.RoleScopeGlobal {
+			return "", fmt.Errorf("externalId needs roleScope Global on the connection, use serviceAccount instead")
+		}
+		return id.Spec.ExternalID, nil
+	}
+	return "", nil
 }
 
 // AdoptTags returns the existing tags plus the ownership tags. Ziti replaces the whole tag map on PATCH.

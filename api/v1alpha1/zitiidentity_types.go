@@ -24,6 +24,8 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode == oldSelf.enrollmentMode",message="enrollmentMode is immutable"
+// +kubebuilder:validation:XValidation:rule="!(has(self.serviceAccount) && has(self.externalId))",message="set only one of serviceAccount and externalId"
+// +kubebuilder:validation:XValidation:rule="self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount) || has(self.externalId)))",message="enrollmentMode None needs authPolicy and serviceAccount or externalId"
 type ZitiIdentitySpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -49,10 +51,23 @@ type ZitiIdentitySpec struct {
 	// +optional
 	SecretName string `json:"secretName,omitempty"`
 
+	// serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity.
+	// It sets externalId to system:serviceaccount:<namespace>:<name>. Needs a ZitiJwtSigner and an authPolicy that allows it.
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	ServiceAccount string `json:"serviceAccount,omitempty"`
+
+	// externalId is the value that a token claim must match to log in as this identity, for an identity provider
+	// other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject.
+	// +kubebuilder:validation:MaxLength=1000
+	// +optional
+	ExternalID string `json:"externalId,omitempty"`
+
 	// enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
 	// OperatorEnrolled makes the operator enroll and write identity.json to the Secret.
+	// None creates an identity without enrollment. It logs in with a token, so authPolicy is required.
 	// +kubebuilder:default=JwtOnly
-	// +kubebuilder:validation:Enum=JwtOnly;OperatorEnrolled
+	// +kubebuilder:validation:Enum=JwtOnly;OperatorEnrolled;None
 	// +optional
 	EnrollmentMode EnrollmentMode `json:"enrollmentMode,omitempty"`
 
@@ -76,6 +91,7 @@ type EnrollmentMode string
 const (
 	EnrollmentJWTOnly  EnrollmentMode = "JwtOnly"
 	EnrollmentOperator EnrollmentMode = "OperatorEnrolled"
+	EnrollmentNone     EnrollmentMode = "None"
 )
 
 type ZitiIdentityStatus struct {

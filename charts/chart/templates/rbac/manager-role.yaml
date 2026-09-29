@@ -10,6 +10,11 @@ metadata:
 {{- end }}
   name: {{ include "ziti-operator.resourceName" (dict "suffix" "manager-role" "context" $) }}
 rules:
+- nonResourceURLs:
+  - /.well-known/openid-configuration
+  - /openid/v1/jwks
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:
@@ -50,6 +55,7 @@ rules:
   - zitiapps
   - ziticonnections
   - zitiidentities
+  - zitijwtsigners
   verbs:
   - create
   - delete
@@ -65,6 +71,7 @@ rules:
   - zitiapps/finalizers
   - ziticonnections/finalizers
   - zitiidentities/finalizers
+  - zitijwtsigners/finalizers
   verbs:
   - update
 - apiGroups:
@@ -74,6 +81,7 @@ rules:
   - zitiapps/status
   - ziticonnections/status
   - zitiidentities/status
+  - zitijwtsigners/status
   verbs:
   - get
   - patch

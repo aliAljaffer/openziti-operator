@@ -36,6 +36,7 @@ const (
 	Enrollments               Kind = "enrollments"
 	AuthPolicies              Kind = "auth-policies"
 	Authenticators            Kind = "authenticators"
+	ExternalJWTSigners        Kind = "external-jwt-signers"
 )
 
 type Entity map[string]any
