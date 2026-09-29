@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- ziti_v1alpha1_ziticonnection.yaml
+- ziti_v1alpha1_zitiservice.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

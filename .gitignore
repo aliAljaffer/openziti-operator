@@ -1,2 +1,4 @@
 CURRENT_STATE.md
 *.private.yaml
+bin/
+cover.out
