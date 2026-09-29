@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiservices.ziti.alialjaffer.com
+  name: zitiapps.ziti.alialjaffer.com
 spec:
   group: ziti.alialjaffer.com
   names:
-    kind: ZitiService
-    listKind: ZitiServiceList
-    plural: zitiservices
+    kind: ZitiApp
+    listKind: ZitiAppList
+    plural: zitiapps
     shortNames:
-    - ztsvc
-    singular: zitiservice
+    - ztapp
+    singular: zitiapp
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -45,7 +45,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiService is the Schema for the zitiservices API
+        description: ZitiApp is the Schema for the zitiapps API
         properties:
           apiVersion:
             description: |-
@@ -65,7 +65,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiService
+            description: spec defines the desired state of ZitiApp
             properties:
               access:
                 properties:
@@ -193,7 +193,7 @@ spec:
               rule: self.managementPolicy == 'Observe' || (has(self.intercept) &&
                 has(self.host))
           status:
-            description: status defines the observed state of ZitiService
+            description: status defines the observed state of ZitiApp
             properties:
               conditions:
                 items:

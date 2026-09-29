@@ -14,10 +14,10 @@ import (
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
-func builder(mut func(*zitiv1.ZitiService, *zitiv1.ZitiConnection)) *Builder {
-	svc := &zitiv1.ZitiService{
+func builder(mut func(*zitiv1.ZitiApp, *zitiv1.ZitiConnection)) *Builder {
+	svc := &zitiv1.ZitiApp{
 		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "team-a", UID: "uid-1"},
-		Spec: zitiv1.ZitiServiceSpec{
+		Spec: zitiv1.ZitiAppSpec{
 			Intercept: zitiv1.Intercept{Addresses: []string{"app.example.com"}, Ports: []int32{443}, Protocols: []string{"tcp"}},
 			Host:      zitiv1.Host{Address: "10.0.0.5", Port: 8443},
 		},
@@ -39,7 +39,7 @@ func TestZitiName(t *testing.T) {
 	if got := builder(nil).ZitiName(); got != "team-a.app" {
 		t.Errorf("default name = %q", got)
 	}
-	b := builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.ZitiName = "app.example.com" })
+	b := builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.ZitiName = "app.example.com" })
 	if got := b.ZitiName(); got != "app.example.com" {
 		t.Errorf("custom name = %q", got)
 	}
@@ -48,7 +48,7 @@ func TestZitiName(t *testing.T) {
 func TestTags(t *testing.T) {
 	tags := builder(nil).Tags()
 	want := map[string]any{
-		TagCluster: "default", TagKind: "ZitiService", TagNamespace: "team-a", TagName: "app", TagUID: "uid-1",
+		TagCluster: "default", TagKind: "ZitiApp", TagNamespace: "team-a", TagName: "app", TagUID: "uid-1",
 	}
 	if !reflect.DeepEqual(tags, want) {
 		t.Errorf("tags = %v", tags)
@@ -58,28 +58,28 @@ func TestTags(t *testing.T) {
 func TestHostConfig(t *testing.T) {
 	tests := []struct {
 		name string
-		mut  func(*zitiv1.ZitiService, *zitiv1.ZitiConnection)
+		mut  func(*zitiv1.ZitiApp, *zitiv1.ZitiConnection)
 		want map[string]any
 		err  string
 	}{
 		{"address tcp", nil, map[string]any{"address": "10.0.0.5", "port": int32(8443), "protocol": "tcp"}, ""},
-		{"service ref", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+		{"service ref", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 			s.Spec.Host = zitiv1.Host{ServiceRef: &zitiv1.ServiceRef{Name: "web", Port: 80}}
 		}, map[string]any{"address": "web.team-a.svc", "port": int32(80), "protocol": "tcp"}, ""},
-		{"udp only", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.Intercept.Protocols = []string{"udp"} },
+		{"udp only", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.Intercept.Protocols = []string{"udp"} },
 			map[string]any{"address": "10.0.0.5", "port": int32(8443), "protocol": "udp"}, ""},
-		{"forward protocol", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+		{"forward protocol", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 			s.Spec.Intercept.Protocols = []string{"tcp", "udp"}
 			s.Spec.Host.ForwardProtocol = true
 		}, map[string]any{"address": "10.0.0.5", "port": int32(8443), "forwardProtocol": true, "allowedProtocols": []string{"tcp", "udp"}}, ""},
-		{"udp mismatch", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+		{"udp mismatch", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 			s.Spec.Intercept.Protocols = []string{"tcp", "udp"}
 		},
 			nil, "forwardProtocol"},
-		{"both targets", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+		{"both targets", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 			s.Spec.Host.ServiceRef = &zitiv1.ServiceRef{Name: "web", Port: 80}
 		}, nil, "exactly one"},
-		{"no target", func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.Host = zitiv1.Host{} }, nil, "exactly one"},
+		{"no target", func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.Host = zitiv1.Host{} }, nil, "exactly one"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestHostConfig(t *testing.T) {
 }
 
 func TestInterceptConfig(t *testing.T) {
-	b := builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+	b := builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 		s.Spec.Intercept.Ports = []int32{80, 443}
 		s.Spec.Intercept.Protocols = nil
 	})
@@ -145,7 +145,7 @@ func TestScopeRoles(t *testing.T) {
 
 func TestServiceRoleAttributes(t *testing.T) {
 	set := func(scope zitiv1.RoleScope) *Builder {
-		return builder(func(s *zitiv1.ZitiService, c *zitiv1.ZitiConnection) {
+		return builder(func(s *zitiv1.ZitiApp, c *zitiv1.ZitiConnection) {
 			s.Spec.RoleAttributes = []string{"tenant"}
 			c.Spec.RoleScope = scope
 		})
@@ -164,7 +164,7 @@ func TestServiceRoleAttributes(t *testing.T) {
 }
 
 func TestBindAndSERP(t *testing.T) {
-	b := builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.EdgeRouters = []string{"r-x", "r-admin"} })
+	b := builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.EdgeRouters = []string{"r-x", "r-admin"} })
 	bind, err := b.Bind("svc-1")
 	if err != nil {
 		t.Fatal(err)
@@ -183,15 +183,15 @@ func TestBindAndSERP(t *testing.T) {
 }
 
 func TestHostingRouterErrors(t *testing.T) {
-	b := builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.HostingRouter = "r-x" })
+	b := builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.HostingRouter = "r-x" })
 	if _, err := b.Bind("s"); err == nil || !strings.Contains(err.Error(), "hostingRouters") {
 		t.Errorf("router outside allow-list: %v", err)
 	}
-	b = builder(func(_ *zitiv1.ZitiService, c *zitiv1.ZitiConnection) { c.Spec.DefaultEdgeRouters = []string{"missing"} })
+	b = builder(func(_ *zitiv1.ZitiApp, c *zitiv1.ZitiConnection) { c.Spec.DefaultEdgeRouters = []string{"missing"} })
 	if _, err := b.SERP("s"); err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("unknown router: %v", err)
 	}
-	b = builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.HostingRouter = "r-admin" })
+	b = builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.HostingRouter = "r-admin" })
 	bind, _ := b.Bind("s")
 	if !reflect.DeepEqual(bind["identityRoles"], []string{"@id-admin"}) {
 		t.Errorf("explicit hosting router: %v", bind["identityRoles"])
@@ -203,14 +203,14 @@ func TestDial(t *testing.T) {
 	if e != nil || err != nil {
 		t.Errorf("no access roles: %v %v", e, err)
 	}
-	b := builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) {
+	b := builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
 		s.Spec.Access.IdentityRoles = []string{"#staff"}
 	})
 	e, err = b.Dial("svc-1")
 	if err != nil || !reflect.DeepEqual(e["identityRoles"], []string{"#team-a.staff"}) || e["type"] != "Dial" {
 		t.Errorf("dial = %v %v", e, err)
 	}
-	b = builder(func(s *zitiv1.ZitiService, _ *zitiv1.ZitiConnection) { s.Spec.Access.IdentityRoles = []string{"#all"} })
+	b = builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) { s.Spec.Access.IdentityRoles = []string{"#all"} })
 	if _, err := b.Dial("svc-1"); err == nil {
 		t.Error("namespaced #all must fail")
 	}

@@ -155,8 +155,8 @@ spec:
                   type: string
                 type: array
               hostingRouters:
-                description: hostingRouters are the router names a ZitiService may
-                  bind through. The first entry is the default.
+                description: hostingRouters are the router names a ZitiApp may bind
+                  through. The first entry is the default.
                 items:
                   type: string
                 minItems: 1

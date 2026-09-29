@@ -35,7 +35,7 @@ type ZitiIdentitySpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
-	// roleAttributes follow the connection roleScope, like ZitiService roleAttributes.
+	// roleAttributes follow the connection roleScope, like ZitiApp roleAttributes.
 	// +optional
 	RoleAttributes []string `json:"roleAttributes,omitempty"`
 

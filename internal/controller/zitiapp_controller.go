@@ -56,24 +56,24 @@ const (
 
 var deleteOrder = []ziti.Kind{ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.Services, ziti.Configs}
 
-type ZitiServiceReconciler struct {
+type ZitiAppReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Clients  ClientProvider
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiservices/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 type specError struct{ reason, msg string }
 
 func (e *specError) Error() string { return e.msg }
 
-func (r *ZitiServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var svc zitiv1alpha1.ZitiService
+func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var svc zitiv1alpha1.ZitiApp
 	if err := r.Get(ctx, req.NamespacedName, &svc); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -127,7 +127,7 @@ func jitter(d time.Duration) time.Duration {
 	return d + time.Duration(rand.Int64N(int64(d/10)))
 }
 
-func (r *ZitiServiceReconciler) connect(ctx context.Context, svc *zitiv1alpha1.ZitiService) (*zitiv1alpha1.ZitiConnection, ziti.Client, error) {
+func (r *ZitiAppReconciler) connect(ctx context.Context, svc *zitiv1alpha1.ZitiApp) (*zitiv1alpha1.ZitiConnection, ziti.Client, error) {
 	return connect(ctx, r.Client, r.Clients, svc.Spec.ConnectionRef)
 }
 
@@ -147,7 +147,7 @@ func tagFilter(uid types.UID) string {
 	return fmt.Sprintf(`tags.%s="%s"`, desired.TagUID, uid)
 }
 
-func (r *ZitiServiceReconciler) finalize(ctx context.Context, svc *zitiv1alpha1.ZitiService) error {
+func (r *ZitiAppReconciler) finalize(ctx context.Context, svc *zitiv1alpha1.ZitiApp) error {
 	if !controllerutil.ContainsFinalizer(svc, Finalizer) {
 		return nil
 	}
@@ -181,7 +181,7 @@ type syncResult struct {
 	report      check.ServiceReport
 }
 
-func (r *ZitiServiceReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiService, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) (*syncResult, error) {
+func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) (*syncResult, error) {
 	b := &desired.Builder{Svc: svc, Conn: conn}
 	name := b.ZitiName()
 	if strings.ContainsAny(name, `"\`) {
@@ -268,7 +268,7 @@ func (r *ZitiServiceReconciler) sync(ctx context.Context, svc *zitiv1alpha1.Ziti
 }
 
 // observeExisting reports on a service that was created outside this operator. It never writes to Ziti.
-func (r *ZitiServiceReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers []ziti.Entity) (*syncResult, error) {
+func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers []ziti.Entity) (*syncResult, error) {
 	found, err := zc.List(ctx, ziti.Services, fmt.Sprintf(`name="%s"`, name))
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func withID(e ziti.Entity, id string) ziti.Entity {
 	return out
 }
 
-func (r *ZitiServiceReconciler) observe(ctx context.Context, zc ziti.Client, name string, ids zitiv1alpha1.EntityIDs,
+func (r *ZitiAppReconciler) observe(ctx context.Context, zc ziti.Client, name string, ids zitiv1alpha1.EntityIDs,
 	routers, configTypes, configs []ziti.Entity, svc ziti.Entity) (*syncResult, error) {
 	g := &check.Graph{Services: []ziti.Entity{svc}, Configs: configs, ConfigTypes: configTypes, Routers: routers}
 	for _, l := range []struct {
@@ -383,7 +383,7 @@ func findingsFor(fs []check.Finding, codes ...string) (string, string) {
 	return reason, strings.Join(msgs, "; ")
 }
 
-func applyResult(svc *zitiv1alpha1.ZitiService, o *syncResult) {
+func applyResult(svc *zitiv1alpha1.ZitiApp, o *syncResult) {
 	svc.Status.ZitiName, svc.Status.IDs, svc.Status.Terminators = o.name, o.ids, o.terminators
 	fs := o.report.Findings
 	setCond(&svc.Status.Conditions, svc.Generation, CondSynced, true, "Synced", "", "")
@@ -414,10 +414,10 @@ func markFailed(conds *[]metav1.Condition, gen int64, reason, msg string) {
 	}
 }
 
-func (r *ZitiServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ZitiAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&zitiv1alpha1.ZitiService{}).
-		Named("zitiservice").
+		For(&zitiv1alpha1.ZitiApp{}).
+		Named("zitiapp").
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).
 		Complete(r)
 }

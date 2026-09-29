@@ -27,7 +27,7 @@ const (
 )
 
 type Builder struct {
-	Svc       *zitiv1.ZitiService
+	Svc       *zitiv1.ZitiApp
 	Conn      *zitiv1.ZitiConnection
 	RouterIDs map[string]string
 }
@@ -40,7 +40,7 @@ func (b *Builder) ZitiName() string {
 }
 
 func (b *Builder) Tags() map[string]any {
-	return ownerTags(b.Conn, "ZitiService", &b.Svc.ObjectMeta)
+	return ownerTags(b.Conn, "ZitiApp", &b.Svc.ObjectMeta)
 }
 
 func ownerTags(conn *zitiv1.ZitiConnection, kind string, m *metav1.ObjectMeta) map[string]any {

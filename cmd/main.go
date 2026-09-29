@@ -193,13 +193,13 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "ziticonnection")
 		os.Exit(1)
 	}
-	if err := (&controller.ZitiServiceReconciler{
+	if err := (&controller.ZitiAppReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Clients:  clients,
 		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "zitiservice")
+		setupLog.Error(err, "Failed to create controller", "controller", "zitiapp")
 		os.Exit(1)
 	}
 	if err := (&controller.ZitiIdentityReconciler{

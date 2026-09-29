@@ -23,7 +23,7 @@ resources:
   controller: true
   domain: alialjaffer.com
   group: ziti
-  kind: ZitiService
+  kind: ZitiApp
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:

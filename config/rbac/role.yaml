@@ -36,9 +36,9 @@ rules:
   - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies
+  - zitiapps
   - ziticonnections
   - zitiidentities
-  - zitiservices
   verbs:
   - create
   - delete
@@ -51,18 +51,18 @@ rules:
   - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies/finalizers
+  - zitiapps/finalizers
   - ziticonnections/finalizers
   - zitiidentities/finalizers
-  - zitiservices/finalizers
   verbs:
   - update
 - apiGroups:
   - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies/status
+  - zitiapps/status
   - ziticonnections/status
   - zitiidentities/status
-  - zitiservices/status
   verbs:
   - get
   - patch

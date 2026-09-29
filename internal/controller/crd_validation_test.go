@@ -13,10 +13,10 @@ import (
 )
 
 var _ = Describe("CRD validation", func() {
-	newService := func(name string, mut func(*zitiv1.ZitiServiceSpec)) *zitiv1.ZitiService {
-		s := &zitiv1.ZitiService{
+	newService := func(name string, mut func(*zitiv1.ZitiAppSpec)) *zitiv1.ZitiApp {
+		s := &zitiv1.ZitiApp{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-			Spec: zitiv1.ZitiServiceSpec{
+			Spec: zitiv1.ZitiAppSpec{
 				Intercept: zitiv1.Intercept{Addresses: []string{"app.example.com"}, Ports: []int32{443}},
 				Host:      zitiv1.Host{Address: "10.0.0.5", Port: 8443},
 			},
@@ -27,8 +27,8 @@ var _ = Describe("CRD validation", func() {
 		return s
 	}
 
-	DescribeTable("ZitiService create",
-		func(mut func(*zitiv1.ZitiServiceSpec), wantErr string) {
+	DescribeTable("ZitiApp create",
+		func(mut func(*zitiv1.ZitiAppSpec), wantErr string) {
 			err := k8sClient.Create(ctx, newService("create-case", mut))
 			DeferCleanup(func() { _ = k8sClient.Delete(ctx, newService("create-case", nil)) })
 			if wantErr == "" {
@@ -38,34 +38,34 @@ var _ = Describe("CRD validation", func() {
 			Expect(err).To(MatchError(ContainSubstring(wantErr)))
 		},
 		Entry("valid address host", nil, ""),
-		Entry("valid serviceRef host", func(s *zitiv1.ZitiServiceSpec) {
+		Entry("valid serviceRef host", func(s *zitiv1.ZitiAppSpec) {
 			s.Host = zitiv1.Host{ServiceRef: &zitiv1.ServiceRef{Name: "web", Port: 80}}
 		}, ""),
-		Entry("serviceRef and address", func(s *zitiv1.ZitiServiceSpec) {
+		Entry("serviceRef and address", func(s *zitiv1.ZitiAppSpec) {
 			s.Host.ServiceRef = &zitiv1.ServiceRef{Name: "web", Port: 80}
 		}, "set exactly one of serviceRef and address"),
-		Entry("no host target", func(s *zitiv1.ZitiServiceSpec) { s.Host = zitiv1.Host{} }, "intercept and host are required"),
-		Entry("observe needs no intercept or host", func(s *zitiv1.ZitiServiceSpec) {
+		Entry("no host target", func(s *zitiv1.ZitiAppSpec) { s.Host = zitiv1.Host{} }, "intercept and host are required"),
+		Entry("observe needs no intercept or host", func(s *zitiv1.ZitiAppSpec) {
 			s.ManagementPolicy = zitiv1.ManagementObserve
 			s.Intercept, s.Host = zitiv1.Intercept{}, zitiv1.Host{}
 		}, ""),
-		Entry("adopt is not allowed for services", func(s *zitiv1.ZitiServiceSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
-		Entry("address without port", func(s *zitiv1.ZitiServiceSpec) { s.Host.Port = 0 }, "port is required with address"),
-		Entry("port out of range", func(s *zitiv1.ZitiServiceSpec) { s.Intercept.Ports = []int32{70000} }, "less than or equal to 65535"),
-		Entry("no addresses", func(s *zitiv1.ZitiServiceSpec) { s.Intercept.Addresses = nil }, "addresses"),
-		Entry("two protocols without forwardProtocol", func(s *zitiv1.ZitiServiceSpec) {
+		Entry("adopt is not allowed for services", func(s *zitiv1.ZitiAppSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
+		Entry("address without port", func(s *zitiv1.ZitiAppSpec) { s.Host.Port = 0 }, "port is required with address"),
+		Entry("port out of range", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Ports = []int32{70000} }, "less than or equal to 65535"),
+		Entry("no addresses", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Addresses = nil }, "addresses"),
+		Entry("two protocols without forwardProtocol", func(s *zitiv1.ZitiAppSpec) {
 			s.Intercept.Protocols = []string{"tcp", "udp"}
 		}, "requires host.forwardProtocol"),
-		Entry("two protocols with forwardProtocol", func(s *zitiv1.ZitiServiceSpec) {
+		Entry("two protocols with forwardProtocol", func(s *zitiv1.ZitiAppSpec) {
 			s.Intercept.Protocols = []string{"tcp", "udp"}
 			s.Host.ForwardProtocol = true
 		}, ""),
-		Entry("unknown protocol", func(s *zitiv1.ZitiServiceSpec) { s.Intercept.Protocols = []string{"icmp"} }, "Unsupported value"),
-		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiServiceSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
+		Entry("unknown protocol", func(s *zitiv1.ZitiAppSpec) { s.Intercept.Protocols = []string{"icmp"} }, "Unsupported value"),
+		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiAppSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
 	)
 
-	It("makes ZitiService zitiName and deletionPolicy immutable and applies defaults", func() {
-		svc := newService("immutable-svc", func(s *zitiv1.ZitiServiceSpec) { s.ZitiName = "a.example.com" })
+	It("makes ZitiApp zitiName and deletionPolicy immutable and applies defaults", func() {
+		svc := newService("immutable-svc", func(s *zitiv1.ZitiAppSpec) { s.ZitiName = "a.example.com" })
 		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
 		Expect(svc.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))

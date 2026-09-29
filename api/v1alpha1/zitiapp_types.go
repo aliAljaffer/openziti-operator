@@ -87,7 +87,7 @@ type Access struct {
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="!has(self.intercept) || !has(self.intercept.protocols) || size(self.intercept.protocols) < 2 || (has(self.host.forwardProtocol) && self.host.forwardProtocol)",message="more than one intercept protocol requires host.forwardProtocol"
 // +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.intercept) && has(self.host))",message="intercept and host are required unless managementPolicy is Observe"
-type ZitiServiceSpec struct {
+type ZitiAppSpec struct {
 	// +kubebuilder:default=default
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
@@ -144,7 +144,7 @@ type Terminator struct {
 	Router string `json:"router"`
 }
 
-type ZitiServiceStatus struct {
+type ZitiAppStatus struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 	// +optional
@@ -162,7 +162,7 @@ type ZitiServiceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=ztsvc
+// +kubebuilder:resource:shortName=ztapp
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Hosted",type=string,JSONPath=".status.conditions[?(@.type=='Hosted')].status"
@@ -172,35 +172,35 @@ type ZitiServiceStatus struct {
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
-// ZitiService is the Schema for the zitiservices API
-type ZitiService struct {
+// ZitiApp is the Schema for the zitiapps API
+type ZitiApp struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata is a standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	// spec defines the desired state of ZitiService
+	// spec defines the desired state of ZitiApp
 	// +required
-	Spec ZitiServiceSpec `json:"spec"`
+	Spec ZitiAppSpec `json:"spec"`
 
-	// status defines the observed state of ZitiService
+	// status defines the observed state of ZitiApp
 	// +optional
-	Status ZitiServiceStatus `json:"status,omitzero"`
+	Status ZitiAppStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 
-// ZitiServiceList contains a list of ZitiService
-type ZitiServiceList struct {
+// ZitiAppList contains a list of ZitiApp
+type ZitiAppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items           []ZitiService `json:"items"`
+	Items           []ZitiApp `json:"items"`
 }
 
 func init() {
 	SchemeBuilder.Register(func(s *runtime.Scheme) error {
-		s.AddKnownTypes(SchemeGroupVersion, &ZitiService{}, &ZitiServiceList{})
+		s.AddKnownTypes(SchemeGroupVersion, &ZitiApp{}, &ZitiAppList{})
 		return nil
 	})
 }

@@ -76,7 +76,7 @@ type ZitiConnectionSpec struct {
 	// +optional
 	AllowedNamespaces *metav1.LabelSelector `json:"allowedNamespaces,omitempty"`
 
-	// hostingRouters are the router names a ZitiService may bind through. The first entry is the default.
+	// hostingRouters are the router names a ZitiApp may bind through. The first entry is the default.
 	// +kubebuilder:validation:MinItems=1
 	HostingRouters []string `json:"hostingRouters"`
 

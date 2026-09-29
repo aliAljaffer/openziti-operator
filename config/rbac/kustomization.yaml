@@ -28,9 +28,9 @@ resources:
 - zitiidentity_admin_role.yaml
 - zitiidentity_editor_role.yaml
 - zitiidentity_viewer_role.yaml
-- zitiservice_admin_role.yaml
-- zitiservice_editor_role.yaml
-- zitiservice_viewer_role.yaml
+- zitiapp_admin_role.yaml
+- zitiapp_editor_role.yaml
+- zitiapp_viewer_role.yaml
 - ziticonnection_admin_role.yaml
 - ziticonnection_editor_role.yaml
 - ziticonnection_viewer_role.yaml

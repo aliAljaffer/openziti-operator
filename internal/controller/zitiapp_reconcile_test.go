@@ -28,13 +28,13 @@ func (p staticProvider) For(context.Context, *zitiv1.ZitiConnection) (ziti.Clien
 }
 
 type env struct {
-	r   *ZitiServiceReconciler
+	r   *ZitiAppReconciler
 	zc  *ziti.Fake
 	k   client.Client
 	svc types.NamespacedName
 }
 
-func setup(t *testing.T, mut func(*zitiv1.ZitiService)) *env {
+func setup(t *testing.T, mut func(*zitiv1.ZitiApp)) *env {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := zitiv1.AddToScheme(scheme); err != nil {
@@ -47,9 +47,9 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiService)) *env {
 			HostingRouters: []string{"r-main"},
 		},
 	}
-	svc := &zitiv1.ZitiService{
+	svc := &zitiv1.ZitiApp{
 		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "team-a", UID: "uid-1", Generation: 1},
-		Spec: zitiv1.ZitiServiceSpec{
+		Spec: zitiv1.ZitiAppSpec{
 			ConnectionRef:  "default",
 			ZitiName:       "app.example.com",
 			RoleAttributes: []string{"tenant"},
@@ -62,7 +62,7 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiService)) *env {
 		mut(svc)
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(conn, svc).
-		WithStatusSubresource(&zitiv1.ZitiService{}, &zitiv1.ZitiConnection{}).Build()
+		WithStatusSubresource(&zitiv1.ZitiApp{}, &zitiv1.ZitiConnection{}).Build()
 
 	zc := ziti.NewFake()
 	zc.Put(ziti.ConfigTypes, ziti.Entity{"name": "intercept.v1"})
@@ -70,7 +70,7 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiService)) *env {
 	zc.Put(ziti.EdgeRouters, ziti.Entity{"id": "id-main", "name": "r-main", "isOnline": true})
 
 	return &env{
-		r:   &ZitiServiceReconciler{Client: k, Scheme: scheme, Clients: staticProvider{zc}, Recorder: record.NewFakeRecorder(100)},
+		r:   &ZitiAppReconciler{Client: k, Scheme: scheme, Clients: staticProvider{zc}, Recorder: record.NewFakeRecorder(100)},
 		zc:  zc,
 		k:   k,
 		svc: types.NamespacedName{Namespace: "team-a", Name: "app"},
@@ -86,9 +86,9 @@ func (e *env) reconcile(t *testing.T) ctrl.Result {
 	return res
 }
 
-func (e *env) get(t *testing.T) *zitiv1.ZitiService {
+func (e *env) get(t *testing.T) *zitiv1.ZitiApp {
 	t.Helper()
-	var s zitiv1.ZitiService
+	var s zitiv1.ZitiApp
 	if err := e.k.Get(t.Context(), e.svc, &s); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func (e *env) writes() []string {
 	return w
 }
 
-func condStatus(s *zitiv1.ZitiService, typ string) metav1.ConditionStatus {
+func condStatus(s *zitiv1.ZitiApp, typ string) metav1.ConditionStatus {
 	c := meta.FindStatusCondition(s.Status.Conditions, typ)
 	if c == nil {
 		return "missing"
@@ -170,7 +170,7 @@ func TestRevertsDriftedEntity(t *testing.T) {
 }
 
 func TestDialPolicyAddedAndRemoved(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiService) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
 	e.reconcile(t)
 	if e.count(ziti.ServicePolicies) != 2 || e.get(t).Status.IDs.Dial == "" {
 		t.Fatal("dial policy missing")
@@ -217,14 +217,14 @@ func TestNeverDeletesUntaggedEntities(t *testing.T) {
 	if e.count(ziti.Configs)+e.count(ziti.Services)+e.count(ziti.ServiceEdgeRouterPolicies) != 0 || e.count(ziti.ServicePolicies) != 1 {
 		t.Errorf("owned entities remain: %v", e.zc.Calls)
 	}
-	var gone zitiv1.ZitiService
+	var gone zitiv1.ZitiApp
 	if err := e.k.Get(t.Context(), e.svc, &gone); err == nil {
 		t.Error("service still exists after finalize")
 	}
 }
 
 func TestOrphanKeepsEntities(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiService) { s.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan })
 	e.reconcile(t)
 	if err := e.k.Delete(t.Context(), e.get(t)); err != nil {
 		t.Fatal(err)
@@ -236,7 +236,7 @@ func TestOrphanKeepsEntities(t *testing.T) {
 }
 
 func TestInvalidSpecDoesNotCreateAnything(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiService) { s.Spec.HostingRouter = "r-other" })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.HostingRouter = "r-other" })
 	e.reconcile(t)
 	if e.count(ziti.Configs)+e.count(ziti.Services) != 0 {
 		t.Errorf("created entities for an invalid spec: %v", e.zc.Calls)
@@ -248,7 +248,7 @@ func TestInvalidSpecDoesNotCreateAnything(t *testing.T) {
 }
 
 func TestHealthyServiceIsReady(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiService) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.Access.IdentityRoles = []string{"#staff"} })
 	e.reconcile(t)
 	svcID := e.get(t).Status.IDs.Service
 	e.zc.Put(ziti.Terminators, ziti.Entity{"serviceId": svcID, "routerId": "id-main"})
@@ -267,7 +267,7 @@ func TestHealthyServiceIsReady(t *testing.T) {
 }
 
 func TestObserveReadsExistingServiceWithoutWriting(t *testing.T) {
-	e := setup(t, func(s *zitiv1.ZitiService) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
 		s.Spec.ManagementPolicy = zitiv1.ManagementObserve
 		s.Spec.Intercept, s.Spec.Host = zitiv1.Intercept{}, zitiv1.Host{}
 	})

@@ -105,7 +105,7 @@ spec:
                 type: string
               roleAttributes:
                 description: roleAttributes follow the connection roleScope, like
-                  ZitiService roleAttributes.
+                  ZitiApp roleAttributes.
                 items:
                   type: string
                 type: array
