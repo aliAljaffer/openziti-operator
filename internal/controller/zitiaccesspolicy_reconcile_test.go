@@ -254,3 +254,7 @@ func TestAccessPolicyOrphanReleasesTags(t *testing.T) {
 		}
 	}
 }
+
+func typesName2(ns, name string) types.NamespacedName {
+	return types.NamespacedName{Namespace: ns, Name: name}
+}

@@ -43,6 +43,7 @@ rules:
   resources:
   - zitiaccesspolicies
   - zitiapps
+  - ziticas
   - ziticonnections
   - zitiidentities
   - zitijwtsigners
@@ -59,6 +60,7 @@ rules:
   resources:
   - zitiaccesspolicies/finalizers
   - zitiapps/finalizers
+  - ziticas/finalizers
   - ziticonnections/finalizers
   - zitiidentities/finalizers
   - zitijwtsigners/finalizers
@@ -69,6 +71,7 @@ rules:
   resources:
   - zitiaccesspolicies/status
   - zitiapps/status
+  - ziticas/status
   - ziticonnections/status
   - zitiidentities/status
   - zitijwtsigners/status

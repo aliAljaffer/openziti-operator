@@ -4,7 +4,11 @@ package ziti
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -134,6 +138,12 @@ func (f *Fake) Create(_ context.Context, kind Kind, body Entity) (string, error)
 		f.next++
 		b["jwt"] = fmt.Sprintf("jwt-%d", f.next)
 	}
+	if kind == CertificateAuthorities {
+		f.next++
+		b["verificationToken"] = fmt.Sprintf("tok-%d", f.next)
+		b["isVerified"] = false
+		b["fingerprint"] = certFingerprint(fmt.Sprint(b["certPem"]))
+	}
 	id := f.put(kind, "", b)
 	if _, ott := clone(body)["enrollment"].(map[string]any); ott && kind == Identities {
 		f.next++
@@ -152,7 +162,47 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 	if f.nameTaken(kind, body.Name(), id) {
 		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "name must be unique"}
 	}
-	f.put(kind, id, clone(body))
+	next := clone(body)
+	if kind == CertificateAuthorities {
+		// Ziti accepts a new certPem and silently keeps the old certificate.
+		cur := f.Objects[kind][id]
+		for _, k := range []string{"certPem", "fingerprint", "verificationToken", "isVerified"} {
+			if v, ok := cur[k]; ok {
+				next[k] = v
+			}
+		}
+	}
+	f.put(kind, id, next)
+	return nil
+}
+
+func certFingerprint(certPEM string) string {
+	sum := sha1.Sum([]byte(certPEM))
+	if block, _ := pem.Decode([]byte(certPEM)); block != nil {
+		sum = sha1.Sum(block.Bytes)
+	}
+	return hex.EncodeToString(sum[:])
+}
+
+// Verify accepts a certificate whose common name is the verification token. It does not check the signature.
+func (f *Fake) Verify(_ context.Context, kind Kind, id string, pemCertificate string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "verify "+string(kind)+" "+id)
+	ca, ok := f.Objects[kind][id]
+	if !ok {
+		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+	}
+	block, _ := pem.Decode([]byte(pemCertificate))
+	if block == nil {
+		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "not a certificate"}
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil || cert.Subject.CommonName != ca["verificationToken"] {
+		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "wrong verification certificate"}
+	}
+	ca["isVerified"] = true
+	delete(ca, "verificationToken")
 	return nil
 }
 

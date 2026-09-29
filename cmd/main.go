@@ -284,6 +284,16 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitijwtsigner")
 		os.Exit(1)
 	}
+	if err := (&controller.ZitiCAReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Clients:  clients,
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+		Reader:   mgr.GetAPIReader(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "zitica")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

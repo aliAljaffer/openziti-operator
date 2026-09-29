@@ -37,6 +37,7 @@ const (
 	AuthPolicies              Kind = "auth-policies"
 	Authenticators            Kind = "authenticators"
 	ExternalJWTSigners        Kind = "external-jwt-signers"
+	CertificateAuthorities    Kind = "cas"
 )
 
 type Entity map[string]any
@@ -54,6 +55,8 @@ type Client interface {
 	List(ctx context.Context, kind Kind, filter string) ([]Entity, error)
 	Create(ctx context.Context, kind Kind, body Entity) (string, error)
 	Update(ctx context.Context, kind Kind, id string, body Entity) error
+	// Verify sends the proof of ownership of a certificate authority: a PEM certificate signed by it.
+	Verify(ctx context.Context, kind Kind, id string, pemCertificate string) error
 	// Patch changes only the fields in body. A "tags" field replaces the whole tag map.
 	Patch(ctx context.Context, kind Kind, id string, body Entity) error
 	Delete(ctx context.Context, kind Kind, id string) error
@@ -137,9 +140,14 @@ type envelope struct {
 
 func (c *REST) do(ctx context.Context, method, path string, query url.Values, body any) (*envelope, error) {
 	var payload []byte
-	if body != nil {
+	contentType := "application/json"
+	switch b := body.(type) {
+	case nil:
+	case plainText:
+		payload, contentType = []byte(b), "text/plain"
+	default:
 		var err error
-		if payload, err = json.Marshal(body); err != nil {
+		if payload, err = json.Marshal(b); err != nil {
 			return nil, err
 		}
 	}
@@ -159,7 +167,7 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 			return nil, err
 		}
 		req.Header.Set("zt-session", token)
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 		resp, err := c.http.Do(req)
 		if err != nil {
 			metrics.APIRequests.WithLabelValues(method, kindOf(path), "error").Inc()
@@ -258,6 +266,13 @@ func (c *REST) Update(ctx context.Context, kind Kind, id string, body Entity) er
 
 func (c *REST) Patch(ctx context.Context, kind Kind, id string, body Entity) error {
 	_, err := c.do(ctx, http.MethodPatch, string(kind)+"/"+id, nil, body)
+	return err
+}
+
+type plainText string
+
+func (c *REST) Verify(ctx context.Context, kind Kind, id string, pemCertificate string) error {
+	_, err := c.do(ctx, http.MethodPost, string(kind)+"/"+id+"/verify", nil, plainText(pemCertificate))
 	return err
 }
 

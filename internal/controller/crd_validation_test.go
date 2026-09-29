@@ -293,3 +293,47 @@ var _ = Describe("ZitiJwtSigner and token identities", func() {
 		Entry("JwtOnly with a service account", func(s *zitiv1.ZitiIdentitySpec) { s.ServiceAccount = "web" }, ""),
 	)
 })
+
+var _ = Describe("ZitiCA", func() {
+	ca := func(mut func(*zitiv1.ZitiCASpec)) *zitiv1.ZitiCA {
+		c := &zitiv1.ZitiCA{
+			ObjectMeta: metav1.ObjectMeta{Name: "ca-case"},
+			Spec:       zitiv1.ZitiCASpec{Certificate: zitiv1.CertificateSource{SecretRef: zitiv1.SecretRef{Namespace: "cert-manager", Name: "issuer"}}},
+		}
+		if mut != nil {
+			mut(&c.Spec)
+		}
+		return c
+	}
+
+	It("applies defaults and keeps zitiName and deletionPolicy fixed", func() {
+		c := ca(func(s *zitiv1.ZitiCASpec) { s.ZitiName = "a" })
+		Expect(k8sClient.Create(ctx, c)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, c) })
+		Expect(c.Spec.Certificate.CertKey).To(Equal("tls.crt"))
+		Expect(*c.Spec.AuthEnabled).To(BeTrue())
+		Expect(c.Spec.Verification.SignWithSecretKey).To(BeFalse())
+		Expect(c.Spec.ExternalIDClaim.Location).To(Equal("COMMON_NAME"))
+		Expect(c.Spec.ExternalIDClaim.Matcher).To(Equal("ALL"))
+		Expect(c.Spec.ExternalIDClaim.Parser).To(Equal("NONE"))
+		Expect(c.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+
+		c.Spec.ZitiName = "b"
+		Expect(k8sClient.Update(ctx, c)).To(MatchError(ContainSubstring("zitiName is immutable")))
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "ca-case"}, c)).To(Succeed())
+		c.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
+		Expect(k8sClient.Update(ctx, c)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
+	})
+
+	DescribeTable("rejects bad values",
+		func(mut func(*zitiv1.ZitiCASpec), wantErr string) {
+			err := k8sClient.Create(ctx, ca(mut))
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, ca(nil)) })
+			Expect(err).To(MatchError(ContainSubstring(wantErr)))
+		},
+		Entry("unknown claim location", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Location = "SUBJECT" }, "Unsupported value"),
+		Entry("unknown matcher", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Matcher = "REGEX" }, "Unsupported value"),
+		Entry("unknown parser", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Parser = "CUT" }, "Unsupported value"),
+		Entry("negative index", func(s *zitiv1.ZitiCASpec) { s.ExternalIDClaim.Index = -1 }, "greater than or equal to 0"),
+	)
+})

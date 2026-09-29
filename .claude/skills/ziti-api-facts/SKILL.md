@@ -39,3 +39,12 @@ Each line was tested against a real controller. Test a new assumption the same w
 - An auth policy allows a signer with `primary.extJwt.allowed=true` and `allowedSigners=[<signer id>]`. Identities match the token claim to `externalId`. An identity may have no enrollment.
 - Log in with `POST /edge/client/v1/authenticate?method=ext-jwt` and `Authorization: Bearer <token>`.
 - Kubernetes publishes signing keys as a JWKS. Wrap the public key in a self-signed certificate to use `certPem`.
+
+## Certificate authorities
+
+- `POST /cas` needs `certPem`, `isAuthEnabled`, `isAutoCaEnrollmentEnabled`, `isOttCaEnrollmentEnabled`, `identityRoles`, and `identityNameFormat`. `externalIdClaim` needs `location`, `matcher`, `matcherCriteria`, `parser`, and `parserCriteria`, all sent, criteria may be empty. A `PUT` also needs `identityNameFormat`.
+- A certificate can be registered as a CA once.
+- The CA returns `verificationToken` (a short string) and `isVerified: false`. Verify with `POST /cas/{id}/verify`, `Content-Type: text/plain`, body a PEM certificate signed by the CA with common name equal to the token. The token disappears after that.
+- `certPem` cannot change. `PUT` and `PATCH` return success and keep the old certificate. Replace the CA to follow a renewed issuer. The fingerprint is the SHA-1 of the DER certificate.
+- With `isAuthEnabled` and an `externalIdClaim`, a client certificate signed by a verified CA logs in as the identity whose `externalId` equals the claim value (`POST /edge/client/v1/authenticate?method=cert` over mTLS). A fresh certificate with the same common name works, so renewal needs no re-enrollment. An unknown name gets 401.
+- An `externalId` must be unique across identities.

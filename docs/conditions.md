@@ -24,6 +24,9 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
 | `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
 | | `Ready` | Same as `Synced`. |
+| `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
+| | `Verified` | Ziti accepted the proof that you control the CA. |
+| | `Ready` | Same as `Verified`. |
 | `ZitiAccessPolicy` | `Synced` | The Dial policy (and the edge router policy) exist and match. |
 | | `Ready` | The Dial policy selects at least one identity and one service. |
 
@@ -67,6 +70,8 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `PendingEnrollment` | The identity is not enrolled yet. With `JwtOnly`, the enrollment JWT is in the Secret. |
 | `IdentityFileLost` | The Secret has no working `identity.json`. The operator deleted the Ziti identity and enrolls a new one. Its Ziti ID changes. |
 | `CertExpired` | The client certificate expired. |
+| `AwaitingVerification` (`ZitiCA`) | The CA is registered but not proven yet. The message has the token. Set `verification.signWithSecretKey` or verify by hand. |
+| `VerificationFailed` (`ZitiCA`) | The proof was rejected or could not be signed (wrong or missing `tls.key`). The message has the cause. |
 | `TokenLogin` (true) | `enrollmentMode: None`. The identity logs in with a token. There is nothing to enroll. |
 
 `CertificateValid` is `False` with reason `ExpiresSoon` (fewer than 30 days left) or `Expired`. `OperatorEnrolled` identities renew on their own. With `JwtOnly`, the workload must renew or re-enroll.
@@ -87,6 +92,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `Released` | The operator removed its tags and left the entity in Ziti (`Orphan` or an adopted identity). |
 | `Adopted` | The operator took over an existing identity. |
 | `Enrolled`, `EnrollmentCreated`, `EnrollmentExpired` | Identity enrollment steps. |
+| `Verified`, `Renewed` | A `ZitiCA` was proven to Ziti, or its certificate changed and the CA was replaced. |
 | `CertificateRenewed`, `RenewalFailed`, `CertificateExpiring` | Certificate lifecycle. |
 | `IdentityFileLost` | See above. |
 | `DeleteBlocked` | The operator cannot reach Ziti, so the resource cannot finish deleting. |
