@@ -32,6 +32,7 @@ const (
 	Terminators               Kind = "terminators"
 	Enrollments               Kind = "enrollments"
 	AuthPolicies              Kind = "auth-policies"
+	Authenticators            Kind = "authenticators"
 )
 
 type Entity map[string]any

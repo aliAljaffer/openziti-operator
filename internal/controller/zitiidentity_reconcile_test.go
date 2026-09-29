@@ -3,8 +3,14 @@
 package controller
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -293,5 +299,68 @@ func TestOperatorEnrollFailureIsReported(t *testing.T) {
 	}
 	if z := e.get(t); z.Status.Enrolled || findCond(z, CondReady).Reason != "Error" {
 		t.Errorf("status = %+v", z.Status)
+	}
+}
+
+func certPEM(t *testing.T, notAfter time.Time) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: notAfter.Add(-2 * 365 * 24 * time.Hour), NotAfter: notAfter}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+}
+
+func TestIdentityCertificateExpiry(t *testing.T) {
+	day := 24 * time.Hour
+	for _, tc := range []struct {
+		name      string
+		notAfter  time.Duration
+		certValid metav1.ConditionStatus
+		reason    string
+		ready     metav1.ConditionStatus
+		warns     bool
+	}{
+		{"valid", 90 * day, metav1.ConditionTrue, "Valid", metav1.ConditionTrue, false},
+		{"expires soon", 10 * day, metav1.ConditionFalse, "ExpiresSoon", metav1.ConditionTrue, true},
+		{"expired", -day, metav1.ConditionFalse, "Expired", metav1.ConditionFalse, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := setupIdentity(t)
+			e.reconcile(t)
+			iden := e.identity()
+			iden["authenticators"] = map[string]any{"cert": map[string]any{"id": "a1"}}
+			e.zc.Put(ziti.Authenticators, ziti.Entity{"identity": iden.ID(), "method": "cert", "certPem": certPEM(t, time.Now().Add(tc.notAfter))})
+			for len(e.rec.Events) > 0 {
+				<-e.rec.Events
+			}
+
+			e.reconcile(t)
+			z := e.get(t)
+			if c := findCond(z, CondCertValid); c.Status != tc.certValid || c.Reason != tc.reason {
+				t.Errorf("CertificateValid = %+v", c)
+			}
+			if condStatusOf(z, CondReady) != tc.ready {
+				t.Errorf("Ready = %v", condStatusOf(z, CondReady))
+			}
+			if z.Status.CertNotAfter == nil || z.Status.CertNotAfter.Time.Before(time.Now().Add(tc.notAfter-time.Minute)) {
+				t.Errorf("certNotAfter = %v", z.Status.CertNotAfter)
+			}
+			if got := len(e.rec.Events) > 0; got != tc.warns {
+				t.Errorf("warning event = %v, want %v", got, tc.warns)
+			}
+			for len(e.rec.Events) > 0 {
+				<-e.rec.Events
+			}
+			e.reconcile(t)
+			if len(e.rec.Events) != 0 {
+				t.Error("warning repeated on the next reconcile")
+			}
+		})
 	}
 }

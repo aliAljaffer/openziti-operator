@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"maps"
@@ -48,6 +50,8 @@ const (
 	defaultAuthPolicy = "Default"
 	enrollmentTTL     = 24 * time.Hour
 	pendingRecheck    = time.Minute
+	certWarnBefore    = 30 * 24 * time.Hour
+	CondCertValid     = "CertificateValid"
 )
 
 type ZitiIdentityReconciler struct {
@@ -209,7 +213,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		if len(secret.Data[SecretKeyIdentity]) > 0 {
 			id.Status.EnrollmentExpiresAt = nil
 			setIdentityCond(id, CondReady, true, "Enrolled", "", "")
-			return nil
+			return r.trackCert(ctx, id, zc)
 		}
 		// The private key exists only in identity.json. Without it the identity is unusable, so start over.
 		if err := zc.Delete(ctx, ziti.Identities, zid.ID()); err != nil {
@@ -222,7 +226,10 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	case id.Status.Enrolled:
 		id.Status.EnrollmentExpiresAt = nil
 		setIdentityCond(id, CondReady, true, "Enrolled", "", "")
-		return r.dropJWT(ctx, id)
+		if err := r.dropJWT(ctx, id); err != nil {
+			return err
+		}
+		return r.trackCert(ctx, id, zc)
 	}
 
 	setIdentityCond(id, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
@@ -247,6 +254,54 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	r.Recorder.Eventf(id, "Normal", "Enrolled", "enrolled identity %s", name)
 	id.Status.Enrolled, id.Status.EnrollmentExpiresAt = true, nil
 	setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+	return r.trackCert(ctx, id, zc)
+}
+
+// trackCert records the earliest client certificate expiry. It warns before expiry.
+// An expired certificate sets Ready=False. The operator does not renew certificates.
+func (r *ZitiIdentityReconciler) trackCert(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) error {
+	auths, err := zc.List(ctx, ziti.Authenticators, fmt.Sprintf(`identity="%s"`, id.Status.ZitiID))
+	if err != nil {
+		return err
+	}
+	var earliest time.Time
+	for _, a := range auths {
+		pemText, _ := a["certPem"].(string)
+		block, _ := pem.Decode([]byte(pemText))
+		if block == nil {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			continue
+		}
+		if earliest.IsZero() || cert.NotAfter.Before(earliest) {
+			earliest = cert.NotAfter
+		}
+	}
+	if earliest.IsZero() {
+		id.Status.CertNotAfter = nil
+		meta.RemoveStatusCondition(&id.Status.Conditions, CondCertValid)
+		return nil
+	}
+	id.Status.CertNotAfter = &metav1.Time{Time: earliest}
+
+	left := time.Until(earliest)
+	wasOK := !meta.IsStatusConditionFalse(id.Status.Conditions, CondCertValid)
+	switch {
+	case left <= 0:
+		setIdentityCond(id, CondCertValid, false, "", "Expired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
+		setIdentityCond(id, CondReady, false, "", "CertExpired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
+	case left < certWarnBefore:
+		msg := "certificate expires " + earliest.UTC().Format(time.RFC3339)
+		setIdentityCond(id, CondCertValid, false, "", "ExpiresSoon", msg)
+	default:
+		setIdentityCond(id, CondCertValid, true, "Valid", "", "")
+		return nil
+	}
+	if wasOK {
+		r.Recorder.Eventf(id, "Warning", "CertificateExpiring", "certificate expires %s", earliest.UTC().Format(time.RFC3339))
+	}
 	return nil
 }
 

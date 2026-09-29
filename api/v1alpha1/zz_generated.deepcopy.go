@@ -417,6 +417,10 @@ func (in *ZitiIdentityStatus) DeepCopyInto(out *ZitiIdentityStatus) {
 		in, out := &in.EnrollmentExpiresAt, &out.EnrollmentExpiresAt
 		*out = (*in).DeepCopy()
 	}
+	if in.CertNotAfter != nil {
+		in, out := &in.CertNotAfter, &out.CertNotAfter
+		*out = (*in).DeepCopy()
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]v1.Condition, len(*in))

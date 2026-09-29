@@ -26,6 +26,9 @@ spec:
     - jsonPath: .status.enrollmentExpiresAt
       name: Enrollment Expires
       type: date
+    - jsonPath: .status.certNotAfter
+      name: Cert Expires
+      type: date
     - jsonPath: .status.zitiId
       name: Ziti ID
       priority: 1
@@ -112,6 +115,11 @@ spec:
           status:
             description: status defines the observed state of ZitiIdentity
             properties:
+              certNotAfter:
+                description: certNotAfter is the earliest expiry of the identity's
+                  client certificates.
+                format: date-time
+                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current

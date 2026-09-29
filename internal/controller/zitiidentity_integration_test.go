@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/openziti/edge-api/rest_util"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -111,6 +112,12 @@ func TestOperatorEnrolledAgainstRealController(t *testing.T) {
 	}
 	if !z.Status.Enrolled {
 		t.Fatalf("status = %+v", z.Status)
+	}
+	if z.Status.CertNotAfter == nil || time.Until(z.Status.CertNotAfter.Time) < 300*24*time.Hour {
+		t.Fatalf("certNotAfter = %v", z.Status.CertNotAfter)
+	}
+	if condStatusOf(z, CondCertValid) != "True" {
+		t.Fatalf("CertificateValid = %+v", z.Status.Conditions)
 	}
 	e.reconcile(t)
 	got, _ := real.List(t.Context(), ziti.Identities, tagFilter(z.UID))

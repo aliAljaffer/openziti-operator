@@ -75,6 +75,9 @@ type ZitiIdentityStatus struct {
 	Enrolled bool `json:"enrolled,omitempty"`
 	// +optional
 	EnrollmentExpiresAt *metav1.Time `json:"enrollmentExpiresAt,omitempty"`
+	// certNotAfter is the earliest expiry of the identity's client certificates.
+	// +optional
+	CertNotAfter *metav1.Time `json:"certNotAfter,omitempty"`
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -90,6 +93,7 @@ type ZitiIdentityStatus struct {
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Enrollment Expires",type=date,JSONPath=".status.enrollmentExpiresAt"
+// +kubebuilder:printcolumn:name="Cert Expires",type=date,JSONPath=".status.certNotAfter"
 // +kubebuilder:printcolumn:name="Ziti ID",type=string,JSONPath=".status.zitiId",priority=1
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
