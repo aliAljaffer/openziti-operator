@@ -269,6 +269,9 @@ func subset(want, got any) bool {
 		return true
 	case []any:
 		g, ok := got.([]any)
+		if len(w) == 0 {
+			return len(g) == 0
+		}
 		if !ok || len(g) != len(w) {
 			return false
 		}

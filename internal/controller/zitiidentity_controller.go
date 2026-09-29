@@ -85,6 +85,9 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	before := id.Status.DeepCopy()
 	conn, zc, err := connect(ctx, r.Client, r.Clients, id.Spec.ConnectionRef)
 	if err == nil {
+		err = namespaceAllowed(ctx, r.Client, conn, id.Namespace)
+	}
+	if err == nil {
 		err = r.sync(ctx, &id, conn, zc)
 	}
 
@@ -96,15 +99,15 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	case err == nil:
 		next.RequeueAfter = jitter(pendingRecheck)
 	case errors.As(err, &se):
-		markIdentityFailed(&id, se.reason, se.msg)
+		markFailed(&id.Status.Conditions, id.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markIdentityFailed(&id, "ZitiRejected", err.Error())
+		markFailed(&id.Status.Conditions, id.Generation, "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markIdentityFailed(&id, "Error", err.Error())
+		markFailed(&id.Status.Conditions, id.Generation, "Error", err.Error())
 	}
 	id.Status.ObservedGeneration = id.Generation
 
@@ -238,7 +241,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	}
 
 	id.Status.ZitiID = zid.ID()
-	setIdentityCond(id, CondSynced, true, "Synced", "", "")
+	setCond(&id.Status.Conditions, id.Generation, CondSynced, true, "Synced", "", "")
 
 	// The identity list shows a non-empty authenticators map after enrollment.
 	auth, _ := zid["authenticators"].(map[string]any)
@@ -258,7 +261,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		}
 		if len(secret.Data[SecretKeyIdentity]) > 0 {
 			id.Status.EnrollmentExpiresAt = nil
-			setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+			setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
 			return r.trackCert(ctx, id, zc)
 		}
 		// The private key exists only in identity.json. Without it the identity is unusable, so start over.
@@ -267,18 +270,18 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		}
 		r.Recorder.Eventf(id, "Warning", "IdentityFileLost", "identity is enrolled but Secret has no %s, deleted identity to enroll again", SecretKeyIdentity)
 		id.Status.ZitiID, id.Status.Enrolled = "", false
-		setIdentityCond(id, CondReady, false, "", "IdentityFileLost", "identity file was lost, enrolling again")
+		setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "IdentityFileLost", "identity file was lost, enrolling again")
 		return nil
 	case id.Status.Enrolled:
 		id.Status.EnrollmentExpiresAt = nil
-		setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+		setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
 		if err := r.dropJWT(ctx, id); err != nil {
 			return err
 		}
 		return r.trackCert(ctx, id, zc)
 	}
 
-	setIdentityCond(id, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
+	setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
 	jwt, err := r.currentEnrollmentJWT(ctx, id, zc)
 	if err != nil {
 		return err
@@ -299,17 +302,17 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	}
 	r.Recorder.Eventf(id, "Normal", "Enrolled", "enrolled identity %s", name)
 	id.Status.Enrolled, id.Status.EnrollmentExpiresAt = true, nil
-	setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+	setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
 	return r.trackCert(ctx, id, zc)
 }
 
 func (r *ZitiIdentityReconciler) observeIdentity(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) error {
 	if id.Status.Enrolled {
 		id.Status.EnrollmentExpiresAt = nil
-		setIdentityCond(id, CondReady, true, "Enrolled", "", "")
+		setCond(&id.Status.Conditions, id.Generation, CondReady, true, "Enrolled", "", "")
 		return r.trackCert(ctx, id, zc)
 	}
-	setIdentityCond(id, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
+	setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "PendingEnrollment", "identity is not enrolled yet")
 	enrollments, err := zc.List(ctx, ziti.Enrollments, fmt.Sprintf(`identity="%s"`, id.Status.ZitiID))
 	if err != nil {
 		return err
@@ -356,13 +359,13 @@ func (r *ZitiIdentityReconciler) trackCert(ctx context.Context, id *zitiv1alpha1
 	wasOK := !meta.IsStatusConditionFalse(id.Status.Conditions, CondCertValid)
 	switch {
 	case left <= 0:
-		setIdentityCond(id, CondCertValid, false, "", "Expired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
-		setIdentityCond(id, CondReady, false, "", "CertExpired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
+		setCond(&id.Status.Conditions, id.Generation, CondCertValid, false, "", "Expired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
+		setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "CertExpired", "certificate expired "+earliest.UTC().Format(time.RFC3339))
 	case left < certWarnBefore:
 		msg := "certificate expires " + earliest.UTC().Format(time.RFC3339)
-		setIdentityCond(id, CondCertValid, false, "", "ExpiresSoon", msg)
+		setCond(&id.Status.Conditions, id.Generation, CondCertValid, false, "", "ExpiresSoon", msg)
 	default:
-		setIdentityCond(id, CondCertValid, true, "Valid", "", "")
+		setCond(&id.Status.Conditions, id.Generation, CondCertValid, true, "Valid", "", "")
 		return nil
 	}
 	if wasOK {
@@ -466,22 +469,6 @@ func (r *ZitiIdentityReconciler) dropJWT(ctx context.Context, id *zitiv1alpha1.Z
 	}
 	delete(secret.Data, SecretKeyJWT)
 	return r.Update(ctx, &secret)
-}
-
-func setIdentityCond(id *zitiv1alpha1.ZitiIdentity, typ string, ok bool, reasonTrue, reasonFalse, msg string) {
-	c := metav1.Condition{Type: typ, ObservedGeneration: id.Generation}
-	if ok {
-		c.Status, c.Reason = metav1.ConditionTrue, reasonTrue
-	} else {
-		c.Status, c.Reason, c.Message = metav1.ConditionFalse, reasonFalse, msg
-	}
-	meta.SetStatusCondition(&id.Status.Conditions, c)
-}
-
-func markIdentityFailed(id *zitiv1alpha1.ZitiIdentity, reason, msg string) {
-	for _, t := range []string{CondSynced, CondReady} {
-		setIdentityCond(id, t, false, "", reason, msg)
-	}
 }
 
 func (r *ZitiIdentityReconciler) SetupWithManager(mgr ctrl.Manager) error {

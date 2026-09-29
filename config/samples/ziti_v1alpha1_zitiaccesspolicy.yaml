@@ -1,0 +1,9 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiAccessPolicy
+metadata:
+  name: team-a
+  namespace: default
+spec:
+  connectionRef: default
+  identityRoles: ["#team-a"]
+  serviceRoles: ["#team-a"]

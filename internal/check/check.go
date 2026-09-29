@@ -108,6 +108,11 @@ func (g *Graph) ids(entities []ziti.Entity, policy ziti.Entity, rolesKey string)
 	return out
 }
 
+// Selected returns the ids of the entities a policy selects through rolesKey.
+func Selected(entities []ziti.Entity, policy ziti.Entity, rolesKey string) []string {
+	return (*Graph)(nil).ids(entities, policy, rolesKey)
+}
+
 func (g *Graph) policiesFor(policies []ziti.Entity, svc ziti.Entity, typ string) []ziti.Entity {
 	var out []ziti.Entity
 	for _, p := range policies {

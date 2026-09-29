@@ -118,4 +118,25 @@ var _ = Describe("CRD validation", func() {
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ok) })
 		Expect(ok.Spec.RoleScope).To(Equal(zitiv1.RoleScopeNamespaced))
 	})
+
+	It("validates ZitiAccessPolicy and makes zitiName and deletionPolicy immutable", func() {
+		mk := func(ident, svc []string) *zitiv1.ZitiAccessPolicy {
+			return &zitiv1.ZitiAccessPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "ap-case", Namespace: "default"},
+				Spec:       zitiv1.ZitiAccessPolicySpec{ZitiName: "a", IdentityRoles: ident, ServiceRoles: svc},
+			}
+		}
+		Expect(k8sClient.Create(ctx, mk(nil, []string{"#x"}))).To(MatchError(ContainSubstring("identityRoles")))
+		Expect(k8sClient.Create(ctx, mk([]string{"#x"}, nil))).To(MatchError(ContainSubstring("serviceRoles")))
+		ap := mk([]string{"#x"}, []string{"#y"})
+		Expect(k8sClient.Create(ctx, ap)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ap) })
+		Expect(ap.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+
+		ap.Spec.ZitiName = "b"
+		Expect(k8sClient.Update(ctx, ap)).To(MatchError(ContainSubstring("zitiName is immutable")))
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "ap-case"}, ap)).To(Succeed())
+		ap.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
+		Expect(k8sClient.Update(ctx, ap)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
+	})
 })

@@ -90,6 +90,9 @@ func (r *ZitiServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	conn, zc, err := r.connect(ctx, &svc)
 	var out *syncResult
 	if err == nil {
+		err = namespaceAllowed(ctx, r.Client, conn, svc.Namespace)
+	}
+	if err == nil {
 		out, err = r.sync(ctx, &svc, conn, zc)
 	}
 
@@ -100,15 +103,15 @@ func (r *ZitiServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		applyResult(&svc, out)
 		next.RequeueAfter = jitter(serviceResync)
 	case errors.As(err, &se):
-		markFailed(&svc, se.reason, se.msg)
+		markFailed(&svc.Status.Conditions, svc.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&svc, "ZitiRejected", err.Error())
+		markFailed(&svc.Status.Conditions, svc.Generation, "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&svc, "Error", err.Error())
+		markFailed(&svc.Status.Conditions, svc.Generation, "Error", err.Error())
 	}
 	svc.Status.ObservedGeneration = svc.Generation
 
@@ -224,83 +227,39 @@ func (r *ZitiServiceReconciler) sync(ctx context.Context, svc *zitiv1alpha1.Ziti
 		}
 	}
 
-	existing := map[ziti.Kind]map[string]ziti.Entity{}
-	for _, kind := range deleteOrder {
-		list, err := zc.List(ctx, kind, tagFilter(svc.UID))
-		if err != nil {
-			return nil, err
-		}
-		existing[kind] = map[string]ziti.Entity{}
-		for _, e := range list {
-			existing[kind][e.Name()] = e
-		}
-	}
-	keep := map[ziti.Kind]map[string]bool{}
-	ensure := func(kind ziti.Kind, body ziti.Entity) (string, error) {
-		if keep[kind] == nil {
-			keep[kind] = map[string]bool{}
-		}
-		if ex, ok := existing[kind][body.Name()]; ok {
-			keep[kind][ex.ID()] = true
-			if !desired.Matches(body, ex) {
-				if err := zc.Update(ctx, kind, ex.ID(), body); err != nil {
-					return "", err
-				}
-				r.Recorder.Eventf(svc, "Normal", "Updated", "updated %s %s", kind, body.Name())
-			}
-			return ex.ID(), nil
-		}
-		clash, err := zc.List(ctx, kind, fmt.Sprintf(`name="%s"`, body.Name()))
-		if err != nil {
-			return "", err
-		}
-		if len(clash) > 0 {
-			return "", &specError{"NameConflict", fmt.Sprintf("%s %q already exists and is not managed by this operator", kind, body.Name())}
-		}
-		id, err := zc.Create(ctx, kind, body)
-		if err != nil {
-			return "", err
-		}
-		keep[kind][id] = true
-		r.Recorder.Eventf(svc, "Normal", "Created", "created %s %s", kind, body.Name())
-		return id, nil
-	}
-
-	var ids zitiv1alpha1.EntityIDs
-	if ids.Intercept, err = ensure(ziti.Configs, icBody); err != nil {
+	set, err := newEntitySet(ctx, zc, r.Recorder, svc, svc.UID, deleteOrder)
+	if err != nil {
 		return nil, err
 	}
-	if ids.Host, err = ensure(ziti.Configs, hcBody); err != nil {
+	ensure := set.ensure
+
+	var ids zitiv1alpha1.EntityIDs
+	if ids.Intercept, err = ensure(ctx, ziti.Configs, icBody); err != nil {
+		return nil, err
+	}
+	if ids.Host, err = ensure(ctx, ziti.Configs, hcBody); err != nil {
 		return nil, err
 	}
 	svcBody, _ := b.Service(ids.Intercept, ids.Host)
-	if ids.Service, err = ensure(ziti.Services, svcBody); err != nil {
+	if ids.Service, err = ensure(ctx, ziti.Services, svcBody); err != nil {
 		return nil, err
 	}
 	bind, _ := b.Bind(ids.Service)
-	if ids.Bind, err = ensure(ziti.ServicePolicies, bind); err != nil {
+	if ids.Bind, err = ensure(ctx, ziti.ServicePolicies, bind); err != nil {
 		return nil, err
 	}
 	serp, _ := b.SERP(ids.Service)
-	if ids.SERP, err = ensure(ziti.ServiceEdgeRouterPolicies, serp); err != nil {
+	if ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
 		return nil, err
 	}
 	if dial, _ := b.Dial(ids.Service); dial != nil {
-		if ids.Dial, err = ensure(ziti.ServicePolicies, dial); err != nil {
+		if ids.Dial, err = ensure(ctx, ziti.ServicePolicies, dial); err != nil {
 			return nil, err
 		}
 	}
 
-	for _, kind := range deleteOrder {
-		for _, e := range existing[kind] {
-			if keep[kind][e.ID()] {
-				continue
-			}
-			if err := zc.Delete(ctx, kind, e.ID()); err != nil {
-				return nil, err
-			}
-			r.Recorder.Eventf(svc, "Normal", "Deleted", "deleted %s %s", kind, e.Name())
-		}
+	if err := set.prune(ctx); err != nil {
+		return nil, err
 	}
 
 	return r.observe(ctx, zc, name, ids, routers, configTypes, []ziti.Entity{
@@ -400,14 +359,14 @@ func (r *ZitiServiceReconciler) observe(ctx context.Context, zc ziti.Client, nam
 	return out, nil
 }
 
-func setCond(svc *zitiv1alpha1.ZitiService, typ string, ok bool, reasonTrue, reasonFalse, msg string) {
-	c := metav1.Condition{Type: typ, ObservedGeneration: svc.Generation}
+func setCond(conds *[]metav1.Condition, gen int64, typ string, ok bool, reasonTrue, reasonFalse, msg string) {
+	c := metav1.Condition{Type: typ, ObservedGeneration: gen}
 	if ok {
 		c.Status, c.Reason = metav1.ConditionTrue, reasonTrue
 	} else {
 		c.Status, c.Reason, c.Message = metav1.ConditionFalse, reasonFalse, msg
 	}
-	meta.SetStatusCondition(&svc.Status.Conditions, c)
+	meta.SetStatusCondition(conds, c)
 }
 
 func findingsFor(fs []check.Finding, codes ...string) (string, string) {
@@ -427,19 +386,19 @@ func findingsFor(fs []check.Finding, codes ...string) (string, string) {
 func applyResult(svc *zitiv1alpha1.ZitiService, o *syncResult) {
 	svc.Status.ZitiName, svc.Status.IDs, svc.Status.Terminators = o.name, o.ids, o.terminators
 	fs := o.report.Findings
-	setCond(svc, CondSynced, true, "Synced", "", "")
+	setCond(&svc.Status.Conditions, svc.Generation, CondSynced, true, "Synced", "", "")
 	reason, msg := findingsFor(fs, check.NoTerminator, check.NoBind, check.InertBind, check.MissingConfig, check.ProtocolMismatch)
-	setCond(svc, CondHosted, o.report.Hosted, "Hosted", reasonOr(reason, "NotHosted"), msg)
+	setCond(&svc.Status.Conditions, svc.Generation, CondHosted, o.report.Hosted, "Hosted", reasonOr(reason, "NotHosted"), msg)
 	reason, msg = findingsFor(fs, check.NoDialer)
-	setCond(svc, CondDialable, o.report.Dialable, "Dialable", reasonOr(reason, "NotDialable"), msg)
+	setCond(&svc.Status.Conditions, svc.Generation, CondDialable, o.report.Dialable, "Dialable", reasonOr(reason, "NotDialable"), msg)
 	reason, msg = findingsFor(fs, check.OfflinePath, check.NoCommonRouter)
-	setCond(svc, CondRoutePath, o.report.RoutePath, "RoutePath", reasonOr(reason, "NoRoutePath"), msg)
+	setCond(&svc.Status.Conditions, svc.Generation, CondRoutePath, o.report.RoutePath, "RoutePath", reasonOr(reason, "NoRoutePath"), msg)
 	ready := o.report.Hosted && o.report.Dialable && o.report.RoutePath
 	var all []string
 	for _, f := range fs {
 		all = append(all, f.Message)
 	}
-	setCond(svc, CondReady, ready, "Ready", "NotReady", strings.Join(all, "; "))
+	setCond(&svc.Status.Conditions, svc.Generation, CondReady, ready, "Ready", "NotReady", strings.Join(all, "; "))
 }
 
 func reasonOr(r, def string) string {
@@ -449,11 +408,9 @@ func reasonOr(r, def string) string {
 	return r
 }
 
-func markFailed(svc *zitiv1alpha1.ZitiService, reason, msg string) {
+func markFailed(conds *[]metav1.Condition, gen int64, reason, msg string) {
 	for _, t := range []string{CondSynced, CondReady} {
-		meta.SetStatusCondition(&svc.Status.Conditions, metav1.Condition{
-			Type: t, Status: metav1.ConditionFalse, Reason: reason, Message: msg, ObservedGeneration: svc.Generation,
-		})
+		setCond(conds, gen, t, false, "", reason, msg)
 	}
 }
 

@@ -274,3 +274,19 @@ func TestScopeAttributes(t *testing.T) {
 		t.Error("attribute all must be rejected when namespaced")
 	}
 }
+
+func TestMatchesTreatsEmptyListAsMissing(t *testing.T) {
+	want := ziti.Entity{"name": "p", "postureCheckRoles": []string{}}
+	for name, got := range map[string]ziti.Entity{
+		"missing": {"name": "p"},
+		"null":    {"name": "p", "postureCheckRoles": nil},
+		"empty":   {"name": "p", "postureCheckRoles": []any{}},
+	} {
+		if !Matches(want, got) {
+			t.Errorf("%s: want match", name)
+		}
+	}
+	if Matches(want, ziti.Entity{"name": "p", "postureCheckRoles": []any{"#x"}}) {
+		t.Error("non-empty actual must not match empty desired")
+	}
+}

@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - namespaces
   verbs:
   - get
   - list
@@ -34,6 +35,7 @@ rules:
 - apiGroups:
   - ziti.alialjaffer.com
   resources:
+  - zitiaccesspolicies
   - ziticonnections
   - zitiidentities
   - zitiservices
@@ -48,6 +50,7 @@ rules:
 - apiGroups:
   - ziti.alialjaffer.com
   resources:
+  - zitiaccesspolicies/finalizers
   - ziticonnections/finalizers
   - zitiidentities/finalizers
   - zitiservices/finalizers
@@ -56,6 +59,7 @@ rules:
 - apiGroups:
   - ziti.alialjaffer.com
   resources:
+  - zitiaccesspolicies/status
   - ziticonnections/status
   - zitiidentities/status
   - zitiservices/status

@@ -10,6 +10,8 @@ import (
 
 	"github.com/openziti/edge-api/rest_util"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,4 +76,26 @@ func (p *SecretClientProvider) For(ctx context.Context, conn *zitiv1.ZitiConnect
 	}
 	p.cache[conn.Name] = cachedClient{key: key, client: c}
 	return c, nil
+}
+
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+
+// namespaceAllowed enforces ZitiConnection.spec.allowedNamespaces. An empty selector allows every namespace.
+func namespaceAllowed(ctx context.Context, k client.Reader, conn *zitiv1.ZitiConnection, namespace string) error {
+	sel := conn.Spec.AllowedNamespaces
+	if sel == nil || (len(sel.MatchLabels) == 0 && len(sel.MatchExpressions) == 0) {
+		return nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(sel)
+	if err != nil {
+		return &specError{"InvalidConnection", "allowedNamespaces: " + err.Error()}
+	}
+	var ns corev1.Namespace
+	if err := k.Get(ctx, types.NamespacedName{Name: namespace}, &ns); err != nil {
+		return err
+	}
+	if !selector.Matches(labels.Set(ns.Labels)) {
+		return &specError{"NamespaceNotAllowed", fmt.Sprintf("namespace %q is not allowed to use connection %q", namespace, conn.Name)}
+	}
+	return nil
 }
