@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -560,4 +561,31 @@ func identityJSONWithCert(t *testing.T, notBefore, notAfter time.Time) []byte {
 		"key":  "pem:" + string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})),
 	}})
 	return out
+}
+
+func TestIdentitySecretIsLabeledAndHiddenSecretIsAConflict(t *testing.T) {
+	e := setupIdentity(t)
+	e.reconcile(t)
+	if got := e.secret(t).Labels[ManagedByLabel]; got != ManagedByLabelValue {
+		t.Errorf("secret label = %q", got)
+	}
+
+	// A filtered cache cannot see an unlabeled Secret: Get says not found, Create says already exists.
+	hidden := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "backend", Namespace: "team-a"}}
+	e2 := setupIdentity(t, hidden)
+	e2.r.Client = hideSecrets{e2.r.Client}
+	e2.reconcile(t)
+	if c := findCond(e2.get(t), CondSynced); c.Reason != "SecretConflict" {
+		t.Errorf("synced = %+v", c)
+	}
+}
+
+// hideSecrets behaves like a cache that filters out Secrets without the operator label.
+type hideSecrets struct{ client.Client }
+
+func (h hideSecrets) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*corev1.Secret); ok {
+		return kerrors.NewNotFound(corev1.Resource("secrets"), key.Name)
+	}
+	return h.Client.Get(ctx, key, obj, opts...)
 }

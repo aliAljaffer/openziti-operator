@@ -48,11 +48,14 @@ import (
 const (
 	SecretKeyJWT      = "enrollment.jwt"
 	SecretKeyIdentity = "identity.json"
-	defaultAuthPolicy = "Default"
-	enrollmentTTL     = 24 * time.Hour
-	pendingRecheck    = time.Minute
-	certWarnBefore    = 30 * 24 * time.Hour
-	CondCertValid     = "CertificateValid"
+	// ManagedByLabel marks the Secrets this operator creates. The manager cache holds only those.
+	ManagedByLabel      = "app.kubernetes.io/managed-by"
+	ManagedByLabelValue = "ziti-operator"
+	defaultAuthPolicy   = "Default"
+	enrollmentTTL       = 24 * time.Hour
+	pendingRecheck      = time.Minute
+	certWarnBefore      = 30 * 24 * time.Hour
+	CondCertValid       = "CertificateValid"
 )
 
 type ZitiIdentityReconciler struct {
@@ -510,12 +513,18 @@ func (r *ZitiIdentityReconciler) writeSecret(ctx context.Context, id *zitiv1alph
 	err := r.Get(ctx, key, &secret)
 	switch {
 	case apierrors.IsNotFound(err):
-		secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}}
+		secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name,
+			Labels: map[string]string{ManagedByLabel: ManagedByLabelValue}}}
 		if err := controllerutil.SetControllerReference(id, &secret, r.Scheme); err != nil {
 			return err
 		}
 		secret.Data = map[string][]byte{dataKey: value}
-		return r.Create(ctx, &secret)
+		err = r.Create(ctx, &secret)
+		if apierrors.IsAlreadyExists(err) {
+			// The cache only shows labeled Secrets, so an existing Secret here belongs to someone else.
+			return &specError{"SecretConflict", fmt.Sprintf("Secret %s exists and is not owned by this ZitiIdentity", key.Name)}
+		}
+		return err
 	case err != nil:
 		return err
 	case !metav1.IsControlledBy(&secret, id):

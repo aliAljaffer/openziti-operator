@@ -102,8 +102,8 @@ type ZitiIdentityStatus struct {
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
-// +kubebuilder:printcolumn:name="Enrollment Expires",type=date,JSONPath=".status.enrollmentExpiresAt"
-// +kubebuilder:printcolumn:name="Cert Expires",type=date,JSONPath=".status.certNotAfter"
+// +kubebuilder:printcolumn:name="Enrollment Expires",type=string,JSONPath=".status.enrollmentExpiresAt"
+// +kubebuilder:printcolumn:name="Cert Expires",type=string,JSONPath=".status.certNotAfter"
 // +kubebuilder:printcolumn:name="Ziti ID",type=string,JSONPath=".status.zitiId",priority=1
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"

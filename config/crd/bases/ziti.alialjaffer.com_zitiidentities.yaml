@@ -28,10 +28,10 @@ spec:
       type: string
     - jsonPath: .status.enrollmentExpiresAt
       name: Enrollment Expires
-      type: date
+      type: string
     - jsonPath: .status.certNotAfter
       name: Cert Expires
-      type: date
+      type: string
     - jsonPath: .status.zitiId
       name: Ziti ID
       priority: 1
