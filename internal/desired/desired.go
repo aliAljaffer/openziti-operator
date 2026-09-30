@@ -305,7 +305,13 @@ func (b *Builder) Dial(serviceID string, roles []string) ziti.Entity {
 
 // ERP gives the allowed identities access to the entry routers. It returns nil without entryRouters or roles.
 func (b *Builder) ERP(roles []string) (ziti.Entity, error) {
-	if len(b.Svc.Spec.EntryRouters) == 0 || len(roles) == 0 {
+	if len(b.Svc.Spec.EntryRouters) == 0 {
+		return nil, nil
+	}
+	if err := CheckEntryRouters(b.Conn, b.Svc.Spec.EntryRouters); err != nil {
+		return nil, err
+	}
+	if len(roles) == 0 {
 		return nil, nil
 	}
 	names := append(slices.Clone(b.Svc.Spec.EntryRouters), b.Conn.Spec.DefaultEdgeRouters...)

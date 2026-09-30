@@ -49,7 +49,7 @@
 | `connection.managementUrl`, `connection.hostingRouters` | none | Required when `connection.create` is true. |
 | `connection.auth.updb.secretName` or `connection.auth.cert.secretName` | none | Set exactly one. |
 | `connection.caBundle.configMapName` | `ziti-root-ca` | ConfigMap in the release namespace. |
-| `connection.roleScope`, `defaultEdgeRouters`, `clusterId`, `allowedNamespaces` | see below | Same as the `ZitiConnection` keys. |
+| `connection.roleScope`, `entryRouters`, `defaultEdgeRouters`, `clusterId`, `allowedNamespaces` | see below | Same as the `ZitiConnection` keys. |
 | `trustManager.enabled`, `trustManager.sources` | off | Copy the Ziti root CA into the release namespace with a trust-manager `Bundle`. |
 | `rbac.secretNamespaces` | empty | Limit Secret access to these namespaces plus the release namespace. Empty means cluster-wide. List every namespace that holds a `ZitiIdentity`. |
 | `metrics.enabled`, `metrics.secure`, `prometheus.enabled` | on, on, off | Metrics endpoint and an optional ServiceMonitor. |
@@ -86,6 +86,7 @@
 | `auth.updb` or `auth.cert` | Set exactly one. |
 | `roleScope` | `Namespaced` (default) or `Global`. See [role scope](role-scope.md). |
 | `hostingRouters` | Routers an app may run behind. The first one is the default. |
+| `entryRouters` | Routers that an app `entryRouters` and an access policy `edgeRouters` may name, with `defaultEdgeRouters`. Empty means any router. |
 | `defaultEdgeRouters` | Routers added to every app's router policy. |
 | `allowedNamespaces` | Label selector. Only these namespaces may use the connection. Empty means all. |
 | `clusterId` | Separates operators that share one Ziti network, for example staging and production. |

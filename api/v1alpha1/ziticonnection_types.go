@@ -105,6 +105,11 @@ type ZitiConnectionSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	HostingRouters []string `json:"hostingRouters"`
 
+	// entryRouters are the router names that ZitiApp entryRouters and ZitiAccessPolicy edgeRouters may use,
+	// together with defaultEdgeRouters. Empty allows any router.
+	// +optional
+	EntryRouters []string `json:"entryRouters,omitempty"`
+
 	// defaultEdgeRouters are router names added to every service edge router policy.
 	// +optional
 	DefaultEdgeRouters []string `json:"defaultEdgeRouters,omitempty"`

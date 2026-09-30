@@ -192,6 +192,13 @@ spec:
                 items:
                   type: string
                 type: array
+              entryRouters:
+                description: |-
+                  entryRouters are the router names that ZitiApp entryRouters and ZitiAccessPolicy edgeRouters may use,
+                  together with defaultEdgeRouters. Empty allows any router.
+                items:
+                  type: string
+                type: array
               hostingRouters:
                 description: hostingRouters are the router names a ZitiApp may bind
                   through. The first entry is the default.

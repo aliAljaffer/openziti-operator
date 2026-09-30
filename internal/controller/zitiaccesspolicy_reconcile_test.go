@@ -252,3 +252,17 @@ func TestAccessPolicyOrphanReleasesTags(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessPolicyRejectsEdgeRouterOutsideAllowList(t *testing.T) {
+	e := setupAccess(t, zitiv1.RoleScopeNamespaced, func(ap *zitiv1.ZitiAccessPolicy, c *zitiv1.ZitiConnection) {
+		ap.Spec.EdgeRouters = []string{"r-entry"}
+		c.Spec.EntryRouters = []string{"other-router"}
+	})
+	ap := e.reconcile(t)
+	if c := findConditionByType(ap.Status.Conditions, CondSynced); c.Reason != "InvalidSpec" {
+		t.Errorf("synced = %+v", c)
+	}
+	if len(e.zc.Objects[ziti.ServicePolicies]) != 0 || len(e.zc.Objects[ziti.EdgeRouterPolicies]) != 0 {
+		t.Error("created a policy for a router outside entryRouters")
+	}
+}

@@ -41,6 +41,10 @@ spec:
   clusterId: {{ $c.clusterId }}
   hostingRouters:
     {{- toYaml $c.hostingRouters | nindent 4 }}
+  {{- with $c.entryRouters }}
+  entryRouters:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with $c.defaultEdgeRouters }}
   defaultEdgeRouters:
     {{- toYaml . | nindent 4 }}

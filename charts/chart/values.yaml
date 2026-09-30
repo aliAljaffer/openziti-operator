@@ -146,6 +146,8 @@ connection:
   roleScope: Namespaced
   ## Routers an app may run behind. The first one is the default. Required when create is true.
   hostingRouters: []
+  ## Routers that app entryRouters and access policy edgeRouters may use, with defaultEdgeRouters. Empty allows any router.
+  entryRouters: []
   defaultEdgeRouters: []
   ## Separates operators that share one Ziti network.
   clusterId: default

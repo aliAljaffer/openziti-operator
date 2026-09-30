@@ -45,6 +45,7 @@
 | `spec.caBundle.configMapRef.namespace` | string | yes |  | namespace of the ConfigMap. |
 | `spec.clusterId` | string | no | `"default"` | clusterId isolates operators that share one Ziti network, for example staging and production. Maximum length 63. Must match `^[a-z]([-a-z0-9]*[a-z0-9])?$`. |
 | `spec.defaultEdgeRouters` | list of string | no |  | defaultEdgeRouters are router names added to every service edge router policy. |
+| `spec.entryRouters` | list of string | no |  | entryRouters are the router names that ZitiApp entryRouters and ZitiAccessPolicy edgeRouters may use, together with defaultEdgeRouters. Empty allows any router. |
 | `spec.hostingRouters` | list of string | yes |  | hostingRouters are the router names a ZitiApp may bind through. The first entry is the default. Minimum items 1. |
 | `spec.managementUrl` | string | yes |  | managementUrl is the Edge Management API URL, for example https://controller:443/edge/management/v1. Must match `^https://`. |
 | `spec.roleScope` | string | no | `"Namespaced"` | roleScope Namespaced rewrites "#attr" to "#&lt;namespace&gt;.attr". Global passes roles through unchanged. One of: `Namespaced`, `Global`. |

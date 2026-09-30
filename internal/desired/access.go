@@ -4,6 +4,7 @@ package desired
 
 import (
 	"fmt"
+	"slices"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
@@ -62,6 +63,9 @@ func AccessERP(ap *zitiv1.ZitiAccessPolicy, conn *zitiv1.ZitiConnection, routerI
 	if len(ap.Spec.EdgeRouters) == 0 {
 		return nil, nil
 	}
+	if err := CheckEntryRouters(conn, ap.Spec.EdgeRouters); err != nil {
+		return nil, err
+	}
 	ident, err := ScopeRoles(scopeOf(conn), ap.Namespace, ap.Spec.IdentityRoles)
 	if err != nil {
 		return nil, fmt.Errorf("identityRoles: %w", err)
@@ -78,4 +82,17 @@ func AccessERP(ap *zitiv1.ZitiAccessPolicy, conn *zitiv1.ZitiConnection, routerI
 	e["identityRoles"] = ident
 	e["edgeRouterRoles"] = roles
 	return e, nil
+}
+
+// CheckEntryRouters rejects a router that the connection entryRouters and defaultEdgeRouters do not list. Without entryRouters every router is allowed.
+func CheckEntryRouters(conn *zitiv1.ZitiConnection, names []string) error {
+	if len(conn.Spec.EntryRouters) == 0 {
+		return nil
+	}
+	for _, n := range names {
+		if !slices.Contains(conn.Spec.EntryRouters, n) && !slices.Contains(conn.Spec.DefaultEdgeRouters, n) {
+			return fmt.Errorf("router %q is not in the connection entryRouters", n)
+		}
+	}
+	return nil
 }

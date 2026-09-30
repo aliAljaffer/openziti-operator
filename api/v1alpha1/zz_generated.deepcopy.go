@@ -953,6 +953,11 @@ func (in *ZitiConnectionSpec) DeepCopyInto(out *ZitiConnectionSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.EntryRouters != nil {
+		in, out := &in.EntryRouters, &out.EntryRouters
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.DefaultEdgeRouters != nil {
 		in, out := &in.DefaultEdgeRouters, &out.DefaultEdgeRouters
 		*out = make([]string, len(*in))
