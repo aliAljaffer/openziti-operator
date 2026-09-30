@@ -77,6 +77,38 @@ spec:
                 description: authPolicy is a Ziti auth policy name. It defaults to
                   "Default".
                 type: string
+              certificate:
+                description: |-
+                  certificate makes the operator create a cert-manager Certificate for this identity. Its common name is externalId
+                  and it is stored in the Secret secretName (tls.crt, tls.key). The workload logs in with it.
+                  The issuer must belong to a CA that a ZitiCA registered in Ziti. Needs enrollmentMode None and externalId.
+                properties:
+                  duration:
+                    description: duration is the lifetime of the certificate. Empty
+                      uses the cert-manager default (90 days).
+                    type: string
+                  issuerRef:
+                    description: issuerRef names the cert-manager issuer that signs
+                      the certificate.
+                    properties:
+                      kind:
+                        default: ClusterIssuer
+                        description: kind is Issuer or ClusterIssuer.
+                        enum:
+                        - Issuer
+                        - ClusterIssuer
+                        type: string
+                      name:
+                        description: name of the issuer.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - issuerRef
+                type: object
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
@@ -151,6 +183,9 @@ spec:
               rule: self.enrollmentMode == oldSelf.enrollmentMode
             - message: set only one of serviceAccount and externalId
               rule: '!(has(self.serviceAccount) && has(self.externalId))'
+            - message: certificate needs enrollmentMode None and externalId
+              rule: '!has(self.certificate) || (self.enrollmentMode == ''None'' &&
+                has(self.externalId))'
             - message: enrollmentMode None needs authPolicy and serviceAccount or
                 externalId
               rule: self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount)

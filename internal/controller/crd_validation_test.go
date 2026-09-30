@@ -110,6 +110,27 @@ var _ = Describe("CRD validation", func() {
 		}
 	})
 
+	It("allows a ZitiIdentity certificate only with enrollmentMode None and externalId", func() {
+		mk := func(name string, mut func(*zitiv1.ZitiIdentitySpec)) *zitiv1.ZitiIdentity {
+			id := &zitiv1.ZitiIdentity{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+				Spec:       zitiv1.ZitiIdentitySpec{Certificate: &zitiv1.WorkloadCertificate{IssuerRef: zitiv1.CertificateIssuerRef{Name: "ca"}}},
+			}
+			mut(&id.Spec)
+			return id
+		}
+		Expect(k8sClient.Create(ctx, mk("cert-jwt", func(s *zitiv1.ZitiIdentitySpec) {}))).To(MatchError(ContainSubstring("certificate needs enrollmentMode None and externalId")))
+		Expect(k8sClient.Create(ctx, mk("cert-sa", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.AuthPolicy, s.ServiceAccount = zitiv1.EnrollmentNone, "Default", "web"
+		}))).To(MatchError(ContainSubstring("certificate needs enrollmentMode None and externalId")))
+		ok := mk("cert-ok", func(s *zitiv1.ZitiIdentitySpec) {
+			s.EnrollmentMode, s.AuthPolicy, s.ExternalID = zitiv1.EnrollmentNone, "Default", "team-a.web"
+		})
+		Expect(k8sClient.Create(ctx, ok)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ok) })
+		Expect(ok.Spec.Certificate.IssuerRef.Kind).To(Equal("ClusterIssuer"))
+	})
+
 	It("rejects a ZitiConnection with a non-https URL or no hostingRouters", func() {
 		conn := func(url string, routers []string) *zitiv1.ZitiConnection {
 			c := &zitiv1.ZitiConnection{

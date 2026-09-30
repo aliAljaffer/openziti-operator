@@ -25,6 +25,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode == oldSelf.enrollmentMode",message="enrollmentMode is immutable"
 // +kubebuilder:validation:XValidation:rule="!(has(self.serviceAccount) && has(self.externalId))",message="set only one of serviceAccount and externalId"
+// +kubebuilder:validation:XValidation:rule="!has(self.certificate) || (self.enrollmentMode == 'None' && has(self.externalId))",message="certificate needs enrollmentMode None and externalId"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount) || has(self.externalId)))",message="enrollmentMode None needs authPolicy and serviceAccount or externalId"
 type ZitiIdentitySpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
@@ -71,6 +72,12 @@ type ZitiIdentitySpec struct {
 	// +optional
 	EnrollmentMode EnrollmentMode `json:"enrollmentMode,omitempty"`
 
+	// certificate makes the operator create a cert-manager Certificate for this identity. Its common name is externalId
+	// and it is stored in the Secret secretName (tls.crt, tls.key). The workload logs in with it.
+	// The issuer must belong to a CA that a ZitiCA registered in Ziti. Needs enrollmentMode None and externalId.
+	// +optional
+	Certificate *WorkloadCertificate `json:"certificate,omitempty"`
+
 	// managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName:
 	// it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity.
 	// Observe only reads the existing identity and never writes to Ziti.
@@ -84,6 +91,31 @@ type ZitiIdentitySpec struct {
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
+}
+
+// WorkloadCertificate describes the cert-manager Certificate that the operator creates for an identity.
+type WorkloadCertificate struct {
+	// issuerRef names the cert-manager issuer that signs the certificate.
+	// +required
+	IssuerRef CertificateIssuerRef `json:"issuerRef"`
+
+	// duration is the lifetime of the certificate. Empty uses the cert-manager default (90 days).
+	// +optional
+	Duration *metav1.Duration `json:"duration,omitempty"`
+}
+
+// CertificateIssuerRef points to a cert-manager Issuer or ClusterIssuer. An Issuer must be in the namespace of the identity.
+type CertificateIssuerRef struct {
+	// name of the issuer.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// kind is Issuer or ClusterIssuer.
+	// +kubebuilder:default=ClusterIssuer
+	// +kubebuilder:validation:Enum=Issuer;ClusterIssuer
+	// +optional
+	Kind string `json:"kind,omitempty"`
 }
 
 type EnrollmentMode string

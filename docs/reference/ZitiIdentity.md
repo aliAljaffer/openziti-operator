@@ -28,6 +28,11 @@
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `spec.authPolicy` | string | no |  | authPolicy is a Ziti auth policy name. It defaults to "Default". |
+| `spec.certificate` | object | no |  | certificate makes the operator create a cert-manager Certificate for this identity. Its common name is externalId and it is stored in the Secret secretName (tls.crt, tls.key). The workload logs in with it. The issuer must belong to a CA that a ZitiCA registered in Ziti. Needs enrollmentMode None and externalId. |
+| `spec.certificate.duration` | string | no |  | duration is the lifetime of the certificate. Empty uses the cert-manager default (90 days). |
+| `spec.certificate.issuerRef` | object | yes |  | issuerRef names the cert-manager issuer that signs the certificate. |
+| `spec.certificate.issuerRef.kind` | string | no | `"ClusterIssuer"` | kind is Issuer or ClusterIssuer. One of: `Issuer`, `ClusterIssuer`. |
+| `spec.certificate.issuerRef.name` | string | yes |  | name of the issuer. Minimum length 1. Maximum length 253. |
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy does not apply to adopted identities. Those are released, never deleted. One of: `Delete`, `Orphan`. |
 | `spec.enrollmentMode` | string | no | `"JwtOnly"` | enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it. OperatorEnrolled makes the operator enroll and write identity.json to the Secret. None creates an identity without enrollment. It logs in with a token, so authPolicy is required. One of: `JwtOnly`, `OperatorEnrolled`, `None`. |
@@ -46,6 +51,7 @@ The API server rejects a resource that breaks one of these rules.
 - `spec`: deletionPolicy is immutable
 - `spec`: enrollmentMode is immutable
 - `spec`: set only one of serviceAccount and externalId
+- `spec`: certificate needs enrollmentMode None and externalId
 - `spec`: enrollmentMode None needs authPolicy and serviceAccount or externalId
 
 ## Status

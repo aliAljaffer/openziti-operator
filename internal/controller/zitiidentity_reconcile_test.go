@@ -19,7 +19,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -689,5 +691,56 @@ func TestIdentityAdoptWithExternalIDPatchesIt(t *testing.T) {
 	got := e.zc.Objects[ziti.Identities][id]
 	if got["externalId"] != "system:serviceaccount:team-a:web" || got["externalId"] == "ext-1" || got.Tags()["owner"] != "human" {
 		t.Errorf("adopted identity = %v", got)
+	}
+}
+
+func TestIdentityCreatesTheCertManagerCertificate(t *testing.T) {
+	e := setupIdentity(t)
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Spec.RoleScope = zitiv1.RoleScopeGlobal
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	setSpec(t, e, func(s *zitiv1.ZitiIdentitySpec) {
+		s.EnrollmentMode, s.AuthPolicy, s.ExternalID = zitiv1.EnrollmentNone, "Default", "team-a.backend"
+		s.Certificate = &zitiv1.WorkloadCertificate{IssuerRef: zitiv1.CertificateIssuerRef{Name: "ziti-workload-ca"}}
+	})
+
+	e.reconcile(t)
+	cert := &unstructured.Unstructured{}
+	cert.SetGroupVersionKind(schema.GroupVersionKind{Group: "cert-manager.io", Version: "v1", Kind: "Certificate"})
+	if err := e.k.Get(t.Context(), e.key, cert); err != nil {
+		t.Fatal(err)
+	}
+	spec, _ := cert.Object["spec"].(map[string]any)
+	ref, _ := spec["issuerRef"].(map[string]any)
+	if spec["commonName"] != "team-a.backend" || spec["secretName"] != "backend" || ref["name"] != "ziti-workload-ca" || ref["kind"] != "ClusterIssuer" {
+		t.Errorf("spec = %v", spec)
+	}
+	if !metav1.IsControlledBy(cert, e.get(t)) {
+		t.Error("the Certificate must belong to the identity")
+	}
+	if c := findCond(e.get(t), CondReady); c.Status != metav1.ConditionFalse || c.Reason != "CertificatePending" {
+		t.Errorf("before issue: %+v", c)
+	}
+
+	cert.Object["status"] = map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}
+	if err := e.k.Update(t.Context(), cert); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if c := findCond(e.get(t), CondReady); c.Status != metav1.ConditionTrue || c.Reason != "CertificateLogin" {
+		t.Errorf("after issue: %+v", c)
+	}
+
+	e.zc.Calls = nil
+	e.reconcile(t)
+	for _, c := range e.zc.Calls {
+		if strings.HasPrefix(c, "create") || strings.HasPrefix(c, "update") || strings.HasPrefix(c, "delete") {
+			t.Errorf("second reconcile wrote: %s", c)
+		}
 	}
 }

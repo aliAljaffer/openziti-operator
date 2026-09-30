@@ -30,8 +30,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -77,6 +79,7 @@ type ZitiIdentityReconciler struct {
 // +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var id zitiv1alpha1.ZitiIdentity
@@ -107,6 +110,8 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var se *specError
 	var next ctrl.Result
 	switch {
+	case err == nil && id.Spec.Certificate != nil && !meta.IsStatusConditionTrue(id.Status.Conditions, CondReady):
+		next.RequeueAfter = jitter(pendingRecheck)
 	case err == nil && (id.Status.Enrolled || id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentNone):
 		next.RequeueAfter = jitter(serviceResync)
 	case err == nil:
@@ -283,6 +288,14 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		// The identity logs in with a token. There is nothing to enroll, no Secret, and no certificate.
 		id.Status.Enrolled, id.Status.EnrollmentExpiresAt, id.Status.CertNotAfter = false, nil, nil
 		meta.RemoveStatusCondition(&id.Status.Conditions, CondCertValid)
+		if id.Spec.Certificate != nil {
+			ready, msg, err := r.ensureCertificate(ctx, id)
+			if err != nil {
+				return err
+			}
+			setCond(&id.Status.Conditions, id.Generation, CondReady, ready, "CertificateLogin", "CertificatePending", msg)
+			return nil
+		}
 		setCond(&id.Status.Conditions, id.Generation, CondReady, true, "TokenLogin", "", "")
 		return nil
 	}
@@ -536,6 +549,54 @@ func (r *ZitiIdentityReconciler) writeSecret(ctx context.Context, id *zitiv1alph
 
 func (r *ZitiIdentityReconciler) dropJWT(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) error {
 	return dropSecretKey(ctx, r.Client, id, r.secretKey(id), SecretKeyJWT)
+}
+
+// ensureCertificate keeps the cert-manager Certificate of the identity and reports whether cert-manager issued it.
+// The Secret with the key and certificate belongs to cert-manager, not to the operator.
+func (r *ZitiIdentityReconciler) ensureCertificate(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) (bool, string, error) {
+	want := desired.WorkloadCertificate(id)
+	got := &unstructured.Unstructured{}
+	got.SetGroupVersionKind(want.GroupVersionKind())
+	err := r.Get(ctx, client.ObjectKeyFromObject(want), got)
+	switch {
+	case meta.IsNoMatchError(err):
+		return false, "", &specError{"CertManagerMissing", "cert-manager is not installed: the Certificate kind does not exist"}
+	case apierrors.IsNotFound(err):
+		if err := controllerutil.SetControllerReference(id, want, r.Scheme); err != nil {
+			return false, "", err
+		}
+		if err := r.Create(ctx, want); err != nil {
+			return false, "", err
+		}
+		r.Recorder.Eventf(id, "Normal", "Created", "created Certificate %s", want.GetName())
+		return false, "waiting for cert-manager to issue the certificate", nil
+	case err != nil:
+		return false, "", err
+	case !metav1.IsControlledBy(got, id):
+		return false, "", &specError{"CertificateConflict", fmt.Sprintf("Certificate %s exists and is not owned by this identity", want.GetName())}
+	}
+	wantSpec, _ := want.Object["spec"].(map[string]any)
+	gotSpec, _ := got.Object["spec"].(map[string]any)
+	if !desired.Matches(wantSpec, gotSpec) {
+		got.Object["spec"] = want.Object["spec"]
+		if err := r.Update(ctx, got); err != nil {
+			return false, "", err
+		}
+		r.Recorder.Eventf(id, "Normal", "Updated", "updated Certificate %s", want.GetName())
+		return false, "waiting for cert-manager to issue the certificate", nil
+	}
+	conds, _, _ := unstructured.NestedSlice(got.Object, "status", "conditions")
+	for _, c := range conds {
+		m, _ := c.(map[string]any)
+		if m["type"] == "Ready" {
+			if m["status"] == "True" {
+				return true, "", nil
+			}
+			msg, _ := m["message"].(string)
+			return false, msg, nil
+		}
+	}
+	return false, "waiting for cert-manager to issue the certificate", nil
 }
 
 func (r *ZitiIdentityReconciler) SetupWithManager(mgr ctrl.Manager) error {

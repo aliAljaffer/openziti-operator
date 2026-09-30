@@ -53,7 +53,7 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
 
    `kubectl get ztca` must show `VERIFIED` `true`.
 
-4. Create the identity. A free `externalId` needs `roleScope: Global` on the connection.
+4. Create the identity. A free `externalId` needs `roleScope: Global` on the connection. With `certificate`, the operator also creates the cert-manager Certificate (step 5) for you. The Secret is `secretName`, default the name of the identity.
 
    ```yaml
    apiVersion: alialjaffer.ziti/v1alpha1
@@ -64,9 +64,13 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
      externalId: team-a.web
      authPolicy: Default
      roleAttributes: [web]
+     certificate:
+       issuerRef: {name: ziti-workload-ca, kind: ClusterIssuer}
    ```
 
-5. Issue the workload certificate with the same name.
+   `kubectl get ztid web` shows `Ready` `true` when cert-manager has issued the certificate. Skip step 5 in this case. Use `duration` to set the lifetime. The operator needs no access to the Secret, because cert-manager writes it.
+
+5. Or issue the workload certificate yourself, with the same name.
 
    ```yaml
    apiVersion: cert-manager.io/v1
@@ -121,4 +125,5 @@ Sign a certificate with that common name using the CA key, and send it as plain 
 
 - Tested with cert-manager in a cluster: the operator registers and verifies the CA. A certificate that cert-manager issued logs in as the identity, and a request without a certificate is rejected. A reissued workload certificate (new key) logs in with no operator action. After cert-manager rotates the CA, the operator replaces the CA in Ziti, verifies it again, and a certificate from the new CA logs in.
 - Not tested: a Ziti tunneler or SDK that uses the certificate and key directly. Check that your client supports certificate login with an external CA.
-- The operator does not create the cert-manager objects for you.
+- The operator creates only the workload `Certificate` (with `certificate` on the identity). It does not create the issuer or the CA. cert-manager must be installed, or the identity shows the reason `CertManagerMissing`.
+- Tested with real cert-manager on a cluster: the Certificate that the operator builds is accepted and issued. The full chain (operator, `ZitiCA`, login with the issued certificate) was tested by hand with the certificate from step 5.
