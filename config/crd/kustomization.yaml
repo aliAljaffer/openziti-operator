@@ -2,19 +2,19 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/alialjaffer.ziti_ziticonnections.yaml
-- bases/alialjaffer.ziti_zitiapps.yaml
-- bases/alialjaffer.ziti_zitiidentities.yaml
-- bases/alialjaffer.ziti_zitiaccesspolicies.yaml
-- bases/alialjaffer.ziti_zitijwtsigners.yaml
-- bases/alialjaffer.ziti_ziticas.yaml
-- bases/alialjaffer.ziti_ziticonfigs.yaml
-- bases/alialjaffer.ziti_zitiservices.yaml
-- bases/alialjaffer.ziti_zitiservicepolicies.yaml
-- bases/alialjaffer.ziti_zitiedgerouterpolicies.yaml
-- bases/alialjaffer.ziti_zitiserviceedgerouterpolicies.yaml
-- bases/alialjaffer.ziti_zitirouters.yaml
-- bases/alialjaffer.ziti_zititerminators.yaml
+- bases/alialjaffer.com_ziticonnections.yaml
+- bases/alialjaffer.com_zitiapps.yaml
+- bases/alialjaffer.com_zitiidentities.yaml
+- bases/alialjaffer.com_zitiaccesspolicies.yaml
+- bases/alialjaffer.com_zitijwtsigners.yaml
+- bases/alialjaffer.com_ziticas.yaml
+- bases/alialjaffer.com_ziticonfigs.yaml
+- bases/alialjaffer.com_zitiservices.yaml
+- bases/alialjaffer.com_zitiservicepolicies.yaml
+- bases/alialjaffer.com_zitiedgerouterpolicies.yaml
+- bases/alialjaffer.com_zitiserviceedgerouterpolicies.yaml
+- bases/alialjaffer.com_zitirouters.yaml
+- bases/alialjaffer.com_zititerminators.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

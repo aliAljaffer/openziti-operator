@@ -1,12 +1,15 @@
----
+{{- if .Values.crd.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiaccesspolicies.alialjaffer.ziti
+  name: zitiaccesspolicies.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
@@ -207,3 +210,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}

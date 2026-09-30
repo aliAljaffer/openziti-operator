@@ -7,9 +7,9 @@ metadata:
     "helm.sh/resource-policy": keep
     {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiserviceedgerouterpolicies.alialjaffer.ziti
+  name: zitiserviceedgerouterpolicies.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti

@@ -14,7 +14,7 @@ import (
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 )
 
-const AnnotationPrefix = "alialjaffer.ziti/"
+const AnnotationPrefix = "alialjaffer.com/"
 
 // Annotations on a Kubernetes Service. Only expose is required. Lists are comma separated.
 const (

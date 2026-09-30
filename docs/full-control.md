@@ -38,7 +38,7 @@ Apply the resources in any order. A resource that names an object that does not 
 ## Example: an app with your own policies
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiConfig
 metadata: {name: web-intercept, namespace: team-a}
 spec:
@@ -49,7 +49,7 @@ spec:
     addresses: [web.example.com]
     portRanges: [{low: 80, high: 80}]
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiConfig
 metadata: {name: web-host, namespace: team-a}
 spec:
@@ -59,7 +59,7 @@ spec:
     terminators:
       - {address: 10.0.0.5, port: 8443, protocol: tcp}
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiService
 metadata: {name: web, namespace: team-a}
 spec:
@@ -67,7 +67,7 @@ spec:
   configs: [web-intercept, web-host]
   roleAttributes: [web]
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiServicePolicy
 metadata: {name: web-bind, namespace: team-a}
 spec:
@@ -76,7 +76,7 @@ spec:
   identityRoles: ["@router-a"]
   serviceRoles: ["@web.example.com"]
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiServicePolicy
 metadata: {name: web-dial, namespace: team-a}
 spec:
@@ -85,7 +85,7 @@ spec:
   identityRoles: ["#staff"]
   serviceRoles: ["#web"]
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiServiceEdgeRouterPolicy
 metadata: {name: web-serp, namespace: team-a}
 spec:
@@ -93,7 +93,7 @@ spec:
   serviceRoles: ["#web"]
   edgeRouterRoles: ["@router-a"]
 ---
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiEdgeRouterPolicy
 metadata: {name: web-erp, namespace: team-a}
 spec:
@@ -113,7 +113,7 @@ Most services need no terminator resource. The hosting router creates the termin
 Use a `ZitiTerminator` for a fixed route: a router that forwards a service to one address.
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiTerminator
 metadata: {name: web-via-router-a, namespace: team-a}
 spec:

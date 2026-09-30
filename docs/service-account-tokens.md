@@ -13,7 +13,7 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
 1. Create the signer. It is cluster-scoped, so only cluster admins can create it.
 
    ```yaml
-   apiVersion: alialjaffer.ziti/v1alpha1
+   apiVersion: alialjaffer.com/v1alpha1
    kind: ZitiJwtSigner
    metadata: {name: k8s}
    spec:
@@ -27,7 +27,7 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
 2. Create an identity for a service account in the same namespace.
 
    ```yaml
-   apiVersion: alialjaffer.ziti/v1alpha1
+   apiVersion: alialjaffer.com/v1alpha1
    kind: ZitiIdentity
    metadata: {name: web, namespace: team-a}
    spec:

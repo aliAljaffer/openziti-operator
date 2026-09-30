@@ -1,4 +1,4 @@
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiConfig
 metadata:
   labels:

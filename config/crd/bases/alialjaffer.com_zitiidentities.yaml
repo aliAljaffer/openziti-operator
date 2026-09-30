@@ -1,33 +1,42 @@
-{{- if .Values.crd.enabled }}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    {{- if .Values.crd.keep }}
-    "helm.sh/resource-policy": keep
-    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiservices.alialjaffer.ziti
+  name: zitiidentities.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiService
-    listKind: ZitiServiceList
-    plural: zitiservices
+    kind: ZitiIdentity
+    listKind: ZitiIdentityList
+    plural: zitiidentities
     shortNames:
-    - ztsvc
-    singular: zitiservice
+    - ztid
+    singular: zitiidentity
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.managementPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.enrolled
+      name: Enrolled
+      type: boolean
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
+      type: string
+    - jsonPath: .status.enrollmentExpiresAt
+      name: Enrollment Expires
+      type: string
+    - jsonPath: .status.certNotAfter
+      name: Cert Expires
+      type: string
     - jsonPath: .status.zitiId
       name: Ziti ID
       priority: 1
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='Ready')].status
-      name: Ready
       type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].message
       name: Message
@@ -39,8 +48,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiService is a Ziti service, one to one. Use ZitiApp to publish
-          an app with all its policies.
+        description: ZitiIdentity is the Schema for the zitiidentities API
         properties:
           apiVersion:
             description: |-
@@ -60,14 +68,44 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiService
+            description: spec defines the desired state of ZitiIdentity
             properties:
-              configs:
-                description: configs are the names of the Ziti configs that the service
-                  uses, for example those made by ZitiConfig.
-                items:
-                  type: string
-                type: array
+              authPolicy:
+                description: authPolicy is a Ziti auth policy name. It defaults to
+                  "Default".
+                type: string
+              certificate:
+                description: |-
+                  certificate makes the operator create a cert-manager Certificate for this identity. Its common name is externalId
+                  and it is stored in the Secret secretName (tls.crt, tls.key). The workload logs in with it.
+                  The issuer must belong to a CA that a ZitiCA registered in Ziti. Needs enrollmentMode None and externalId.
+                properties:
+                  duration:
+                    description: duration is the lifetime of the certificate. Empty
+                      uses the cert-manager default (90 days).
+                    type: string
+                  issuerRef:
+                    description: issuerRef names the cert-manager issuer that signs
+                      the certificate.
+                    properties:
+                      kind:
+                        default: ClusterIssuer
+                        description: kind is Issuer or ClusterIssuer.
+                        enum:
+                        - Issuer
+                        - ClusterIssuer
+                        type: string
+                      name:
+                        description: name of the issuer.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - issuerRef
+                type: object
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
@@ -75,48 +113,59 @@ spec:
                 type: string
               deletionPolicy:
                 default: Delete
-                description: |-
-                  deletionPolicy Delete removes the object from Ziti when this resource is deleted.
-                  Orphan removes only the operator tags and keeps the object. It cannot change after creation.
+                description: deletionPolicy does not apply to adopted identities.
+                  Those are released, never deleted.
                 enum:
                 - Delete
                 - Orphan
                 type: string
-              encryptionRequired:
-                default: true
-                description: encryptionRequired makes the traffic end-to-end encrypted.
-                type: boolean
+              enrollmentMode:
+                default: JwtOnly
+                description: |-
+                  enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
+                  OperatorEnrolled makes the operator enroll and write identity.json to the Secret.
+                  None creates an identity without enrollment. It logs in with a token, so authPolicy is required.
+                enum:
+                - JwtOnly
+                - OperatorEnrolled
+                - None
+                type: string
+              externalId:
+                description: |-
+                  externalId is the value that a token claim must match to log in as this identity, for an identity provider
+                  other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject.
+                maxLength: 1000
+                type: string
               managementPolicy:
                 default: Manage
                 description: |-
-                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
-                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
-                  Observe only reads the existing object and never writes to Ziti.
+                  managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName:
+                  it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity.
+                  Observe only reads the existing identity and never writes to Ziti.
                 enum:
                 - Manage
                 - Adopt
                 - Observe
                 type: string
-              maxIdleTimeMillis:
-                description: maxIdleTimeMillis closes a circuit after this idle time.
-                  Zero means never.
-                format: int64
-                minimum: 0
-                type: integer
               roleAttributes:
-                description: roleAttributes are the groups the service belongs to.
-                  They follow the connection roleScope.
+                description: roleAttributes follow the connection roleScope, like
+                  ZitiApp roleAttributes.
                 items:
                   type: string
                 type: array
-              terminatorStrategy:
-                default: smartrouting
-                description: 'terminatorStrategy is how Ziti picks a terminator: smartrouting,
-                  random, or another strategy your controller knows.'
+              secretName:
+                description: secretName receives "enrollment.jwt" or "identity.json",
+                  by enrollmentMode. It defaults to the CR name.
+                maxLength: 253
+                type: string
+              serviceAccount:
+                description: |-
+                  serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity.
+                  It sets externalId to system:serviceaccount:<namespace>:<name>. Needs a ZitiJwtSigner and an authPolicy that allows it.
+                maxLength: 253
                 type: string
               zitiName:
-                description: zitiName is the name of the object in Ziti. It defaults
-                  to <namespace>.<name>. It cannot change later.
+                description: zitiName defaults to <namespace>.<name>.
                 maxLength: 1000
                 minLength: 1
                 type: string
@@ -127,9 +176,25 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: enrollmentMode is immutable
+              rule: self.enrollmentMode == oldSelf.enrollmentMode
+            - message: set only one of serviceAccount and externalId
+              rule: '!(has(self.serviceAccount) && has(self.externalId))'
+            - message: certificate needs enrollmentMode None and externalId
+              rule: '!has(self.certificate) || (self.enrollmentMode == ''None'' &&
+                has(self.externalId))'
+            - message: enrollmentMode None needs authPolicy and serviceAccount or
+                externalId
+              rule: self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount)
+                || has(self.externalId)))
           status:
-            description: status defines the observed state of ZitiService
+            description: status defines the observed state of ZitiIdentity
             properties:
+              certNotAfter:
+                description: certNotAfter is the earliest expiry of the identity's
+                  client certificates.
+                format: date-time
+                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -189,11 +254,15 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              enrolled:
+                type: boolean
+              enrollmentExpiresAt:
+                format: date-time
+                type: string
               observedGeneration:
                 format: int64
                 type: integer
               zitiId:
-                description: zitiId is the ID of the object in Ziti.
                 type: string
             type: object
         required:
@@ -203,4 +272,3 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}

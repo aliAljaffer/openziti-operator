@@ -1,30 +1,32 @@
-{{- if .Values.crd.enabled }}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    {{- if .Values.crd.keep }}
-    "helm.sh/resource-policy": keep
-    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiedgerouterpolicies.alialjaffer.ziti
+  name: zitirouters.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiEdgeRouterPolicy
-    listKind: ZitiEdgeRouterPolicyList
-    plural: zitiedgerouterpolicies
+    kind: ZitiRouter
+    listKind: ZitiRouterList
+    plural: zitirouters
     shortNames:
-    - zterp
-    singular: zitiedgerouterpolicy
-  scope: Namespaced
+    - ztrouter
+    singular: zitirouter
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.zitiId
-      name: Ziti ID
-      priority: 1
+    - jsonPath: .status.enrolled
+      name: Enrolled
+      type: boolean
+    - jsonPath: .status.online
+      name: Online
+      type: boolean
+    - jsonPath: .status.enrollmentExpiresAt
+      name: Enrollment Expires
       type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
@@ -39,8 +41,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiEdgeRouterPolicy is a Ziti edge router policy, one to one.
-          It says which routers identities may connect to.
+        description: ZitiRouter is the Schema for the zitirouters API
         properties:
           apiVersion:
             description: |-
@@ -60,65 +61,94 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiEdgeRouterPolicy
+            description: spec defines the desired state of ZitiRouter
             properties:
+              advertisedAddress:
+                description: |-
+                  advertisedAddress is the DNS name or IP where clients and other routers reach this router. The router needs it to start.
+                  With enrollmentSecretRef and this field, the operator also writes ready-made "docker-compose.yml" and
+                  "deployment.yaml" files to the Secret, so the router can be started on a VM or in a Kubernetes cluster without router configuration.
+                  Without it, only the JWT is written and the condition ManifestsReady says why.
+                maxLength: 253
+                pattern: ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$
+                type: string
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
                   It defaults to "default".
                 type: string
+              cost:
+                description: cost makes Ziti prefer routers with a lower cost.
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
               deletionPolicy:
                 default: Delete
                 description: |-
-                  deletionPolicy Delete removes the object from Ziti when this resource is deleted.
-                  Orphan removes only the operator tags and keeps the object. It cannot change after creation.
+                  deletionPolicy Delete removes the router from Ziti when this resource is deleted.
+                  Orphan removes only the operator tags and keeps the router. It cannot change after creation.
                 enum:
                 - Delete
                 - Orphan
                 type: string
-              edgeRouterRoles:
+              disabled:
+                description: disabled takes the router out of service without deleting
+                  it.
+                type: boolean
+              enrollmentSecretRef:
                 description: |-
-                  edgeRouterRoles select the edge routers the identities may connect to. "#attr" selects by role attribute,
-                  "#all" every router, "@name" one router.
+                  enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
+                  Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
+                  With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml".
+                  The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires.
+                  Without it, the JWT stays in Ziti.
+                properties:
+                  name:
+                    description: name of the Secret.
+                    type: string
+                  namespace:
+                    description: namespace of the Secret.
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+              noTraversal:
+                description: noTraversal keeps other traffic off this router. The
+                  router only serves its own edge connections.
+                type: boolean
+              port:
+                default: 3022
+                description: port is the port the router listens on for clients and
+                  links. It is used in the generated manifests.
+                format: int32
+                maximum: 65535
+                minimum: 1
+                type: integer
+              roleAttributes:
+                description: |-
+                  roleAttributes are the groups the router belongs to. Edge router policies select routers by them.
+                  They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter.
                 items:
                   type: string
-                minItems: 1
                 type: array
-              identityRoles:
-                description: identityRoles select the identities. "#attr" selects
-                  by role attribute, "#all" every identity, "@name" one identity.
-                items:
-                  type: string
-                minItems: 1
-                type: array
-              managementPolicy:
-                default: Manage
+              storageClassName:
                 description: |-
-                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
-                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
-                  Observe only reads the existing object and never writes to Ziti.
-                enum:
-                - Manage
-                - Adopt
-                - Observe
+                  storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default.
+                  Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind.
+                maxLength: 253
                 type: string
-              semantic:
-                default: AnyOf
-                description: semantic is AnyOf (an identity needs one of the roles)
-                  or AllOf (it needs all of them).
-                enum:
-                - AnyOf
-                - AllOf
-                type: string
+              tunnelerEnabled:
+                description: tunnelerEnabled lets the router host and dial services
+                  itself. Routers that host services need it.
+                type: boolean
               zitiName:
-                description: zitiName is the name of the object in Ziti. It defaults
-                  to <namespace>.<name>. It cannot change later.
+                description: zitiName is the router name in Ziti. It defaults to the
+                  resource name. It cannot change later.
                 maxLength: 1000
                 minLength: 1
                 type: string
-            required:
-            - edgeRouterRoles
-            - identityRoles
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -127,7 +157,7 @@ spec:
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
           status:
-            description: status defines the observed state of ZitiEdgeRouterPolicy
+            description: status defines the observed state of ZitiRouter
             properties:
               conditions:
                 items:
@@ -188,11 +218,22 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              enrolled:
+                description: enrolled is true once the router has enrolled with its
+                  JWT.
+                type: boolean
+              enrollmentExpiresAt:
+                description: enrollmentExpiresAt is when the pending JWT expires.
+                  Empty once the router has enrolled.
+                format: date-time
+                type: string
               observedGeneration:
                 format: int64
                 type: integer
-              zitiId:
-                description: zitiId is the ID of the object in Ziti.
+              online:
+                description: online is true while the router is connected to the controller.
+                type: boolean
+              routerId:
                 type: string
             type: object
         required:
@@ -202,4 +243,3 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}

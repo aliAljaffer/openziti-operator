@@ -17,7 +17,7 @@ metadata:
   name: {{ include "ziti-operator.resourceName" (dict "suffix" "zitiaccesspolicy-viewer-role" "context" $) }}
 rules:
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiaccesspolicies
   verbs:
@@ -25,7 +25,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiaccesspolicies/status
   verbs:

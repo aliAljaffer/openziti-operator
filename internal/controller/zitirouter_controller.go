@@ -57,9 +57,9 @@ type ZitiRouterReconciler struct {
 	SecretNamespaces []string
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitirouters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitirouters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitirouters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitirouters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitirouters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitirouters/finalizers,verbs=update
 
 func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var rt zitiv1alpha1.ZitiRouter

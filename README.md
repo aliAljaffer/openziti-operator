@@ -17,12 +17,12 @@ It drives the Ziti Edge Management API. It does not install or run the Ziti cont
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. Lets service accounts log in. |
 
-Annotate a Kubernetes Service with `alialjaffer.ziti/expose: "true"` and the operator creates a `ZitiApp` for it.
+Annotate a Kubernetes Service with `alialjaffer.com/expose: "true"` and the operator creates a `ZitiApp` for it.
 
 ## First app
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiApp
 metadata: {name: billing, namespace: team-a}
 spec:

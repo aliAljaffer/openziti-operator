@@ -60,9 +60,9 @@ type ZitiCAReconciler struct {
 	Reader client.Reader
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas/finalizers,verbs=update
 // +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

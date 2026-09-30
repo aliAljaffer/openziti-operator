@@ -7,24 +7,21 @@ metadata:
     "helm.sh/resource-policy": keep
     {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiservicepolicies.alialjaffer.ziti
+  name: zitiedgerouterpolicies.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiServicePolicy
-    listKind: ZitiServicePolicyList
-    plural: zitiservicepolicies
+    kind: ZitiEdgeRouterPolicy
+    listKind: ZitiEdgeRouterPolicyList
+    plural: zitiedgerouterpolicies
     shortNames:
-    - ztsp
-    singular: zitiservicepolicy
+    - zterp
+    singular: zitiedgerouterpolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.type
-      name: Type
-      type: string
     - jsonPath: .status.zitiId
       name: Ziti ID
       priority: 1
@@ -42,8 +39,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiServicePolicy is a Ziti service policy (Dial or Bind), one
-          to one.
+        description: ZitiEdgeRouterPolicy is a Ziti edge router policy, one to one.
+          It says which routers identities may connect to.
         properties:
           apiVersion:
             description: |-
@@ -63,7 +60,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiServicePolicy
+            description: spec defines the desired state of ZitiEdgeRouterPolicy
             properties:
               connectionRef:
                 default: default
@@ -79,6 +76,14 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              edgeRouterRoles:
+                description: |-
+                  edgeRouterRoles select the edge routers the identities may connect to. "#attr" selects by role attribute,
+                  "#all" every router, "@name" one router.
+                items:
+                  type: string
+                minItems: 1
+                type: array
               identityRoles:
                 description: identityRoles select the identities. "#attr" selects
                   by role attribute, "#all" every identity, "@name" one identity.
@@ -97,12 +102,6 @@ spec:
                 - Adopt
                 - Observe
                 type: string
-              postureCheckRoles:
-                description: postureCheckRoles select the posture checks that identities
-                  must pass.
-                items:
-                  type: string
-                type: array
               semantic:
                 default: AnyOf
                 description: semantic is AnyOf (an identity needs one of the roles)
@@ -111,20 +110,6 @@ spec:
                 - AnyOf
                 - AllOf
                 type: string
-              serviceRoles:
-                description: serviceRoles select the services. "#attr" selects by
-                  role attribute, "#all" every service, "@name" one service.
-                items:
-                  type: string
-                minItems: 1
-                type: array
-              type:
-                description: type is Dial (who may connect) or Bind (who may host).
-                  It cannot change later.
-                enum:
-                - Dial
-                - Bind
-                type: string
               zitiName:
                 description: zitiName is the name of the object in Ziti. It defaults
                   to <namespace>.<name>. It cannot change later.
@@ -132,9 +117,8 @@ spec:
                 minLength: 1
                 type: string
             required:
+            - edgeRouterRoles
             - identityRoles
-            - serviceRoles
-            - type
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -142,10 +126,8 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
-            - message: type is immutable
-              rule: self.type == oldSelf.type
           status:
-            description: status defines the observed state of ZitiServicePolicy
+            description: status defines the observed state of ZitiEdgeRouterPolicy
             properties:
               conditions:
                 items:

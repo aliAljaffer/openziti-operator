@@ -31,9 +31,9 @@ type ZitiTerminatorReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zititerminators,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zititerminators/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zititerminators/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zititerminators,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zititerminators/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zititerminators/finalizers,verbs=update
 
 func (r *ZitiTerminatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var t zitiv1alpha1.ZitiTerminator

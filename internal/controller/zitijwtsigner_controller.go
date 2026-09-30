@@ -52,9 +52,9 @@ type ZitiJwtSignerReconciler struct {
 	TokenFile string
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitijwtsigners,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitijwtsigners/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitijwtsigners/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitijwtsigners,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitijwtsigners/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitijwtsigners/finalizers,verbs=update
 
 func (r *ZitiJwtSignerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var sg zitiv1alpha1.ZitiJwtSigner

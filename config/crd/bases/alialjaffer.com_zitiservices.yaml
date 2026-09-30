@@ -1,36 +1,28 @@
-{{- if .Values.crd.enabled }}
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    {{- if .Values.crd.keep }}
-    "helm.sh/resource-policy": keep
-    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiaccesspolicies.alialjaffer.ziti
+  name: zitiservices.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiAccessPolicy
-    listKind: ZitiAccessPolicyList
-    plural: zitiaccesspolicies
+    kind: ZitiService
+    listKind: ZitiServiceList
+    plural: zitiservices
     shortNames:
-    - ztap
-    singular: zitiaccesspolicy
+    - ztsvc
+    singular: zitiservice
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.zitiName
-      name: Ziti Name
+    - jsonPath: .status.zitiId
+      name: Ziti ID
+      priority: 1
       type: string
-    - jsonPath: .status.identities
-      name: Identities
-      type: integer
-    - jsonPath: .status.services
-      name: Services
-      type: integer
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
       type: string
@@ -44,7 +36,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiAccessPolicy is the Schema for the zitiaccesspolicies API
+        description: ZitiService is a Ziti service, one to one. Use ZitiApp to publish
+          an app with all its policies.
         properties:
           apiVersion:
             description: |-
@@ -64,8 +57,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiAccessPolicy
+            description: spec defines the desired state of ZitiService
             properties:
+              configs:
+                description: configs are the names of the Ziti configs that the service
+                  uses, for example those made by ZitiConfig.
+                items:
+                  type: string
+                type: array
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
@@ -74,46 +73,50 @@ spec:
               deletionPolicy:
                 default: Delete
                 description: |-
-                  deletionPolicy Delete removes the Ziti entities when this resource is deleted.
-                  Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
+                  deletionPolicy Delete removes the object from Ziti when this resource is deleted.
+                  Orphan removes only the operator tags and keeps the object. It cannot change after creation.
                 enum:
                 - Delete
                 - Orphan
                 type: string
-              edgeRouters:
-                description: edgeRouters are router names. When set, an edge router
-                  policy gives the identities access to them.
+              encryptionRequired:
+                default: true
+                description: encryptionRequired makes the traffic end-to-end encrypted.
+                type: boolean
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
+                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
+                  Observe only reads the existing object and never writes to Ziti.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
+              maxIdleTimeMillis:
+                description: maxIdleTimeMillis closes a circuit after this idle time.
+                  Zero means never.
+                format: int64
+                minimum: 0
+                type: integer
+              roleAttributes:
+                description: roleAttributes are the groups the service belongs to.
+                  They follow the connection roleScope.
                 items:
                   type: string
                 type: array
-              identityRoles:
-                description: identityRoles select the identities that may dial. Roles
-                  follow the connection roleScope.
-                items:
-                  type: string
-                minItems: 1
-                type: array
-              postureCheckRoles:
-                description: postureCheckRoles add posture checks to the Dial policy.
-                items:
-                  type: string
-                type: array
-              serviceRoles:
-                description: serviceRoles select the services they may dial. Roles
-                  follow the connection roleScope.
-                items:
-                  type: string
-                minItems: 1
-                type: array
+              terminatorStrategy:
+                default: smartrouting
+                description: 'terminatorStrategy is how Ziti picks a terminator: smartrouting,
+                  random, or another strategy your controller knows.'
+                type: string
               zitiName:
-                description: zitiName defaults to <namespace>.<name>. The Dial policy
-                  is <zitiName>.dial and the router policy is <zitiName>.erp.
+                description: zitiName is the name of the object in Ziti. It defaults
+                  to <namespace>.<name>. It cannot change later.
                 maxLength: 1000
                 minLength: 1
                 type: string
-            required:
-            - identityRoles
-            - serviceRoles
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -122,7 +125,7 @@ spec:
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
           status:
-            description: status defines the observed state of ZitiAccessPolicy
+            description: status defines the observed state of ZitiService
             properties:
               conditions:
                 items:
@@ -183,24 +186,11 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              dialPolicyId:
-                type: string
-              edgeRouterPolicyId:
-                type: string
-              identities:
-                description: identities is how many identities the Dial policy selects
-                  now.
-                format: int32
-                type: integer
               observedGeneration:
                 format: int64
                 type: integer
-              services:
-                description: services is how many services the Dial policy selects
-                  now.
-                format: int32
-                type: integer
-              zitiName:
+              zitiId:
+                description: zitiId is the ID of the object in Ziti.
                 type: string
             type: object
         required:
@@ -210,4 +200,3 @@ spec:
     storage: true
     subresources:
       status: {}
-{{- end }}

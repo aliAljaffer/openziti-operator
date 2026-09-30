@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiedgerouterpolicies.alialjaffer.ziti
+  name: zitiserviceedgerouterpolicies.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiEdgeRouterPolicy
-    listKind: ZitiEdgeRouterPolicyList
-    plural: zitiedgerouterpolicies
+    kind: ZitiServiceEdgeRouterPolicy
+    listKind: ZitiServiceEdgeRouterPolicyList
+    plural: zitiserviceedgerouterpolicies
     shortNames:
-    - zterp
-    singular: zitiedgerouterpolicy
+    - ztserp
+    singular: zitiserviceedgerouterpolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -36,8 +36,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiEdgeRouterPolicy is a Ziti edge router policy, one to one.
-          It says which routers identities may connect to.
+        description: ZitiServiceEdgeRouterPolicy is a Ziti service edge router policy,
+          one to one. It says which routers may carry a service.
         properties:
           apiVersion:
             description: |-
@@ -57,7 +57,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiEdgeRouterPolicy
+            description: spec defines the desired state of ZitiServiceEdgeRouterPolicy
             properties:
               connectionRef:
                 default: default
@@ -75,15 +75,8 @@ spec:
                 type: string
               edgeRouterRoles:
                 description: |-
-                  edgeRouterRoles select the edge routers the identities may connect to. "#attr" selects by role attribute,
+                  edgeRouterRoles select the edge routers that carry the services. "#attr" selects by role attribute,
                   "#all" every router, "@name" one router.
-                items:
-                  type: string
-                minItems: 1
-                type: array
-              identityRoles:
-                description: identityRoles select the identities. "#attr" selects
-                  by role attribute, "#all" every identity, "@name" one identity.
                 items:
                   type: string
                 minItems: 1
@@ -101,12 +94,19 @@ spec:
                 type: string
               semantic:
                 default: AnyOf
-                description: semantic is AnyOf (an identity needs one of the roles)
+                description: semantic is AnyOf (a service needs one of the roles)
                   or AllOf (it needs all of them).
                 enum:
                 - AnyOf
                 - AllOf
                 type: string
+              serviceRoles:
+                description: serviceRoles select the services. "#attr" selects by
+                  role attribute, "#all" every service, "@name" one service.
+                items:
+                  type: string
+                minItems: 1
+                type: array
               zitiName:
                 description: zitiName is the name of the object in Ziti. It defaults
                   to <namespace>.<name>. It cannot change later.
@@ -115,7 +115,7 @@ spec:
                 type: string
             required:
             - edgeRouterRoles
-            - identityRoles
+            - serviceRoles
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -124,7 +124,7 @@ spec:
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
           status:
-            description: status defines the observed state of ZitiEdgeRouterPolicy
+            description: status defines the observed state of ZitiServiceEdgeRouterPolicy
             properties:
               conditions:
                 items:

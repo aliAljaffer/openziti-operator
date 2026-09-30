@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	Finalizer         = "alialjaffer.ziti/finalizer"
+	Finalizer         = "alialjaffer.com/finalizer"
 	CondSynced        = "Synced"
 	CondHosted        = "Hosted"
 	CondDialable      = "Dialable"
@@ -64,9 +64,9 @@ type ZitiAppReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiapps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiapps/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 type specError struct{ reason, msg string }

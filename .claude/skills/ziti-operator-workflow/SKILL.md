@@ -5,7 +5,7 @@ description: Use when you work on any code, chart, or docs in this OpenZiti Kube
 
 # Working in this repo
 
-The operator drives the OpenZiti Edge Management API from Kubernetes resources. Kinds: `ZitiConnection` (cluster), `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy` (namespaced). API group `alialjaffer.ziti`, version `v1alpha1`.
+The operator drives the OpenZiti Edge Management API from Kubernetes resources. Kinds: `ZitiConnection` (cluster), `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy` (namespaced). API group `alialjaffer.com`, version `v1alpha1`.
 
 ## Layout
 

@@ -1,27 +1,32 @@
----
+{{- if .Values.crd.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitiserviceedgerouterpolicies.alialjaffer.ziti
+  name: zitijwtsigners.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiServiceEdgeRouterPolicy
-    listKind: ZitiServiceEdgeRouterPolicyList
-    plural: zitiserviceedgerouterpolicies
+    kind: ZitiJwtSigner
+    listKind: ZitiJwtSignerList
+    plural: zitijwtsigners
     shortNames:
-    - ztserp
-    singular: zitiserviceedgerouterpolicy
-  scope: Namespaced
+    - ztjwt
+    singular: zitijwtsigner
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.zitiId
-      name: Ziti ID
-      priority: 1
+    - jsonPath: .status.issuer
+      name: Issuer
+      type: string
+    - jsonPath: .status.keyId
+      name: Key
       type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
@@ -36,8 +41,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiServiceEdgeRouterPolicy is a Ziti service edge router policy,
-          one to one. It says which routers may carry a service.
+        description: ZitiJwtSigner is the Schema for the zitijwtsigners API
         properties:
           apiVersion:
             description: |-
@@ -57,65 +61,80 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiServiceEdgeRouterPolicy
+            description: spec defines the desired state of ZitiJwtSigner
             properties:
+              audience:
+                description: audience must equal the aud claim of the tokens. Use
+                  a value made for Ziti, for example "ziti".
+                minLength: 1
+                type: string
+              claimsProperty:
+                default: sub
+                description: claimsProperty is the token claim that names the identity.
+                type: string
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
                   It defaults to "default".
                 type: string
+              createAuthPolicy:
+                default: true
+                description: |-
+                  createAuthPolicy creates an auth policy with the same name that accepts only this signer.
+                  Identities select it with spec.authPolicy.
+                type: boolean
               deletionPolicy:
                 default: Delete
                 description: |-
-                  deletionPolicy Delete removes the object from Ziti when this resource is deleted.
-                  Orphan removes only the operator tags and keeps the object. It cannot change after creation.
+                  deletionPolicy Delete removes the Ziti entities when this resource is deleted.
+                  Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
                 enum:
                 - Delete
                 - Orphan
                 type: string
-              edgeRouterRoles:
-                description: |-
-                  edgeRouterRoles select the edge routers that carry the services. "#attr" selects by role attribute,
-                  "#all" every router, "@name" one router.
-                items:
-                  type: string
-                minItems: 1
-                type: array
-              managementPolicy:
-                default: Manage
-                description: |-
-                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
-                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
-                  Observe only reads the existing object and never writes to Ziti.
-                enum:
-                - Manage
-                - Adopt
-                - Observe
-                type: string
-              semantic:
-                default: AnyOf
-                description: semantic is AnyOf (a service needs one of the roles)
-                  or AllOf (it needs all of them).
-                enum:
-                - AnyOf
-                - AllOf
-                type: string
-              serviceRoles:
-                description: serviceRoles select the services. "#attr" selects by
-                  role attribute, "#all" every service, "@name" one service.
-                items:
-                  type: string
-                minItems: 1
-                type: array
+              keys:
+                description: keys tells Ziti how to verify signatures.
+                properties:
+                  jwksEndpoint:
+                    description: jwksEndpoint lets the Ziti controller fetch the keys,
+                      for any identity provider.
+                    properties:
+                      issuer:
+                        description: issuer must equal the iss claim of the tokens.
+                        minLength: 1
+                        type: string
+                      url:
+                        description: url is the JWKS endpoint. The Ziti controller
+                          must be able to reach it.
+                        pattern: ^https://
+                        type: string
+                    required:
+                    - issuer
+                    - url
+                    type: object
+                  kubernetes:
+                    description: |-
+                      kubernetes reads the issuer and the keys from this cluster. The operator picks the key that signs
+                      its own service account token. When the cluster rotates the key, the next sync updates the signer.
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: set exactly one of kubernetes and jwksEndpoint
+                  rule: has(self.kubernetes) != has(self.jwksEndpoint)
+              useExternalId:
+                default: true
+                description: useExternalId matches the claim to the identity externalId.
+                  False matches it to the identity id.
+                type: boolean
               zitiName:
-                description: zitiName is the name of the object in Ziti. It defaults
-                  to <namespace>.<name>. It cannot change later.
+                description: zitiName is the signer name in Ziti. It defaults to the
+                  resource name.
                 maxLength: 1000
                 minLength: 1
                 type: string
             required:
-            - edgeRouterRoles
-            - serviceRoles
+            - audience
+            - keys
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -124,8 +143,10 @@ spec:
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
           status:
-            description: status defines the observed state of ZitiServiceEdgeRouterPolicy
+            description: status defines the observed state of ZitiJwtSigner
             properties:
+              authPolicyId:
+                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -185,11 +206,17 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              issuer:
+                description: issuer is the token issuer that Ziti accepts.
+                type: string
+              keyId:
+                description: keyId is the id of the signing key that Ziti uses. Empty
+                  with jwksEndpoint.
+                type: string
               observedGeneration:
                 format: int64
                 type: integer
-              zitiId:
-                description: zitiId is the ID of the object in Ziti.
+              signerId:
                 type: string
             type: object
         required:
@@ -199,3 +226,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}

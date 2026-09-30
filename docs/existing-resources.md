@@ -13,7 +13,7 @@ The operator ignores every Ziti entity it did not create. To manage or watch an 
 Use it first. It shows the state of an existing service or identity with no risk.
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiApp
 metadata: {name: legacy, namespace: team-a}
 spec:
@@ -26,7 +26,7 @@ spec:
 ## Adopt an identity
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiIdentity
 metadata: {name: alice, namespace: team-a}
 spec:

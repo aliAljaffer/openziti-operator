@@ -75,9 +75,9 @@ type ZitiIdentityReconciler struct {
 	RenewBefore time.Duration
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=zitiidentities/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 

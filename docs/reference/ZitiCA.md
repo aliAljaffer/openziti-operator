@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| API version | `alialjaffer.ziti/v1alpha1` |
+| API version | `alialjaffer.com/v1alpha1` |
 | Scope | Cluster |
 | Short name | `ztca` |
 | Category | `ziti` |
@@ -79,7 +79,7 @@ Conditions and their reasons are listed in [Conditions and reasons](../condition
 ## Example
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiCA
 metadata:
   labels:

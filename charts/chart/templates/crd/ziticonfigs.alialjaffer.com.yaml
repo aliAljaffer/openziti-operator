@@ -1,29 +1,33 @@
----
+{{- if .Values.crd.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: zitijwtsigners.alialjaffer.ziti
+  name: ziticonfigs.alialjaffer.com
 spec:
-  group: alialjaffer.ziti
+  group: alialjaffer.com
   names:
     categories:
     - ziti
-    kind: ZitiJwtSigner
-    listKind: ZitiJwtSignerList
-    plural: zitijwtsigners
+    kind: ZitiConfig
+    listKind: ZitiConfigList
+    plural: ziticonfigs
     shortNames:
-    - ztjwt
-    singular: zitijwtsigner
-  scope: Cluster
+    - ztcfg
+    singular: ziticonfig
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.issuer
-      name: Issuer
+    - jsonPath: .spec.type
+      name: Type
       type: string
-    - jsonPath: .status.keyId
-      name: Key
+    - jsonPath: .status.zitiId
+      name: Ziti ID
+      priority: 1
       type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
@@ -38,7 +42,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ZitiJwtSigner is the Schema for the zitijwtsigners API
+        description: ZitiConfig is a Ziti config, one to one.
         properties:
           apiVersion:
             description: |-
@@ -58,80 +62,52 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ZitiJwtSigner
+            description: spec defines the desired state of ZitiConfig
             properties:
-              audience:
-                description: audience must equal the aud claim of the tokens. Use
-                  a value made for Ziti, for example "ziti".
-                minLength: 1
-                type: string
-              claimsProperty:
-                default: sub
-                description: claimsProperty is the token claim that names the identity.
-                type: string
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
                   It defaults to "default".
                 type: string
-              createAuthPolicy:
-                default: true
-                description: |-
-                  createAuthPolicy creates an auth policy with the same name that accepts only this signer.
-                  Identities select it with spec.authPolicy.
-                type: boolean
+              data:
+                description: data is the body of the config. Its shape is defined
+                  by the config type.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
               deletionPolicy:
                 default: Delete
                 description: |-
-                  deletionPolicy Delete removes the Ziti entities when this resource is deleted.
-                  Orphan removes only the operator tags and keeps the entities. It cannot change after creation.
+                  deletionPolicy Delete removes the object from Ziti when this resource is deleted.
+                  Orphan removes only the operator tags and keeps the object. It cannot change after creation.
                 enum:
                 - Delete
                 - Orphan
                 type: string
-              keys:
-                description: keys tells Ziti how to verify signatures.
-                properties:
-                  jwksEndpoint:
-                    description: jwksEndpoint lets the Ziti controller fetch the keys,
-                      for any identity provider.
-                    properties:
-                      issuer:
-                        description: issuer must equal the iss claim of the tokens.
-                        minLength: 1
-                        type: string
-                      url:
-                        description: url is the JWKS endpoint. The Ziti controller
-                          must be able to reach it.
-                        pattern: ^https://
-                        type: string
-                    required:
-                    - issuer
-                    - url
-                    type: object
-                  kubernetes:
-                    description: |-
-                      kubernetes reads the issuer and the keys from this cluster. The operator picks the key that signs
-                      its own service account token. When the cluster rotates the key, the next sync updates the signer.
-                    type: object
-                type: object
-                x-kubernetes-validations:
-                - message: set exactly one of kubernetes and jwksEndpoint
-                  rule: has(self.kubernetes) != has(self.jwksEndpoint)
-              useExternalId:
-                default: true
-                description: useExternalId matches the claim to the identity externalId.
-                  False matches it to the identity id.
-                type: boolean
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
+                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
+                  Observe only reads the existing object and never writes to Ziti.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
+              type:
+                description: type is the name of the Ziti config type, for example
+                  intercept.v1, host.v1, or host.v2.
+                minLength: 1
+                type: string
               zitiName:
-                description: zitiName is the signer name in Ziti. It defaults to the
-                  resource name.
+                description: zitiName is the name of the object in Ziti. It defaults
+                  to <namespace>.<name>. It cannot change later.
                 maxLength: 1000
                 minLength: 1
                 type: string
             required:
-            - audience
-            - keys
+            - data
+            - type
             type: object
             x-kubernetes-validations:
             - message: zitiName is immutable
@@ -139,11 +115,11 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: type is immutable
+              rule: self.type == oldSelf.type
           status:
-            description: status defines the observed state of ZitiJwtSigner
+            description: status defines the observed state of ZitiConfig
             properties:
-              authPolicyId:
-                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -203,17 +179,11 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              issuer:
-                description: issuer is the token issuer that Ziti accepts.
-                type: string
-              keyId:
-                description: keyId is the id of the signing key that Ziti uses. Empty
-                  with jwksEndpoint.
-                type: string
               observedGeneration:
                 format: int64
                 type: integer
-              signerId:
+              zitiId:
+                description: zitiId is the ID of the object in Ziti.
                 type: string
             type: object
         required:
@@ -223,3 +193,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}

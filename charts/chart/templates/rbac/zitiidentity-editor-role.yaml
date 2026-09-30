@@ -17,7 +17,7 @@ metadata:
   name: {{ include "ziti-operator.resourceName" (dict "suffix" "zitiidentity-editor-role" "context" $) }}
 rules:
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiidentities
   verbs:
@@ -29,7 +29,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiidentities/status
   verbs:

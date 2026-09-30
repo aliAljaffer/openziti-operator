@@ -1,6 +1,6 @@
 ---
 name: run-e2e
-description: Use when you must test the operator against a real Ziti controller or a real Kubernetes cluster. Covers the local controller, integration tests, the kind run with the Helm chart, the homelab run, the client-pod dial test, and safe cleanup.
+description: Use when you must test the operator against a real Ziti controller or a real Kubernetes cluster. Covers the local controller, integration tests, the kind run with the Helm chart, the remote cluster run, the client-pod dial test, and safe cleanup.
 ---
 
 # Run real tests
@@ -27,11 +27,11 @@ The tests use fixed names (`team-a.backend`). Stop any operator that runs agains
 6. Apply a `ZitiIdentity` (`OperatorEnrolled`) and a `ZitiApp` whose target is `ziti-target:80`.
 7. Client pod: one container `openziti/ziti-cli:2.0.4` running `ziti tunnel proxy -i /id/identity.json <zitiName>:8080` with the identity Secret mounted at `/id`, one container `curlimages/curl` running `sleep`. `kubectl exec ... curl localhost:8080` must return 200.
 
-The image is `arm64` on Apple silicon. The homelab nodes are `amd64` and have no registry, so the chart run uses kind.
+The image is `arm64` on Apple silicon. A remote test cluster may have another architecture and no registry, so the chart run uses kind.
 
-## Homelab cluster (manager on the workstation)
+## Remote test cluster (manager on the workstation)
 
-Use `KUBECONFIG=$HOME/.kube/homelab-talos`. Run `make install`, create the namespace, Secret, ConfigMap, and a `ZitiConnection` with `managementUrl` `https://localhost:1280/...`. Start `./bin/manager --leader-elect --leader-election-namespace ziti-operator --metrics-bind-address=:8090 --metrics-secure=false`.
+Set `KUBECONFIG` to the kubeconfig of a test cluster that you may change. Run `make install`, create the namespace, Secret, ConfigMap, and a `ZitiConnection` with `managementUrl` `https://localhost:1280/...`. Start `./bin/manager --leader-elect --leader-election-namespace ziti-operator --metrics-bind-address=:8090 --metrics-secure=false`.
 
 ## Cleanup order
 

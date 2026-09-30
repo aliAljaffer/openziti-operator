@@ -41,7 +41,7 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
 3. Register the CA.
 
    ```yaml
-   apiVersion: alialjaffer.ziti/v1alpha1
+   apiVersion: alialjaffer.com/v1alpha1
    kind: ZitiCA
    metadata: {name: workloads}
    spec:
@@ -56,7 +56,7 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
 4. Create the identity. A free `externalId` needs `roleScope: Global` on the connection. With `certificate`, the operator also creates the cert-manager Certificate (step 5) for you. The Secret is `secretName`, default the name of the identity.
 
    ```yaml
-   apiVersion: alialjaffer.ziti/v1alpha1
+   apiVersion: alialjaffer.com/v1alpha1
    kind: ZitiIdentity
    metadata: {name: web, namespace: team-a}
    spec:
@@ -95,7 +95,7 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
 Use `issuerRef` when the operator must not read the CA key. The operator asks the cert-manager issuer for a short-lived certificate whose common name is Ziti's verification token. It reads that certificate from a Secret and sends it to Ziti. The CA key stays with cert-manager. The proof Certificate and its Secret are removed once Ziti has verified the CA.
 
 ```yaml
-apiVersion: alialjaffer.ziti/v1alpha1
+apiVersion: alialjaffer.com/v1alpha1
 kind: ZitiCA
 metadata: {name: workloads}
 spec:

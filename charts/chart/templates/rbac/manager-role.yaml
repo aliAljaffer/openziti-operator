@@ -49,7 +49,7 @@ rules:
   - watch
 {{- end }}
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiaccesspolicies
   - zitiapps
@@ -73,7 +73,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiaccesspolicies/finalizers
   - zitiapps/finalizers
@@ -91,7 +91,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - alialjaffer.ziti
+  - alialjaffer.com
   resources:
   - zitiaccesspolicies/status
   - zitiapps/status

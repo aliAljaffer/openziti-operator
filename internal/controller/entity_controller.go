@@ -26,9 +26,9 @@ import (
 // Such resources are often applied together, so waiting the long resync would feel broken.
 const dependencyRetry = 30 * time.Second
 
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers,verbs=update
 
 // resolver looks up Ziti entities by name. It lists each kind once per reconcile.
 type resolver struct {
