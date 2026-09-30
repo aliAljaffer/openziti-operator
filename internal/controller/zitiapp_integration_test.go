@@ -4,6 +4,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"testing"
@@ -171,6 +172,15 @@ func TestZitiAppAdoptAgainstRealController(t *testing.T) {
 		t.Fatalf("hand-made service not released: %v", list)
 	}
 
+	// Fields the spec cannot express, set by hand after the app released the entities.
+	bindList, _ := real.List(t.Context(), ziti.ServicePolicies, `name="`+name+`-bind"`)
+	if len(bindList) != 1 {
+		t.Fatalf("hand-made bind policy: %v", bindList)
+	}
+	if err := real.Patch(t.Context(), ziti.ServicePolicies, bindList[0].ID(), ziti.Entity{"postureCheckRoles": []string{"#mfa"}}); err != nil {
+		t.Fatal(err)
+	}
+
 	wc := &writeCounter{Client: real}
 	e := setup(t, mut("uid-adopt", zitiv1.ManagementAdopt, zitiv1.DeletionPolicyDelete))
 	useRouter(e, wc)
@@ -183,11 +193,28 @@ func TestZitiAppAdoptAgainstRealController(t *testing.T) {
 		t.Fatalf("service not adopted: %v", list)
 	}
 
+	kept := func() {
+		t.Helper()
+		bind, _ := real.List(t.Context(), ziti.ServicePolicies, `name="`+name+`-bind"`)
+		if len(bind) != 1 || fmt.Sprint(bind[0]["postureCheckRoles"]) != "[#mfa]" {
+			t.Errorf("adopt lost postureCheckRoles: %v (raw %#v)", len(bind), bind[0]["postureCheckRoles"])
+		}
+	}
+	kept()
+
 	wc.writes = nil
 	e.reconcile(t)
 	if len(wc.writes) != 0 {
 		t.Fatalf("second reconcile wrote: %v", wc.writes)
 	}
+
+	app := e.get(t)
+	app.Spec.MemberOf = []string{"drifted"}
+	if err := e.k.Update(t.Context(), app); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	kept()
 
 	if err := e.k.Delete(t.Context(), e.get(t)); err != nil {
 		t.Fatal(err)

@@ -10,6 +10,7 @@ Each line was tested against a real controller. Test a new assumption the same w
 ## Entities and tags
 
 - The session token from `POST /authenticate?method=password` goes in the `zt-session` header. `Authorization: Bearer <token>` is ignored and every call returns 401 `UNAUTHORIZED`.
+- A `PATCH` with the full policy body (name, type, semantic, roles, tags) keeps fields it leaves out, such as `postureCheckRoles`. A `PUT` clears them. A `PATCH` on a config replaces `data` as a whole (unset keys like `dialOptions` are dropped). `maxIdleTime` is not a service field in v2.0.4: a `PATCH` returns success and stores nothing.
 - Tag filter keys allow only letters, `-`, and `_`. Filter: `tags.ziti-operator-uid="<uid>"`. Dots, digits, and slashes fail to parse.
 - Role selectors must use `@<id>`. `@<name>` returns 400. Resolve names to IDs first.
 - The controller sorts role lists. Compare string lists as sets.

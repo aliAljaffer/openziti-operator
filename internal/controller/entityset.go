@@ -45,8 +45,11 @@ func newEntitySet(ctx context.Context, zc ziti.Client, rec record.EventRecorder,
 func (s *entitySet) ensure(ctx context.Context, kind ziti.Kind, body ziti.Entity) (string, error) {
 	if ex, ok := s.existing[kind][body.Name()]; ok {
 		s.keep[kind][ex.ID()] = true
+		if isAdopted(ex) {
+			body["tags"] = adoptedTags(ex, body)
+		}
 		if !desired.Matches(body, ex) {
-			if err := s.zc.Update(ctx, kind, ex.ID(), body); err != nil {
+			if err := s.write(ctx, kind, ex.ID(), body, isAdopted(ex)); err != nil {
 				return "", err
 			}
 			s.rec.Eventf(s.obj, "Normal", "Updated", "updated %s %s", kind, body.Name())
@@ -77,8 +80,19 @@ func (s *entitySet) adoptClash(ctx context.Context, kind ziti.Kind, body, clash 
 	if owner, _ := clash.Tags()[desired.TagUID].(string); owner != "" {
 		return "", &specError{"NameConflict", fmt.Sprintf("%s %q is already managed by another resource", kind, body.Name())}
 	}
+	body["tags"] = adoptedTags(clash, body)
+	if err := s.write(ctx, kind, clash.ID(), body, true); err != nil {
+		return "", err
+	}
+	s.keep[kind][clash.ID()] = true
+	s.rec.Eventf(s.obj, "Normal", "Adopted", "adopted %s %s", kind, body.Name())
+	return clash.ID(), nil
+}
+
+// adoptedTags merges the existing tags, the desired tags, and the adopted mark. A PATCH on tags replaces the whole map.
+func adoptedTags(existing, body ziti.Entity) map[string]any {
 	tags := map[string]any{}
-	for k, v := range clash.Tags() {
+	for k, v := range existing.Tags() {
 		tags[k] = v
 	}
 	if bt, ok := body["tags"].(map[string]any); ok {
@@ -87,13 +101,22 @@ func (s *entitySet) adoptClash(ctx context.Context, kind ziti.Kind, body, clash 
 		}
 	}
 	tags[desired.TagAdopted] = "true"
-	body["tags"] = tags
-	if err := s.zc.Update(ctx, kind, clash.ID(), body); err != nil {
-		return "", err
+	return tags
+}
+
+// write updates an entity. A PUT replaces it, and drops fields the spec cannot express (posture checks,
+// idle timeouts). So an adopted, hand-made entity gets a PATCH that carries only the fields the spec sets.
+func (s *entitySet) write(ctx context.Context, kind ziti.Kind, id string, body ziti.Entity, adopted bool) error {
+	if !adopted {
+		return s.zc.Update(ctx, kind, id, body)
 	}
-	s.keep[kind][clash.ID()] = true
-	s.rec.Eventf(s.obj, "Normal", "Adopted", "adopted %s %s", kind, body.Name())
-	return clash.ID(), nil
+	patch := ziti.Entity{}
+	for k, v := range body {
+		if k != "configTypeId" {
+			patch[k] = v
+		}
+	}
+	return s.zc.Patch(ctx, kind, id, patch)
 }
 
 // prune deletes owned entities that ensure did not keep, in the order of kinds.

@@ -5,6 +5,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -431,8 +432,12 @@ func TestBadPortRangeIsInvalidSpec(t *testing.T) {
 func TestAdoptTakesOverHandMadeServiceAndReleasesOnDelete(t *testing.T) {
 	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.ManagementPolicy = zitiv1.ManagementAdopt })
 	e.zc.Put(ziti.Services, ziti.Entity{"id": "hand-made", "name": "app.example.com", "tags": map[string]any{"team": "x"}})
+	e.zc.Put(ziti.ServicePolicies, ziti.Entity{"id": "hand-bind", "name": "app.example.com-bind", "postureCheckRoles": []any{"#mfa"}})
 	e.reconcile(t)
 	s := e.get(t)
+	if got := e.zc.Objects[ziti.ServicePolicies]["hand-bind"]["postureCheckRoles"]; fmt.Sprint(got) != "[#mfa]" {
+		t.Errorf("adopt dropped a field the spec cannot express: %v", got)
+	}
 	if s.Status.IDs.Service != "hand-made" {
 		t.Fatalf("service id = %q", s.Status.IDs.Service)
 	}
