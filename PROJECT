@@ -3,7 +3,7 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.16.0
-domain: com
+domain: ziti.alialjaffer.com
 layout:
 - go.kubebuilder.io/v4
 plugins:
@@ -16,8 +16,8 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiConnection
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -25,8 +25,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiApp
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -34,8 +34,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiIdentity
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -43,8 +43,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiAccessPolicy
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -57,64 +57,64 @@ resources:
 - api:
     crdVersion: v1
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiJwtSigner
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiCA
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiConfig
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiService
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiServicePolicy
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiEdgeRouterPolicy
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiServiceEdgeRouterPolicy
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiRouter
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1
@@ -122,8 +122,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: com
-  group: alialjaffer
+  domain: ziti.alialjaffer.com
+  group: ziti
   kind: ZitiTerminator
   path: github.com/aliAljaffer/openziti-operator/api/v1alpha1
   version: v1alpha1

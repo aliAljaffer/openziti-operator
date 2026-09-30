@@ -49,7 +49,19 @@ rules:
   - watch
 {{- end }}
 - apiGroups:
-  - alialjaffer.com
+  - cert-manager.io
+  resources:
+  - certificates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies
   - zitiapps
@@ -73,7 +85,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - alialjaffer.com
+  - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies/finalizers
   - zitiapps/finalizers
@@ -91,7 +103,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - alialjaffer.com
+  - ziti.alialjaffer.com
   resources:
   - zitiaccesspolicies/status
   - zitiapps/status
@@ -110,15 +122,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - cert-manager.io
-  resources:
-  - certificates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch

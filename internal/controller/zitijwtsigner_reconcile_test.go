@@ -183,21 +183,21 @@ func TestSignerFollowsKeyRotation(t *testing.T) {
 func TestSignerRefusesToGuessTheKey(t *testing.T) {
 	e := setupSigner(t, nil, makeJWKS(t, "a", "b"), "")
 	sg := e.reconcile(t)
-	if c := findSignerCond(sg, CondSynced); c.Reason != "KeyAmbiguous" {
+	if c := findSignerCond(sg); c.Reason != "KeyAmbiguous" {
 		t.Errorf("synced = %+v", c)
 	}
 	if len(e.zc.Objects[ziti.ExternalJWTSigners]) != 0 {
 		t.Error("nothing may be created when the key is unknown")
 	}
 	e2 := setupSigner(t, nil, makeJWKS(t, "a", "b"), "not-in-the-set")
-	if c := findSignerCond(e2.reconcile(t), CondSynced); c.Reason != "KeyAmbiguous" {
+	if c := findSignerCond(e2.reconcile(t)); c.Reason != "KeyAmbiguous" {
 		t.Errorf("token kid outside the JWKS: %+v", c)
 	}
 }
 
-func findSignerCond(sg *zitiv1.ZitiJwtSigner, typ string) metav1.Condition {
+func findSignerCond(sg *zitiv1.ZitiJwtSigner) metav1.Condition {
 	for _, c := range sg.Status.Conditions {
-		if c.Type == typ {
+		if c.Type == CondSynced {
 			return c
 		}
 	}
@@ -226,7 +226,7 @@ func TestSignerWithJwksEndpointNeedsNoClusterAccess(t *testing.T) {
 
 func TestSignerErrorsAreReported(t *testing.T) {
 	e := setupSigner(t, nil, jwksSet{raw: []byte(`{"keys":[]}`)}, "")
-	if c := findSignerCond(e.reconcile(t), CondSynced); c.Reason != "InvalidSpec" {
+	if c := findSignerCond(e.reconcile(t)); c.Reason != "InvalidSpec" {
 		t.Errorf("empty JWKS: %+v", c)
 	}
 	e = setupSigner(t, nil, makeJWKS(t, "k"), "")
@@ -236,7 +236,7 @@ func TestSignerErrorsAreReported(t *testing.T) {
 	}
 	e = setupSigner(t, nil, makeJWKS(t, "k"), "")
 	e.r.Keys = nil
-	if c := findSignerCond(e.reconcile(t), CondSynced); c.Reason != "InvalidSpec" || !strings.Contains(c.Message, "in the cluster") {
+	if c := findSignerCond(e.reconcile(t)); c.Reason != "InvalidSpec" || !strings.Contains(c.Message, "in the cluster") {
 		t.Errorf("no cluster access: %+v", c)
 	}
 }
@@ -244,7 +244,7 @@ func TestSignerErrorsAreReported(t *testing.T) {
 func TestSignerNameConflictAndDelete(t *testing.T) {
 	e := setupSigner(t, nil, makeJWKS(t, "k"), "")
 	e.zc.Put(ziti.ExternalJWTSigners, ziti.Entity{"name": "k8s"})
-	if c := findSignerCond(e.reconcile(t), CondSynced); c.Reason != "NameConflict" {
+	if c := findSignerCond(e.reconcile(t)); c.Reason != "NameConflict" {
 		t.Errorf("synced = %+v", c)
 	}
 

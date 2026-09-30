@@ -5,7 +5,7 @@
 1. Apply this file.
 
    ```yaml
-   apiVersion: alialjaffer.com/v1alpha1
+   apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiApp
    metadata: {name: billing, namespace: team-a}
    spec:
@@ -69,11 +69,11 @@ Add annotations to the Service. The operator creates a `ZitiApp` that the Servic
 
 | Annotation | Meaning |
 |---|---|
-| `alialjaffer.com/expose` | `"true"` to publish. Required. |
-| `alialjaffer.com/allow-groups`, `allow-identities` | Who may connect. Comma separated. |
-| `alialjaffer.com/addresses` | Default `<service>.<namespace>.svc`. |
-| `alialjaffer.com/ports` | Default: the Service ports. Ranges allowed. |
-| `alialjaffer.com/protocols` | Default: from the Service ports. |
-| `alialjaffer.com/name`, `connection`, `member-of`, `entry-routers`, `hosted-by` | Same as the `ZitiApp` keys. |
+| `ziti.alialjaffer.com/expose` | `"true"` to publish. Required. |
+| `ziti.alialjaffer.com/allow-groups`, `allow-identities` | Who may connect. Comma separated. |
+| `ziti.alialjaffer.com/addresses` | Default `<service>.<namespace>.svc`. |
+| `ziti.alialjaffer.com/ports` | Default: the Service ports. Ranges allowed. |
+| `ziti.alialjaffer.com/protocols` | Default: from the Service ports. |
+| `ziti.alialjaffer.com/name`, `connection`, `member-of`, `entry-routers`, `hosted-by` | Same as the `ZitiApp` keys. |
 
 Deleting the Service deletes the app and every Ziti entity it created.

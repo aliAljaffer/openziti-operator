@@ -55,7 +55,7 @@ func l(s ...string) []any {
 }
 
 func codes(fs []Finding) []string {
-	var out []string
+	out := make([]string, 0, len(fs))
 	for _, f := range fs {
 		out = append(out, f.Code)
 	}

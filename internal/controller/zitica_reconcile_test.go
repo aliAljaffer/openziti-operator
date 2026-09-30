@@ -37,12 +37,9 @@ type caEnv struct {
 	key types.NamespacedName
 }
 
-func caSecret(t *testing.T, isCA bool, withKey bool, keyFrom *ecdsa.PrivateKey) *corev1.Secret {
+func caSecret(t *testing.T, isCA bool, withKey bool) *corev1.Secret {
 	t.Helper()
-	key := keyFrom
-	if key == nil {
-		key, _ = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	}
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "issuer"}, NotBefore: time.Now().Add(-time.Hour),
 		NotAfter: time.Now().Add(time.Hour), IsCA: isCA, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
@@ -112,7 +109,7 @@ func condOf(ca *zitiv1.ZitiCA, typ string) metav1.Condition {
 }
 
 func TestCAWithoutTheKeyWaitsForManualVerification(t *testing.T) {
-	e := setupCA(t, caSecret(t, true, true, nil), nil)
+	e := setupCA(t, caSecret(t, true, true), nil)
 	ca := e.reconcile(t)
 
 	entity := only(e.zc.Objects[ziti.CertificateAuthorities])
@@ -141,7 +138,7 @@ func TestCAWithoutTheKeyWaitsForManualVerification(t *testing.T) {
 }
 
 func TestCASignsTheProofWithTheSecretKey(t *testing.T) {
-	e := setupCA(t, caSecret(t, true, true, nil), func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
+	e := setupCA(t, caSecret(t, true, true), func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
 	ca := e.reconcile(t)
 	if !ca.Status.Verified || ca.Status.VerificationToken != "" || condOf(ca, CondReady).Status != metav1.ConditionTrue {
 		t.Fatalf("status = %+v conditions = %+v", ca.Status, ca.Status.Conditions)
@@ -160,8 +157,8 @@ func TestCASignsTheProofWithTheSecretKey(t *testing.T) {
 }
 
 func TestCAWithTheWrongKeyFailsVerificationButStaysSynced(t *testing.T) {
-	secret := caSecret(t, true, false, nil)
-	other := caSecret(t, true, true, nil)
+	secret := caSecret(t, true, false)
+	other := caSecret(t, true, true)
 	secret.Data[corev1.TLSPrivateKeyKey] = other.Data[corev1.TLSPrivateKeyKey]
 	e := setupCA(t, secret, func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
 	ca := e.reconcile(t)
@@ -174,7 +171,7 @@ func TestCAWithTheWrongKeyFailsVerificationButStaysSynced(t *testing.T) {
 }
 
 func TestCAWithoutAKeyInTheSecretExplainsIt(t *testing.T) {
-	e := setupCA(t, caSecret(t, true, false, nil), func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
+	e := setupCA(t, caSecret(t, true, false), func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
 	c := condOf(e.reconcile(t), CondVerified)
 	if c.Reason != "VerificationFailed" || !strings.Contains(c.Message, "tls.key") {
 		t.Errorf("verified = %+v", c)
@@ -182,11 +179,11 @@ func TestCAWithoutAKeyInTheSecretExplainsIt(t *testing.T) {
 }
 
 func TestCAInputErrors(t *testing.T) {
-	e := setupCA(t, caSecret(t, false, false, nil), nil)
+	e := setupCA(t, caSecret(t, false, false), nil)
 	if c := condOf(e.reconcile(t), CondSynced); c.Reason != "InvalidSpec" || !strings.Contains(c.Message, "not a CA certificate") {
 		t.Errorf("leaf certificate: %+v", c)
 	}
-	bad := caSecret(t, true, false, nil)
+	bad := caSecret(t, true, false)
 	bad.Data[corev1.TLSCertKey] = []byte("junk")
 	e = setupCA(t, bad, nil)
 	if c := condOf(e.reconcile(t), CondSynced); c.Reason != "InvalidSpec" {
@@ -199,7 +196,7 @@ func TestCAInputErrors(t *testing.T) {
 }
 
 func TestCAAutoEnrollmentAndClaimReachZiti(t *testing.T) {
-	e := setupCA(t, caSecret(t, true, false, nil), func(ca *zitiv1.ZitiCA) {
+	e := setupCA(t, caSecret(t, true, false), func(ca *zitiv1.ZitiCA) {
 		ca.Spec.ExternalIDClaim = zitiv1.ExternalIDClaim{Location: "SAN_URI", Matcher: "SCHEME", MatcherCriteria: "spiffe", Parser: "SPLIT", ParserCriteria: "/", Index: 2}
 		ca.Spec.AutoEnrollment = &zitiv1.AutoEnrollment{IdentityRoles: []string{"auto"}, IdentityNameFormat: "[commonName]"}
 		off := false
@@ -216,7 +213,7 @@ func TestCAAutoEnrollmentAndClaimReachZiti(t *testing.T) {
 
 func TestCADeleteAndOrphan(t *testing.T) {
 	for _, policy := range []zitiv1.DeletionPolicy{zitiv1.DeletionPolicyDelete, zitiv1.DeletionPolicyOrphan} {
-		e := setupCA(t, caSecret(t, true, false, nil), func(ca *zitiv1.ZitiCA) { ca.Spec.DeletionPolicy = policy })
+		e := setupCA(t, caSecret(t, true, false), func(ca *zitiv1.ZitiCA) { ca.Spec.DeletionPolicy = policy })
 		ca := e.reconcile(t)
 		if err := e.k.Delete(t.Context(), ca); err != nil {
 			t.Fatal(err)
@@ -238,7 +235,7 @@ func TestCADeleteAndOrphan(t *testing.T) {
 }
 
 func TestCARenewalReplacesTheEntityAndVerifiesAgain(t *testing.T) {
-	first := caSecret(t, true, true, nil)
+	first := caSecret(t, true, true)
 	e := setupCA(t, first, func(ca *zitiv1.ZitiCA) { ca.Spec.Verification.SignWithSecretKey = true })
 	ca := e.reconcile(t)
 	oldID, oldFingerprint := ca.Status.CAID, ca.Status.Fingerprint
@@ -280,7 +277,7 @@ func TestCARenewalReplacesTheEntityAndVerifiesAgain(t *testing.T) {
 }
 
 func TestCAVerifiesThroughCertManagerWithoutReadingTheKey(t *testing.T) {
-	caSec := caSecret(t, true, true, nil)
+	caSec := caSecret(t, true, true)
 	e := setupCA(t, caSec, func(ca *zitiv1.ZitiCA) {
 		ca.Spec.Verification.IssuerRef = &zitiv1.VerificationIssuer{Name: "workloads", Namespace: "cert-manager"}
 	})

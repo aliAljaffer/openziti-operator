@@ -3,7 +3,7 @@
 package main
 
 import (
-	"sort"
+	"slices"
 	"testing"
 )
 
@@ -12,11 +12,11 @@ func TestSecretCacheNamespaces(t *testing.T) {
 		t.Errorf("empty flag must not limit namespaces: %v", got)
 	}
 	got := secretCache(" a, b ,,c").Namespaces
-	var names []string
+	names := make([]string, 0, len(got))
 	for ns := range got {
 		names = append(names, ns)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	if len(names) != 3 || names[0] != "a" || names[2] != "c" {
 		t.Errorf("namespaces = %v", names)
 	}

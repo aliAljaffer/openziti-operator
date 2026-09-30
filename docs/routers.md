@@ -7,7 +7,7 @@ A `ZitiRouter` creates the edge router entity in Ziti and hands you its enrollme
 ## Create a router
 
 ```yaml
-apiVersion: alialjaffer.com/v1alpha1
+apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiRouter
 metadata: {name: edge-1}
 spec:

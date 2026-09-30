@@ -182,7 +182,7 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 		}
 		metrics.APIRequests.WithLabelValues(method, kindOf(path), strconv.Itoa(resp.StatusCode)).Inc()
 		raw, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, err
 		}

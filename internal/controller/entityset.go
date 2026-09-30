@@ -5,6 +5,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -109,13 +110,9 @@ func adoptedBody(existing, body ziti.Entity) ziti.Entity {
 // adoptedTags merges the existing tags, the desired tags, and the adopted mark. A PATCH on tags replaces the whole map.
 func adoptedTags(existing, body ziti.Entity) map[string]any {
 	tags := map[string]any{}
-	for k, v := range existing.Tags() {
-		tags[k] = v
-	}
+	maps.Copy(tags, existing.Tags())
 	if bt, ok := body["tags"].(map[string]any); ok {
-		for k, v := range bt {
-			tags[k] = v
-		}
+		maps.Copy(tags, bt)
 	}
 	tags[desired.TagAdopted] = "true"
 	return tags

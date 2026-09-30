@@ -75,9 +75,9 @@ type ZitiIdentityReconciler struct {
 	RenewBefore time.Duration
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiidentities/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiidentities/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
@@ -180,6 +180,7 @@ func comparable(body ziti.Entity) ziti.Entity {
 
 func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "true" }
 
+//nolint:gocyclo // one branch per enrollment mode and management policy, split when it grows
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.IdentityName(id)
 	if strings.ContainsAny(name, `"\`) {

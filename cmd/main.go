@@ -42,7 +42,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	alialjafferv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
@@ -57,7 +56,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(zitiv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(alialjafferv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(zitiv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -100,7 +99,8 @@ func main() {
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
-	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10, "Rate limit for calls to the Ziti Edge Management API.")
+	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10,
+		"Rate limit for calls to the Ziti Edge Management API.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
 		"Namespace of the leader election Lease. Only needed when the manager runs outside a cluster.")
 	flag.StringVar(&secretNamespaces, "secret-namespaces", "",
@@ -338,7 +338,7 @@ func main() {
 // secretCache limits the Secret informer to labeled Secrets, and to the given namespaces when set.
 func splitList(v string) []string {
 	var out []string
-	for _, s := range strings.Split(v, ",") {
+	for s := range strings.SplitSeq(v, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			out = append(out, s)
 		}
@@ -347,8 +347,9 @@ func splitList(v string) []string {
 }
 
 func secretCache(namespaces string) cache.ByObject {
-	byObject := cache.ByObject{Label: labels.SelectorFromSet(labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue})}
-	for _, ns := range strings.Split(namespaces, ",") {
+	managed := labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue}
+	byObject := cache.ByObject{Label: labels.SelectorFromSet(managed)}
+	for ns := range strings.SplitSeq(namespaces, ",") {
 		if ns = strings.TrimSpace(ns); ns != "" {
 			if byObject.Namespaces == nil {
 				byObject.Namespaces = map[string]cache.Config{}

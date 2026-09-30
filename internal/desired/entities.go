@@ -102,7 +102,7 @@ func ServiceEntity(o *zitiv1.ZitiService, conn *zitiv1.ZitiConnection, configIDs
 		"roleAttributes":     attrs,
 		"configs":            configIDs,
 		"terminatorStrategy": strategy,
-		"encryptionRequired": boolOr(o.Spec.EncryptionRequired, true),
+		"encryptionRequired": boolOrTrue(o.Spec.EncryptionRequired),
 		"maxIdleTimeMillis":  o.Spec.MaxIdleTimeMillis,
 		"tags":               entityTags(conn, "ZitiService", &o.ObjectMeta),
 	}, nil

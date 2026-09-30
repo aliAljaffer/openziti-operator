@@ -4,7 +4,7 @@
 {{- if not $c.hostingRouters }}{{ fail "connection.hostingRouters needs at least one router when connection.create is true" }}{{ end }}
 {{- if and $c.auth.updb.secretName $c.auth.cert.secretName }}{{ fail "set only one of connection.auth.updb.secretName and connection.auth.cert.secretName" }}{{ end }}
 {{- if not (or $c.auth.updb.secretName $c.auth.cert.secretName) }}{{ fail "set connection.auth.updb.secretName or connection.auth.cert.secretName" }}{{ end }}
-apiVersion: alialjaffer.com/v1alpha1
+apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiConnection
 metadata:
   name: {{ $c.name }}

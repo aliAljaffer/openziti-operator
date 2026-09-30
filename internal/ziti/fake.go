@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"maps"
 	"net/http"
 	"regexp"
 	"strings"
@@ -270,9 +271,7 @@ func (f *Fake) Patch(_ context.Context, kind Kind, id string, body Entity) error
 	if !ok {
 		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
 	}
-	for k, v := range clone(body) {
-		cur[k] = v
-	}
+	maps.Copy(cur, clone(body))
 	return nil
 }
 

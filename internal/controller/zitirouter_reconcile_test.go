@@ -105,11 +105,6 @@ func TestRouterIsCreatedAndItsJWTGoesToTheSecretOnly(t *testing.T) {
 	if routerCond(rt, CondReady).Status != metav1.ConditionFalse || routerCond(rt, CondSynced).Status != metav1.ConditionTrue {
 		t.Errorf("conditions = %+v", rt.Status.Conditions)
 	}
-	for _, c := range e.zc.Calls {
-		if strings.HasPrefix(c, "list edge-routers") {
-			continue
-		}
-	}
 	if list, _ := e.zc.List(t.Context(), ziti.EdgeRouters, ""); list[0]["enrollmentJwt"] != nil {
 		t.Error("List must not return the enrollment JWT")
 	}

@@ -94,7 +94,7 @@ func ExtendCert(identityJSON []byte, authenticatorID string) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		raw, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode >= 300 {
 			return &APIError{Status: resp.StatusCode, Code: "EXTEND", Message: path}

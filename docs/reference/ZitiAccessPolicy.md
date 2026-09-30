@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| API version | `alialjaffer.com/v1alpha1` |
+| API version | `ziti.alialjaffer.com/v1alpha1` |
 | Scope | Namespaced |
 | Short name | `ztap` |
 | Category | `ziti` |
@@ -63,7 +63,7 @@ Conditions and their reasons are listed in [Conditions and reasons](../condition
 ## Example
 
 ```yaml
-apiVersion: alialjaffer.com/v1alpha1
+apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiAccessPolicy
 metadata:
   name: team-a

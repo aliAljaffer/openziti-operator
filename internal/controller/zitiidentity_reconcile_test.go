@@ -413,7 +413,7 @@ func TestIdentityAdoptKeepsTagsAndReleasesInsteadOfDeleting(t *testing.T) {
 	if z.Status.ZitiID != id || !z.Status.Enrolled {
 		t.Errorf("status = %+v", z.Status)
 	}
-	if _, err := e.secretOrNil(t); err == nil {
+	if err := e.secretOrNil(t); err == nil {
 		t.Error("adopting an enrolled identity must not create a Secret")
 	}
 
@@ -430,10 +430,9 @@ func TestIdentityAdoptKeepsTagsAndReleasesInsteadOfDeleting(t *testing.T) {
 	}
 }
 
-func (e *idEnv) secretOrNil(t *testing.T) (*corev1.Secret, error) {
+func (e *idEnv) secretOrNil(t *testing.T) error {
 	var s corev1.Secret
-	err := e.k.Get(t.Context(), e.key, &s)
-	return &s, err
+	return e.k.Get(t.Context(), e.key, &s)
 }
 
 func TestIdentityAdoptErrors(t *testing.T) {
@@ -472,7 +471,7 @@ func TestIdentityObserveNeverWrites(t *testing.T) {
 	if len(z.Finalizers) != 0 {
 		t.Errorf("finalizers = %v", z.Finalizers)
 	}
-	if _, err := e.secretOrNil(t); err == nil {
+	if err := e.secretOrNil(t); err == nil {
 		t.Error("observe must not create a Secret")
 	}
 	if got := e.zc.Objects[ziti.Identities][id]; got.Tags()["owner"] != "human" || len(got.Tags()) != 1 {
@@ -634,7 +633,7 @@ func TestIdentityNoneCreatesWithoutEnrollmentAndUsesTheServiceAccount(t *testing
 	if len(e.zc.Objects[ziti.Enrollments]) != 0 {
 		t.Error("None must not create an enrollment")
 	}
-	if _, err := e.secretOrNil(t); err == nil {
+	if err := e.secretOrNil(t); err == nil {
 		t.Error("None must not create a Secret")
 	}
 	z := e.get(t)

@@ -53,6 +53,6 @@ Phase 2 adds `edge-router-policy`. Phase 3 adds `identity`, `enrollment`, and `a
 
 ## Consequences
 
-- Tag keys change from `alialjaffer.com/*` to `ziti-operator-*` (PLAN.md section 6.1).
+- Tag keys change from `ziti.alialjaffer.com/*` to `ziti-operator-*` (PLAN.md section 6.1).
 - `zitiName` has a CEL `maxLength` of 1000.
 - The chart documents the permission list above instead of an admin credential.

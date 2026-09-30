@@ -63,8 +63,17 @@ func ParseJWKS(raw []byte) ([]JWK, error) {
 			if curve == nil {
 				continue
 			}
-			pub := &ecdsa.PublicKey{Curve: curve, X: b64(k.X), Y: b64(k.Y)}
-			if !curve.IsOnCurve(pub.X, pub.Y) {
+			size := (curve.Params().BitSize + 7) / 8
+			x, y := b64(k.X), b64(k.Y)
+			if x.BitLen() > size*8 || y.BitLen() > size*8 {
+				continue
+			}
+			point := make([]byte, 1+2*size)
+			point[0] = 4
+			x.FillBytes(point[1 : 1+size])
+			y.FillBytes(point[1+size:])
+			pub, err := ecdsa.ParseUncompressedPublicKey(curve, point)
+			if err != nil {
 				continue
 			}
 			out = append(out, JWK{Kid: k.Kid, Key: pub})

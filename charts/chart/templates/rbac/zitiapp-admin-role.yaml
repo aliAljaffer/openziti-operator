@@ -17,13 +17,13 @@ metadata:
   name: {{ include "ziti-operator.resourceName" (dict "suffix" "zitiapp-admin-role" "context" $) }}
 rules:
 - apiGroups:
-  - alialjaffer.com
+  - ziti.alialjaffer.com
   resources:
   - zitiapps
   verbs:
   - '*'
 - apiGroups:
-  - alialjaffer.com
+  - ziti.alialjaffer.com
   resources:
   - zitiapps/status
   verbs:

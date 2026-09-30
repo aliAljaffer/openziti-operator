@@ -22,7 +22,7 @@ type stubAuth struct {
 }
 
 func (a *stubAuth) Authenticate(*url.URL) (*rest_model.CurrentAPISessionDetail, error) {
-	tok := "t" + string(rune('0'+a.logins.Add(1)))
+	tok := "t" + string('0'+a.logins.Add(1))
 	return &rest_model.CurrentAPISessionDetail{APISessionDetail: rest_model.APISessionDetail{Token: &tok}}, nil
 }
 func (a *stubAuth) BuildHttpClient() (*http.Client, error)           { return a.hc, nil }

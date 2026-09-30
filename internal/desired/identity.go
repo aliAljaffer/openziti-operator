@@ -4,6 +4,7 @@ package desired
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -63,12 +64,8 @@ func ExternalID(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection) (string, e
 // AdoptTags returns the existing tags plus the ownership tags. Ziti replaces the whole tag map on PATCH.
 func AdoptTags(conn *zitiv1.ZitiConnection, id *zitiv1.ZitiIdentity, existing map[string]any) map[string]any {
 	out := map[string]any{}
-	for k, v := range existing {
-		out[k] = v
-	}
-	for k, v := range ownerTags(conn, "ZitiIdentity", &id.ObjectMeta) {
-		out[k] = v
-	}
+	maps.Copy(out, existing)
+	maps.Copy(out, ownerTags(conn, "ZitiIdentity", &id.ObjectMeta))
 	out[TagAdopted] = "true"
 	return out
 }

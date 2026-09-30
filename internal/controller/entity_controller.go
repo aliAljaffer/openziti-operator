@@ -26,9 +26,9 @@ import (
 // Such resources are often applied together, so waiting the long resync would feel broken.
 const dependencyRetry = 30 * time.Second
 
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers,verbs=update
 
 // resolver looks up Ziti entities by name. It lists each kind once per reconcile.
 type resolver struct {
@@ -174,8 +174,7 @@ func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.Ziti
 		return res.err
 	}
 	if err != nil {
-		var me *desired.MissingError
-		if errors.As(err, &me) {
+		if _, ok := errors.AsType[*desired.MissingError](err); ok {
 			return err
 		}
 		return &specError{"InvalidSpec", err.Error()}

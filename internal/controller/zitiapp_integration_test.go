@@ -225,3 +225,9 @@ func TestZitiAppAdoptAgainstRealController(t *testing.T) {
 		t.Fatalf("adopted service was deleted or kept its tags: %v", list)
 	}
 }
+
+func typesName(name string) types.NamespacedName { return types.NamespacedName{Name: name} }
+
+func typesName2(ns, name string) types.NamespacedName {
+	return types.NamespacedName{Namespace: ns, Name: name}
+}

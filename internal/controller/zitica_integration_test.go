@@ -45,7 +45,7 @@ func TestCAAndCertificateLoginAgainstRealController(t *testing.T) {
 	}
 	wc := &writeCounter{Client: real}
 
-	secret := caSecret(t, true, true, nil)
+	secret := caSecret(t, true, true)
 	ce := setupCA(t, secret, func(ca *zitiv1.ZitiCA) {
 		ca.Spec.ZitiName = "it-ca"
 		ca.Spec.Verification.SignWithSecretKey = true

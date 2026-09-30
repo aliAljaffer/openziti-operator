@@ -50,7 +50,7 @@ func TestRouterManifestsAreValidYAMLWithTheRightValues(t *testing.T) {
 	if dep := m.Deployment(); !strings.Contains(dep, `storageClassName: "fast"`) {
 		t.Error("storageClassName missing")
 	} else {
-		for _, d := range strings.Split(dep, "\n---\n") {
+		for d := range strings.SplitSeq(dep, "\n---\n") {
 			var v map[string]any
 			if err := yaml.Unmarshal([]byte(d), &v); err != nil {
 				t.Fatalf("%v in:\n%s", err, d)

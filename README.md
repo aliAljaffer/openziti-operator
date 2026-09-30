@@ -20,7 +20,7 @@ This is an independent community project. It is not an official OpenZiti or NetF
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
 | Let a workload log in with a certificate or a service account token | `ZitiCA` and `ZitiJwtSigner`, with cert-manager or your cluster issuer. |
 
-Annotate a Kubernetes Service with `alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it.
+Annotate a Kubernetes Service with `ziti.alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it.
 
 For full control, there is one resource for every Ziti object too. See [Full control](docs/full-control.md).
 
@@ -50,7 +50,7 @@ The image is `ghcr.io/alialjaffer/openziti-operator`. Details are in [Install](d
 ## Publish your first app
 
 ```yaml
-apiVersion: alialjaffer.com/v1alpha1
+apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiApp
 metadata: {name: billing, namespace: team-a}
 spec:

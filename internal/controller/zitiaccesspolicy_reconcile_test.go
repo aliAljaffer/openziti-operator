@@ -229,8 +229,6 @@ func TestAllowedNamespacesIsEnforced(t *testing.T) {
 	}
 }
 
-func typesName(name string) types.NamespacedName { return types.NamespacedName{Name: name} }
-
 func TestAccessPolicyOrphanReleasesTags(t *testing.T) {
 	e := setupAccess(t, zitiv1.RoleScopeGlobal, func(ap *zitiv1.ZitiAccessPolicy, _ *zitiv1.ZitiConnection) {
 		ap.Spec.DeletionPolicy = zitiv1.DeletionPolicyOrphan
@@ -253,8 +251,4 @@ func TestAccessPolicyOrphanReleasesTags(t *testing.T) {
 			}
 		}
 	}
-}
-
-func typesName2(ns, name string) types.NamespacedName {
-	return types.NamespacedName{Namespace: ns, Name: name}
 }

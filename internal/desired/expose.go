@@ -14,7 +14,7 @@ import (
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 )
 
-const AnnotationPrefix = "alialjaffer.com/"
+const AnnotationPrefix = "ziti.alialjaffer.com/"
 
 // Annotations on a Kubernetes Service. Only expose is required. Lists are comma separated.
 const (
@@ -36,7 +36,7 @@ func Exposed(annotations map[string]string) bool { return annotations[AnnExpose]
 
 func list(v string) []string {
 	var out []string
-	for _, s := range strings.Split(v, ",") {
+	for s := range strings.SplitSeq(v, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			out = append(out, s)
 		}

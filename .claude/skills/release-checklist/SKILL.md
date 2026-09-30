@@ -21,7 +21,7 @@ description: Use when you prepare a release or a public push of this operator. L
 - GitHub private vulnerability reporting (`SECURITY.md` points to it).
 - The wiki enabled and one page created by hand, so the wiki repository exists. Then `hack/publish-wiki.sh --push` or the `wiki.yml` workflow updates it.
 - A registry, image build and push, and the `v0.1.0` tag.
-- Confirm the module path `github.com/aliAljaffer/openziti-operator` and the API group `alialjaffer.com`.
+- Confirm the module path `github.com/aliAljaffer/openziti-operator` and the API group `ziti.alialjaffer.com`.
 
 ## Never
 

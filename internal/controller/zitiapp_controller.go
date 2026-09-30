@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	Finalizer         = "alialjaffer.com/finalizer"
+	Finalizer         = "ziti.alialjaffer.com/finalizer"
 	CondSynced        = "Synced"
 	CondHosted        = "Hosted"
 	CondDialable      = "Dialable"
@@ -64,9 +64,9 @@ type ZitiAppReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=zitiapps/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 type specError struct{ reason, msg string }
@@ -439,7 +439,7 @@ func applyResult(svc *zitiv1alpha1.ZitiApp, o *syncResult) {
 	reason, msg = findingsFor(fs, check.OfflinePath, check.NoCommonRouter)
 	setCond(&svc.Status.Conditions, svc.Generation, CondRoutePath, o.report.RoutePath, "RoutePath", reasonOr(reason, "NoRoutePath"), msg)
 	ready := o.report.Hosted && o.report.Dialable && o.report.RoutePath
-	var all []string
+	all := make([]string, 0, len(fs))
 	for _, f := range fs {
 		all = append(all, f.Message)
 	}

@@ -60,9 +60,9 @@ type ZitiCAReconciler struct {
 	Reader client.Reader
 }
 
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=alialjaffer.com,resources=ziticas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticas/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticas/finalizers,verbs=update
 // +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -141,7 +141,7 @@ func (r *ZitiCAReconciler) finalize(ctx context.Context, ca *zitiv1alpha1.ZitiCA
 func (r *ZitiCAReconciler) readSecret(ctx context.Context, ref zitiv1alpha1.SecretRef) (*corev1.Secret, error) {
 	var secret corev1.Secret
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, &secret); err != nil {
-		return nil, fmt.Errorf("Secret %s/%s: %w", ref.Namespace, ref.Name, err)
+		return nil, fmt.Errorf("secret %s/%s: %w", ref.Namespace, ref.Name, err)
 	}
 	return &secret, nil
 }

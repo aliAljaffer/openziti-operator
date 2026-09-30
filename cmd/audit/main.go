@@ -2,7 +2,8 @@
 
 // Command audit reports problems in a Ziti network. It only reads.
 //
-//	ZITI_USERNAME=admin ZITI_PASSWORD=... audit --url https://ctrl:443/edge/management/v1 [--ca-file ca.pem] [-o table|json]
+//	ZITI_USERNAME=admin ZITI_PASSWORD=... audit --url https://ctrl:443/edge/management/v1 \
+//	  [--ca-file ca.pem] [-o table|json]
 package main
 
 import (
@@ -87,9 +88,9 @@ func run(mgmt, caFile, format string, rps float64) error {
 		return enc.Encode(findings)
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "CODE\tENTITY\tMESSAGE")
+	_, _ = fmt.Fprintln(w, "CODE\tENTITY\tMESSAGE")
 	for _, f := range findings {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", f.Code, f.Entity, f.Message)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", f.Code, f.Entity, f.Message)
 	}
 	return w.Flush()
 }

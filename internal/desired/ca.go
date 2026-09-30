@@ -33,7 +33,7 @@ func CA(c *zitiv1.ZitiCA, conn *zitiv1.ZitiConnection, certPEM string) ziti.Enti
 	return ziti.Entity{
 		"name":                      CAName(c),
 		"certPem":                   certPEM,
-		"isAuthEnabled":             boolOr(c.Spec.AuthEnabled, true),
+		"isAuthEnabled":             boolOrTrue(c.Spec.AuthEnabled),
 		"isAutoCaEnrollmentEnabled": auto != nil,
 		"isOttCaEnrollmentEnabled":  false,
 		"identityRoles":             roles,

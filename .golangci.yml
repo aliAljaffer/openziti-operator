@@ -29,6 +29,12 @@ linters:
       logcheck:
         type: "module"
         description: Checks Go logging calls for Kubernetes logging conventions.
+    goconst:
+      min-len: 5
+      min-occurrences: 6
+      ignore-string-values:
+        - "^(Synced|Ready|InvalidSpec|Dialable|AnyOf)$"
+        - "^zitiName must not contain"
     depguard:
       rules:
         forbid-sort-pkg:
@@ -45,6 +51,14 @@ linters:
   exclusions:
     generated: lax
     rules:
+      - linters:
+          - goconst
+          - prealloc
+          - unparam
+        path: _test\.go
+      - linters:
+          - staticcheck
+        text: GetEventRecorderFor is deprecated
       - linters:
           - lll
         path: api/*

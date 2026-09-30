@@ -14,15 +14,15 @@ func SignerName(s *zitiv1.ZitiJwtSigner) string {
 	return s.Name
 }
 
-func boolOr(v *bool, def bool) bool {
+func boolOrTrue(v *bool) bool {
 	if v == nil {
-		return def
+		return true
 	}
 	return *v
 }
 
 // SignerWantsPolicy reports whether the signer gets an auth policy of the same name.
-func SignerWantsPolicy(s *zitiv1.ZitiJwtSigner) bool { return boolOr(s.Spec.CreateAuthPolicy, true) }
+func SignerWantsPolicy(s *zitiv1.ZitiJwtSigner) bool { return boolOrTrue(s.Spec.CreateAuthPolicy) }
 
 // JwtSigner builds the signer. With jwksEndpoint the controller fetches the keys. Otherwise certPEM and kid carry the key.
 func JwtSigner(s *zitiv1.ZitiJwtSigner, conn *zitiv1.ZitiConnection, issuer, kid, certPEM string) ziti.Entity {
@@ -36,7 +36,7 @@ func JwtSigner(s *zitiv1.ZitiJwtSigner, conn *zitiv1.ZitiConnection, issuer, kid
 		"issuer":         issuer,
 		"audience":       s.Spec.Audience,
 		"claimsProperty": claims,
-		"useExternalId":  boolOr(s.Spec.UseExternalID, true),
+		"useExternalId":  boolOrTrue(s.Spec.UseExternalID),
 		"tags":           ownerTags(conn, "ZitiJwtSigner", &s.ObjectMeta),
 	}
 	if ep := s.Spec.Keys.JwksEndpoint; ep != nil {

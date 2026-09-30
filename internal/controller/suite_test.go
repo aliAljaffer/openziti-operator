@@ -34,7 +34,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	alialjafferv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -68,7 +67,7 @@ var _ = BeforeSuite(func() {
 	err = corev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = alialjafferv1alpha1.AddToScheme(scheme.Scheme)
+	err = zitiv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
