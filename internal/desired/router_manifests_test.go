@@ -22,7 +22,7 @@ func TestRouterManifestsAreValidYAMLWithTheRightValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := compose.Services["router"]
-	if r.Image != "openziti/ziti-router:2.0.4" || r.Environment["ZITI_ENROLL_TOKEN"] != "eyJ.abc.def" ||
+	if r.Image != "openziti/ziti-router:2.0.4@"+routerDigests["2.0.4"] || r.Environment["ZITI_ENROLL_TOKEN"] != "eyJ.abc.def" ||
 		r.Environment["ZITI_ROUTER_ADVERTISED_ADDRESS"] != "vm1.example.com" || r.Environment["ZITI_ROUTER_PORT"] != "3022" {
 		t.Errorf("router = %+v", r)
 	}
@@ -38,7 +38,7 @@ func TestRouterManifestsAreValidYAMLWithTheRightValues(t *testing.T) {
 			t.Fatalf("%v in:\n%s", err, d)
 		}
 	}
-	for _, want := range []string{"name: edge-1-enrollment", "fsGroup: 2171", `"vm1.example.com"`} {
+	for _, want := range []string{"name: edge-1-enrollment", "fsGroup: 2171", "runAsNonRoot: true", "runAsUser: 2171", "sha256:95d29bef", "allowPrivilegeEscalation: false", `"vm1.example.com"`} {
 		if !strings.Contains(dep, want) {
 			t.Errorf("deployment lacks %q", want)
 		}
@@ -72,5 +72,11 @@ func TestRouterManifestsUsePlaceholderWithoutAddress(t *testing.T) {
 		if !strings.Contains(out, AddressPlaceholder) || !strings.HasPrefix(out, "# Replace") {
 			t.Errorf("no placeholder note:\n%s", out)
 		}
+	}
+}
+
+func TestRouterImageWithoutKnownDigestKeepsTag(t *testing.T) {
+	if got := (RouterManifest{Version: "9.9.9"}).image(); got != "openziti/ziti-router:9.9.9" {
+		t.Errorf("image = %q", got)
 	}
 }

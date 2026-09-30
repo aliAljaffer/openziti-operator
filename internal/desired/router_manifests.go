@@ -20,6 +20,14 @@ type RouterManifest struct {
 	Port                                      int32
 }
 
+// helperImage runs the chown step in the Compose file.
+const helperImage = "busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+
+// routerDigests pins each tested ziti-router version to its multi-arch index digest. A version not listed here gets a tag only.
+var routerDigests = map[string]string{
+	"2.0.4": "sha256:95d29bef1fb488345eccaa8db8c7bedd22cc31a6f265645dbc222512857d964f",
+}
+
 var nonDNS = regexp.MustCompile(`[^a-z0-9-]+`)
 
 func (m RouterManifest) k8sName() string {
@@ -38,7 +46,12 @@ func (m RouterManifest) address() string {
 }
 
 func (m RouterManifest) image() string {
-	return "openziti/ziti-router:" + strings.TrimPrefix(m.Version, "v")
+	v := strings.TrimPrefix(m.Version, "v")
+	img := "openziti/ziti-router:" + v
+	if d, ok := routerDigests[v]; ok {
+		img += "@" + d
+	}
+	return img
 }
 
 // env lists the variables that bring the ziti-router image to an enrolled, online router. The token is first.
@@ -69,13 +82,16 @@ func (m RouterManifest) Compose() string {
 	}
 	return fmt.Sprintf(`%sservices:
   volume-owner:
-    image: busybox
+    image: %s
     command: chown -R %d /ziti-router
     volumes:
       - router-data:/ziti-router
   router:
     image: %s
     restart: unless-stopped
+    user: "%d"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     depends_on:
       volume-owner:
         condition: service_completed_successfully
@@ -86,7 +102,7 @@ func (m RouterManifest) Compose() string {
       - router-data:/ziti-router
 volumes:
   router-data:
-`, m.note(), routerUID, m.image(), m.Port, m.Port, env.String())
+`, m.note(), helperImage, routerUID, m.image(), routerUID, m.Port, m.Port, env.String())
 }
 
 func (m RouterManifest) storageClass() string {
@@ -138,9 +154,17 @@ spec:
     spec:
       securityContext:
         fsGroup: %[4]d
+        runAsNonRoot: true
+        runAsUser: %[4]d
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: router
           image: %[5]s
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           ports:
             - containerPort: %[6]d
           envFrom:
