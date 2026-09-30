@@ -15,8 +15,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -273,5 +276,60 @@ func TestCARenewalReplacesTheEntityAndVerifiesAgain(t *testing.T) {
 		if !strings.HasPrefix(c, "list") {
 			t.Errorf("a steady CA must not be written: %s", c)
 		}
+	}
+}
+
+func TestCAVerifiesThroughCertManagerWithoutReadingTheKey(t *testing.T) {
+	caSec := caSecret(t, true, true, nil)
+	e := setupCA(t, caSec, func(ca *zitiv1.ZitiCA) {
+		ca.Spec.Verification.IssuerRef = &zitiv1.VerificationIssuer{Name: "workloads", Namespace: "cert-manager"}
+	})
+	ca := e.reconcile(t)
+	if c := condOf(ca, CondVerified); c.Reason != "AwaitingCertificate" {
+		t.Fatalf("verified = %+v", c)
+	}
+	token := only(e.zc.Objects[ziti.CertificateAuthorities])["verificationToken"].(string)
+
+	cert := &unstructured.Unstructured{}
+	cert.SetGroupVersionKind(schema.GroupVersionKind{Group: "cert-manager.io", Version: "v1", Kind: "Certificate"})
+	key := types.NamespacedName{Namespace: "cert-manager", Name: "cm-verify"}
+	if err := e.k.Get(t.Context(), key, cert); err != nil {
+		t.Fatal(err)
+	}
+	spec, _ := cert.Object["spec"].(map[string]any)
+	if spec["commonName"] != token || spec["secretName"] != "cm-verify" {
+		t.Errorf("spec = %v", spec)
+	}
+
+	// cert-manager issues the certificate: Ready and a Secret that holds a leaf with the token as common name.
+	caCert, _, _ := ziti.FirstCertificate(caSec.Data[corev1.TLSCertKey])
+	caKey, _ := ziti.ParsePrivateKey(caSec.Data[corev1.TLSPrivateKeyKey])
+	proof, err := ziti.ProofCertificate(token, caCert, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert.Object["status"] = map[string]any{"conditions": []any{map[string]any{"type": "Ready", "status": "True"}}}
+	if err := e.k.Update(t.Context(), cert); err != nil {
+		t.Fatal(err)
+	}
+	leafSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "cert-manager", Name: "cm-verify",
+		Annotations: map[string]string{"cert-manager.io/certificate-name": "cm-verify"}}, Data: map[string][]byte{corev1.TLSCertKey: []byte(proof)}}
+	if err := e.k.Create(t.Context(), leafSecret); err != nil {
+		t.Fatal(err)
+	}
+
+	ca = e.reconcile(t)
+	if !ca.Status.Verified || condOf(ca, CondReady).Status != metav1.ConditionTrue {
+		t.Fatalf("status = %+v, conditions %+v", ca.Status, ca.Status.Conditions)
+	}
+	if err := e.k.Get(t.Context(), key, cert); !apierrors.IsNotFound(err) {
+		t.Errorf("the proof Certificate must be removed: %v", err)
+	}
+	if err := e.k.Get(t.Context(), key, &corev1.Secret{}); !apierrors.IsNotFound(err) {
+		t.Errorf("the proof Secret must be removed: %v", err)
+	}
+	var kept corev1.Secret
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "cert-manager", Name: "issuer-ca"}, &kept); err != nil {
+		t.Errorf("the CA Secret must stay: %v", err)
 	}
 }

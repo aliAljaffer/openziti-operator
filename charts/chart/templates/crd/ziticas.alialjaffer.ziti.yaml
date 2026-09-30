@@ -168,6 +168,35 @@ spec:
                 description: verification says how the operator proves that it controls
                   the CA. Ziti trusts a CA only after that.
                 properties:
+                  issuerRef:
+                    description: |-
+                      issuerRef proves ownership through cert-manager, so the operator never reads the CA key. The operator asks the
+                      issuer for a short-lived certificate whose common name is Ziti's verification token, reads the certificate
+                      (not its key use) from the Secret, and sends it to Ziti. Set only one of signWithSecretKey and issuerRef.
+                    properties:
+                      kind:
+                        default: ClusterIssuer
+                        description: kind is Issuer or ClusterIssuer.
+                        enum:
+                        - Issuer
+                        - ClusterIssuer
+                        type: string
+                      name:
+                        description: name of the issuer. It must be the issuer whose
+                          CA certificate this ZitiCA registers.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                      namespace:
+                        description: |-
+                          namespace is where the operator creates the short-lived proof Certificate and its Secret. For an Issuer it is
+                          the namespace of the issuer. Both are removed once Ziti has verified the CA.
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
                   signWithSecretKey:
                     default: false
                     description: |-
@@ -177,6 +206,9 @@ spec:
                       whose common name is that token and sends it to Ziti.
                     type: boolean
                 type: object
+                x-kubernetes-validations:
+                - message: set only one of signWithSecretKey and issuerRef
+                  rule: '!(self.signWithSecretKey && has(self.issuerRef))'
               zitiName:
                 description: zitiName is the CA name in Ziti. It defaults to the resource
                   name.

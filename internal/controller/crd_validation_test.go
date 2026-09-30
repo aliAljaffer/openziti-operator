@@ -347,6 +347,20 @@ var _ = Describe("ZitiCA", func() {
 		Expect(k8sClient.Update(ctx, c)).To(MatchError(ContainSubstring("deletionPolicy is immutable")))
 	})
 
+	It("accepts verification through an issuer and rejects it together with signWithSecretKey", func() {
+		both := ca(func(s *zitiv1.ZitiCASpec) {
+			s.Verification.SignWithSecretKey = true
+			s.Verification.IssuerRef = &zitiv1.VerificationIssuer{Name: "workloads", Namespace: "cert-manager"}
+		})
+		Expect(k8sClient.Create(ctx, both)).To(MatchError(ContainSubstring("set only one of signWithSecretKey and issuerRef")))
+		only := ca(func(s *zitiv1.ZitiCASpec) {
+			s.Verification.IssuerRef = &zitiv1.VerificationIssuer{Name: "workloads", Namespace: "cert-manager"}
+		})
+		Expect(k8sClient.Create(ctx, only)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, only) })
+		Expect(only.Spec.Verification.IssuerRef.Kind).To(Equal("ClusterIssuer"))
+	})
+
 	DescribeTable("rejects bad values",
 		func(mut func(*zitiv1.ZitiCASpec), wantErr string) {
 			err := k8sClient.Create(ctx, ca(mut))

@@ -43,3 +43,29 @@ func WorkloadCertificate(id *zitiv1.ZitiIdentity) *unstructured.Unstructured {
 	u.SetName(WorkloadCertificateName(id))
 	return u
 }
+
+// CAProofCertificateName is the name of the proof Certificate and of its Secret.
+func CAProofCertificateName(ca *zitiv1.ZitiCA) string { return ca.Name + "-verify" }
+
+// CAProofCertificate builds the short-lived Certificate whose common name is the verification token of a CA.
+// Ziti accepts a certificate of the CA with that name as proof of ownership.
+func CAProofCertificate(ca *zitiv1.ZitiCA, token string) *unstructured.Unstructured {
+	ref := ca.Spec.Verification.IssuerRef
+	kind := ref.Kind
+	if kind == "" {
+		kind = "ClusterIssuer"
+	}
+	u := &unstructured.Unstructured{Object: map[string]any{"spec": map[string]any{
+		"commonName": token,
+		"secretName": CAProofCertificateName(ca),
+		"duration":   "1h",
+		"usages":     []any{"client auth"},
+		"privateKey": map[string]any{"algorithm": "ECDSA", "size": int64(256)},
+		"issuerRef":  map[string]any{"name": ref.Name, "kind": kind, "group": "cert-manager.io"},
+	}}}
+	u.SetAPIVersion(CertManagerGVK.Group + "/" + CertManagerGVK.Version)
+	u.SetKind(CertManagerGVK.Kind)
+	u.SetNamespace(ref.Namespace)
+	u.SetName(CAProofCertificateName(ca))
+	return u
+}

@@ -42,6 +42,10 @@
 | `spec.externalIdClaim.parser` | string | no | `"NONE"` | parser cuts the value. SPLIT splits it at parserCriteria and takes the part at index. One of: `NONE`, `SPLIT`. |
 | `spec.externalIdClaim.parserCriteria` | string | no |  | parserCriteria is the separator for SPLIT. Empty for NONE. |
 | `spec.verification` | object | no |  | verification says how the operator proves that it controls the CA. Ziti trusts a CA only after that. |
+| `spec.verification.issuerRef` | object | no |  | issuerRef proves ownership through cert-manager, so the operator never reads the CA key. The operator asks the issuer for a short-lived certificate whose common name is Ziti's verification token, reads the certificate (not its key use) from the Secret, and sends it to Ziti. Set only one of signWithSecretKey and issuerRef. |
+| `spec.verification.issuerRef.kind` | string | no | `"ClusterIssuer"` | kind is Issuer or ClusterIssuer. One of: `Issuer`, `ClusterIssuer`. |
+| `spec.verification.issuerRef.name` | string | yes |  | name of the issuer. It must be the issuer whose CA certificate this ZitiCA registers. Minimum length 1. Maximum length 253. |
+| `spec.verification.issuerRef.namespace` | string | yes |  | namespace is where the operator creates the short-lived proof Certificate and its Secret. For an Issuer it is the namespace of the issuer. Both are removed once Ziti has verified the CA. Minimum length 1. |
 | `spec.verification.signWithSecretKey` | boolean | no | `false` | signWithSecretKey lets the operator read the private key (key tls.key) of the same Secret and use it, in memory only, to sign the one-time proof that Ziti asks for. The key is never stored, logged, or sent to Ziti. Without it, status.verificationToken holds the token, and someone with the key signs a certificate whose common name is that token and sends it to Ziti. |
 | `spec.zitiName` | string | no |  | zitiName is the CA name in Ziti. It defaults to the resource name. Minimum length 1. Maximum length 1000. |
 
@@ -51,6 +55,7 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
+- `verification`: set only one of signWithSecretKey and issuerRef
 
 ## Status
 

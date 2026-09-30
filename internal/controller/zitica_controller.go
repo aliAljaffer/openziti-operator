@@ -27,6 +27,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -59,6 +63,7 @@ type ZitiCAReconciler struct {
 // +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=alialjaffer.ziti,resources=ziticas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var ca zitiv1alpha1.ZitiCA
@@ -191,13 +196,20 @@ func (r *ZitiCAReconciler) sync(ctx context.Context, ca *zitiv1alpha1.ZitiCA, co
 		return err
 	}
 	verifyErr := error(nil)
-	if verified, _ := entity["isVerified"].(bool); !verified && ca.Spec.Verification.SignWithSecretKey {
-		if verifyErr = r.verify(ctx, zc, entity, caCert, secret); verifyErr == nil {
+	pending := ""
+	if verified, _ := entity["isVerified"].(bool); !verified && (ca.Spec.Verification.SignWithSecretKey || ca.Spec.Verification.IssuerRef != nil) {
+		if ca.Spec.Verification.IssuerRef != nil {
+			pending, verifyErr = r.verifyWithIssuer(ctx, ca, zc, entity)
+		} else {
+			verifyErr = r.verify(ctx, zc, entity, caCert, secret)
+		}
+		switch {
+		case verifyErr == nil && pending == "":
 			r.Recorder.Eventf(ca, "Normal", "Verified", "proved ownership of CA %s to Ziti", name)
 			if entity, err = r.fetch(ctx, zc, ca.UID); err != nil {
 				return err
 			}
-		} else if !ziti.IsSpecError(verifyErr) && !isVerifySpecError(verifyErr) {
+		case verifyErr != nil && !ziti.IsSpecError(verifyErr) && !isVerifySpecError(verifyErr):
 			return verifyErr
 		}
 	}
@@ -207,12 +219,20 @@ func (r *ZitiCAReconciler) sync(ctx context.Context, ca *zitiv1alpha1.ZitiCA, co
 	fingerprint, _ := entity["fingerprint"].(string)
 	ca.Status.CAID, ca.Status.Fingerprint, ca.Status.Verified, ca.Status.VerificationToken = caID, fingerprint, verified, token
 	if verified {
+		if ca.Spec.Verification.IssuerRef != nil {
+			if err := r.removeProofCertificate(ctx, ca); err != nil {
+				return err
+			}
+		}
 		ca.Status.VerificationToken = ""
 		setCond(&ca.Status.Conditions, ca.Generation, CondVerified, true, "Verified", "", "")
 		setCond(&ca.Status.Conditions, ca.Generation, CondReady, true, "Ready", "", "")
 		return nil
 	}
 	reason, msg := "AwaitingVerification", fmt.Sprintf("sign a certificate with common name %q using the CA key and send it to Ziti, or set verification.signWithSecretKey", token)
+	if pending != "" {
+		reason, msg = "AwaitingCertificate", pending
+	}
 	if verifyErr != nil {
 		reason, msg = "VerificationFailed", verifyErr.Error()
 	}
@@ -260,6 +280,98 @@ func (r *ZitiCAReconciler) verify(ctx context.Context, zc ziti.Client, entity zi
 		return &verifyError{"sign the proof: " + err.Error()}
 	}
 	return zc.Verify(ctx, ziti.CertificateAuthorities, entity.ID(), proof)
+}
+
+// verifyWithIssuer asks a cert-manager issuer for a certificate whose common name is the verification token
+// and sends it to Ziti. It returns a message while cert-manager has not issued the certificate yet.
+func (r *ZitiCAReconciler) verifyWithIssuer(ctx context.Context, ca *zitiv1alpha1.ZitiCA, zc ziti.Client, entity ziti.Entity) (string, error) {
+	token, _ := entity["verificationToken"].(string)
+	if token == "" {
+		return "", &verifyError{"Ziti gave no verification token"}
+	}
+	const waiting = "waiting for cert-manager to issue the proof certificate"
+	want := desired.CAProofCertificate(ca, token)
+	got := &unstructured.Unstructured{}
+	got.SetGroupVersionKind(want.GroupVersionKind())
+	err := r.Get(ctx, client.ObjectKeyFromObject(want), got)
+	switch {
+	case meta.IsNoMatchError(err):
+		return "", &specError{"CertManagerMissing", "cert-manager is not installed: the Certificate kind does not exist"}
+	case apierrors.IsNotFound(err):
+		if err := controllerutil.SetControllerReference(ca, want, r.Scheme); err != nil {
+			return "", err
+		}
+		if err := r.Create(ctx, want); err != nil {
+			return "", err
+		}
+		r.Recorder.Eventf(ca, "Normal", "Created", "created proof Certificate %s/%s", want.GetNamespace(), want.GetName())
+		return waiting, nil
+	case err != nil:
+		return "", err
+	case !metav1.IsControlledBy(got, ca):
+		return "", &specError{"CertificateConflict", fmt.Sprintf("Certificate %s/%s exists and is not owned by this CA", want.GetNamespace(), want.GetName())}
+	}
+	wantSpec, _ := want.Object["spec"].(map[string]any)
+	gotSpec, _ := got.Object["spec"].(map[string]any)
+	if !desired.Matches(wantSpec, gotSpec) {
+		got.Object["spec"] = want.Object["spec"]
+		if err := r.Update(ctx, got); err != nil {
+			return "", err
+		}
+		return waiting, nil
+	}
+	if !certificateReady(got) {
+		return waiting, nil
+	}
+	secret, err := r.readSecret(ctx, zitiv1alpha1.SecretRef{Namespace: want.GetNamespace(), Name: want.GetName()})
+	if apierrors.IsNotFound(errors.Unwrap(err)) {
+		return waiting, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	leaf, leafPEM, err := ziti.FirstCertificate(secret.Data[corev1.TLSCertKey])
+	if err != nil || leaf.Subject.CommonName != token {
+		return waiting, nil
+	}
+	return "", zc.Verify(ctx, ziti.CertificateAuthorities, entity.ID(), leafPEM)
+}
+
+func certificateReady(u *unstructured.Unstructured) bool {
+	conds, _, _ := unstructured.NestedSlice(u.Object, "status", "conditions")
+	for _, c := range conds {
+		if m, _ := c.(map[string]any); m["type"] == "Ready" {
+			return m["status"] == "True"
+		}
+	}
+	return false
+}
+
+// removeProofCertificate deletes the proof Certificate and its Secret once Ziti has verified the CA.
+// The Secret is deleted only when cert-manager made it for that Certificate.
+func (r *ZitiCAReconciler) removeProofCertificate(ctx context.Context, ca *zitiv1alpha1.ZitiCA) error {
+	ref := ca.Spec.Verification.IssuerRef
+	name := desired.CAProofCertificateName(ca)
+	cert := &unstructured.Unstructured{}
+	cert.SetGroupVersionKind(desired.CAProofCertificate(ca, "").GroupVersionKind())
+	err := r.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: name}, cert)
+	switch {
+	case meta.IsNoMatchError(err), apierrors.IsNotFound(err):
+	case err != nil:
+		return err
+	case metav1.IsControlledBy(cert, ca):
+		if err := r.Delete(ctx, cert); client.IgnoreNotFound(err) != nil {
+			return err
+		}
+	}
+	var secret corev1.Secret
+	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: name}, &secret); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if secret.Annotations["cert-manager.io/certificate-name"] != name {
+		return nil
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, &secret))
 }
 
 func (r *ZitiCAReconciler) SetupWithManager(mgr ctrl.Manager) error {

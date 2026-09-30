@@ -33,7 +33,27 @@ type CertificateSource struct {
 	CertKey string `json:"certKey,omitempty"`
 }
 
+// VerificationIssuer names the cert-manager issuer that proves ownership of the CA without the CA key.
+type VerificationIssuer struct {
+	// name of the issuer. It must be the issuer whose CA certificate this ZitiCA registers.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// kind is Issuer or ClusterIssuer.
+	// +kubebuilder:default=ClusterIssuer
+	// +kubebuilder:validation:Enum=Issuer;ClusterIssuer
+	// +optional
+	Kind string `json:"kind,omitempty"`
+
+	// namespace is where the operator creates the short-lived proof Certificate and its Secret. For an Issuer it is
+	// the namespace of the issuer. Both are removed once Ziti has verified the CA.
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace"`
+}
+
 // CAVerification says how the operator proves to Ziti that it controls the CA.
+// +kubebuilder:validation:XValidation:rule="!(self.signWithSecretKey && has(self.issuerRef))",message="set only one of signWithSecretKey and issuerRef"
 type CAVerification struct {
 	// signWithSecretKey lets the operator read the private key (key tls.key) of the same Secret and use it, in memory
 	// only, to sign the one-time proof that Ziti asks for. The key is never stored, logged, or sent to Ziti.
@@ -42,6 +62,12 @@ type CAVerification struct {
 	// +kubebuilder:default=false
 	// +optional
 	SignWithSecretKey bool `json:"signWithSecretKey,omitempty"`
+
+	// issuerRef proves ownership through cert-manager, so the operator never reads the CA key. The operator asks the
+	// issuer for a short-lived certificate whose common name is Ziti's verification token, reads the certificate
+	// (not its key use) from the Secret, and sends it to Ziti. Set only one of signWithSecretKey and issuerRef.
+	// +optional
+	IssuerRef *VerificationIssuer `json:"issuerRef,omitempty"`
 }
 
 // ExternalIDClaim says where in a client certificate Ziti finds the value that names the identity.

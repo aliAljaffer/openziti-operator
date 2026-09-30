@@ -90,6 +90,27 @@ Workloads can log in to Ziti with certificates that cert-manager issues and rene
    curl --cert tls.crt --key tls.key -X POST "https://<controller>/edge/client/v1/authenticate?method=cert"
    ```
 
+## Verify through cert-manager (no CA key access)
+
+Use `issuerRef` when the operator must not read the CA key. The operator asks the cert-manager issuer for a short-lived certificate whose common name is Ziti's verification token. It reads that certificate from a Secret and sends it to Ziti. The CA key stays with cert-manager. The proof Certificate and its Secret are removed once Ziti has verified the CA.
+
+```yaml
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiCA
+metadata: {name: workloads}
+spec:
+  certificate:
+    secretRef: {namespace: cert-manager, name: ziti-workload-ca}
+  verification:
+    issuerRef: {name: ziti-workload-ca, kind: ClusterIssuer, namespace: cert-manager}
+```
+
+- `issuerRef.name` must be the issuer whose CA certificate this `ZitiCA` registers.
+- `issuerRef.namespace` is where the proof Certificate and its Secret live. With `rbac.secretNamespaces`, add that namespace to the list.
+- Set only one of `signWithSecretKey` and `issuerRef`.
+- The operator still reads the CA certificate (`tls.crt`) from the Secret of `certificate.secretRef`. It does not use `tls.key`.
+- If the CA certificate changes, the operator replaces the CA in Ziti and verifies it again the same way.
+
 ## Verify by hand instead
 
 Leave out `signWithSecretKey` if the operator must not read the CA key. The status then shows a token.
