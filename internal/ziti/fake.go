@@ -113,6 +113,9 @@ func (f *Fake) List(_ context.Context, kind Kind, filter string) ([]Entity, erro
 }
 
 func (f *Fake) nameTaken(kind Kind, name, except string) bool {
+	if name == "" {
+		return false
+	}
 	for id, e := range f.Objects[kind] {
 		if id != except && e.Name() == name {
 			return true
@@ -130,6 +133,7 @@ func (f *Fake) Create(_ context.Context, kind Kind, body Entity) (string, error)
 	}
 	b := clone(body)
 	delete(b, "id")
+	f.refsAsObjects(kind, b)
 	if kind == Enrollments {
 		iid, _ := b["identityId"].(string)
 		for _, e := range f.Objects[Enrollments] {
@@ -173,6 +177,7 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "name must be unique"}
 	}
 	next := clone(body)
+	f.refsAsObjects(kind, next)
 	// Ziti keeps these fields on an update. A CA also keeps its certificate: a new certPem is silently ignored.
 	keep := map[Kind][]string{
 		CertificateAuthorities: {"certPem", "fingerprint", "verificationToken", "isVerified"},
@@ -186,6 +191,18 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 	}
 	f.put(kind, id, next)
 	return nil
+}
+
+// refsAsObjects makes the service and router of a terminator look like Ziti returns them: an object with id and name.
+func (f *Fake) refsAsObjects(kind Kind, b Entity) {
+	if kind != Terminators {
+		return
+	}
+	for key, from := range map[string]Kind{"service": Services, "router": EdgeRouters} {
+		if id, ok := b[key].(string); ok {
+			b[key] = map[string]any{"id": id, "name": f.Objects[from][id].Name()}
+		}
+	}
 }
 
 func certFingerprint(certPEM string) string {

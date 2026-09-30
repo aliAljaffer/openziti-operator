@@ -34,7 +34,7 @@ PAGES = {
     "SECURITY.md": "Security",
 }
 for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiAccessPolicy", "ZitiJwtSigner", "ZitiCA",
-             "ZitiRouter", "ZitiConfig", "ZitiService", "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy"):
+             "ZitiRouter", "ZitiConfig", "ZitiService", "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy", "ZitiTerminator"):
     PAGES[f"docs/reference/{kind}.md"] = kind
 
 LINK = re.compile(r"\]\(((?:\.\./|\./)*(?:docs/|reference/|adr/)*)([A-Za-z0-9_.-]+\.md)(#[^)]*)?\)")
@@ -64,6 +64,7 @@ SIDEBAR = """**[Home](Home)**
 - [ZitiServicePolicy](ZitiServicePolicy)
 - [ZitiEdgeRouterPolicy](ZitiEdgeRouterPolicy)
 - [ZitiServiceEdgeRouterPolicy](ZitiServiceEdgeRouterPolicy)
+- [ZitiTerminator](ZitiTerminator)
 
 **Run it**
 - [Conditions and reasons](Conditions-and-Reasons)

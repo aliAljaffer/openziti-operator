@@ -24,7 +24,7 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
 | `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
 | | `Ready` | Same as `Synced`. |
-| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy` | `Synced` | The Ziti object exists and matches the spec. |
+| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `Synced` | The Ziti object exists and matches the spec. |
 | | `Ready` | Same as `Synced`. |
 | `ZitiRouter` | `Synced` | The router exists in Ziti and matches the spec. |
 | | `Enrolled` | The router has enrolled with its JWT. |

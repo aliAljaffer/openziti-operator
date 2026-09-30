@@ -38,6 +38,7 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 		&zitiv1.ZitiServicePolicy{ObjectMeta: metav1.ObjectMeta{Name: "sp", Namespace: "n", UID: "live-servicepolicy"}},
 		&zitiv1.ZitiEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "erp", Namespace: "n", UID: "live-erp"}},
 		&zitiv1.ZitiServiceEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "serp", Namespace: "n", UID: "live-serp"}},
+		&zitiv1.ZitiTerminator{ObjectMeta: metav1.ObjectMeta{Name: "term", Namespace: "n", UID: "live-terminator"}},
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(owners, conn, app)...).Build()
 	zc := ziti.NewFake()
@@ -58,7 +59,7 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	for kind, uid := range map[ziti.Kind]string{
 		ziti.ExternalJWTSigners: "live-signer", ziti.AuthPolicies: "live-signer", ziti.CertificateAuthorities: "live-ca",
 		ziti.Configs: "live-config", ziti.ServicePolicies: "live-servicepolicy", ziti.EdgeRouterPolicies: "live-erp",
-		ziti.ServiceEdgeRouterPolicies: "live-serp", ziti.Identities: "live-identity", ziti.EdgeRouters: "live-router",
+		ziti.ServiceEdgeRouterPolicies: "live-serp", ziti.Terminators: "live-terminator", ziti.Identities: "live-identity", ziti.EdgeRouters: "live-router",
 	} {
 		zc.Put(kind, ziti.Entity{"id": "live-" + string(kind), "name": "live-" + string(kind), "tags": tags("prod", uid)})
 	}

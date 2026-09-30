@@ -1,0 +1,12 @@
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiTerminator
+metadata:
+  labels:
+    app.kubernetes.io/name: ziti-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: zititerminator-sample
+spec:
+  service: web.example.com
+  router: router-a
+  address: tcp:10.0.0.5:8443
+  cost: 10

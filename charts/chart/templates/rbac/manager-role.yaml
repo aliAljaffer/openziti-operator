@@ -63,6 +63,7 @@ rules:
   - zitiserviceedgerouterpolicies
   - zitiservicepolicies
   - zitiservices
+  - zititerminators
   verbs:
   - create
   - delete
@@ -86,6 +87,7 @@ rules:
   - zitiserviceedgerouterpolicies/finalizers
   - zitiservicepolicies/finalizers
   - zitiservices/finalizers
+  - zititerminators/finalizers
   verbs:
   - update
 - apiGroups:
@@ -103,6 +105,7 @@ rules:
   - zitiserviceedgerouterpolicies/status
   - zitiservicepolicies/status
   - zitiservices/status
+  - zititerminators/status
   verbs:
   - get
   - patch

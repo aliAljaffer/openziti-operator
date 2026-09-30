@@ -131,6 +131,26 @@ var _ = Describe("CRD validation", func() {
 		Expect(ok.Spec.Certificate.IssuerRef.Kind).To(Equal("ClusterIssuer"))
 	})
 
+	It("checks the ZitiTerminator address, applies defaults, and keeps service, router, and binding fixed", func() {
+		term := func(name, address string) *zitiv1.ZitiTerminator {
+			return &zitiv1.ZitiTerminator{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+				Spec: zitiv1.ZitiTerminatorSpec{Service: "web", Router: "r", Address: address}}
+		}
+		Expect(k8sClient.Create(ctx, term("bad-addr", "10.0.0.5:80"))).To(MatchError(ContainSubstring("should match")))
+		ok := term("term-ok", "tcp:10.0.0.5:8443")
+		Expect(k8sClient.Create(ctx, ok)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ok) })
+		Expect(ok.Spec.Binding).To(Equal("transport"))
+		Expect(ok.Spec.Precedence).To(Equal("default"))
+		Expect(ok.Spec.DeletionPolicy).To(Equal(zitiv1.DeletionPolicyDelete))
+
+		ok.Spec.Cost = 5
+		ok.Spec.Address = "udp:10.0.0.6:53"
+		Expect(k8sClient.Update(ctx, ok)).To(Succeed())
+		ok.Spec.Router = "other"
+		Expect(k8sClient.Update(ctx, ok)).To(MatchError(ContainSubstring("service, router, and binding are immutable")))
+	})
+
 	It("rejects a ZitiConnection with a non-https URL or no hostingRouters", func() {
 		conn := func(url string, routers []string) *zitiv1.ZitiConnection {
 			c := &zitiv1.ZitiConnection{

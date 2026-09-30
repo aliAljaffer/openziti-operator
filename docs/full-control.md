@@ -9,6 +9,7 @@
 | `ZitiServicePolicy` | `ztsp` | service policy (Dial or Bind) |
 | `ZitiEdgeRouterPolicy` | `zterp` | edge router policy |
 | `ZitiServiceEdgeRouterPolicy` | `ztserp` | service edge router policy |
+| `ZitiTerminator` | `ztterm` | terminator |
 
 The keys are the Ziti keys, in camelCase. There are no derived objects and no defaults beyond Ziti's own. Every kind is namespaced.
 
@@ -107,7 +108,25 @@ Everything with `@` roles needs `roleScope: Global` on the connection. With `Nam
 
 ## Terminators
 
-There is no `ZitiTerminator`. The hosting router creates the terminators from the host config, one for each entry in `terminators` of a `host.v2` config. A terminator has no name that the operator could own, so it is not a resource.
+Most services need no terminator resource. The hosting router creates the terminators from the host config, one for each entry in `terminators` of a `host.v2` config.
+
+Use a `ZitiTerminator` for a fixed route: a router that forwards a service to one address.
+
+```yaml
+apiVersion: alialjaffer.ziti/v1alpha1
+kind: ZitiTerminator
+metadata: {name: web-via-router-a, namespace: team-a}
+spec:
+  service: web.example.com
+  router: router-a
+  address: tcp:10.0.0.5:8443
+  cost: 10
+```
+
+- `service` and `router` are Ziti names of existing objects. The connection needs `roleScope: Global`.
+- A terminator has no name in Ziti. The operator finds it by its ownership tags. Two resources with the same values create two terminators, because Ziti allows duplicates.
+- `address`, `cost`, and `precedence` change in place. `service`, `router`, and `binding` cannot change on the resource.
+- There is no `Adopt` or `Observe`, because a terminator has no name to match.
 
 ## Mixing with ZitiApp
 

@@ -12,7 +12,7 @@ It drives the Ziti Edge Management API. It does not install or run the Ziti cont
 | `ZitiApp` | `ztapp` | namespace | Publishes an app: configs, service, bind, router and dial policies. |
 | `ZitiIdentity` | `ztid` | namespace | Creates, adopts, or observes an identity. Enrolls it and renews its certificate. |
 | `ZitiAccessPolicy` | `ztap` | namespace | One Dial policy and an optional edge router policy. |
-| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy` | `ztcfg`, `ztsvc`, `ztsp`, `zterp`, `ztserp` | namespace | One resource per Ziti object, for full control. See [Full control](docs/full-control.md). |
+| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `ztcfg`, `ztsvc`, `ztsp`, `zterp`, `ztserp`, `ztterm` | namespace | One resource per Ziti object, for full control. See [Full control](docs/full-control.md). |
 | `ZitiRouter` | `ztrouter` | cluster | Creates an edge router in Ziti and puts its enrollment JWT in a Secret. See [Edge routers](docs/routers.md). |
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. Lets service accounts log in. |
