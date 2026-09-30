@@ -76,6 +76,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `Enrolled` (true) | The identity is enrolled. |
 | `PendingEnrollment` | The identity is not enrolled yet. With `JwtOnly`, the enrollment JWT is in the Secret. |
 | `IdentityFileLost` | The Secret has no working `identity.json`. The operator deleted the Ziti identity and enrolls a new one. Its Ziti ID changes. |
+| `IdentityFileUnavailable` | `Adopt` with `OperatorEnrolled` found an identity that enrolled elsewhere. The operator has no key, so it stores no Secret and does not delete or re-enroll the identity. Re-enroll it in Ziti, or use `Manage`. |
 | `CertExpired` | The client certificate expired. |
 | `AwaitingVerification` (`ZitiCA`) | The CA is registered but not proven yet. The message has the token. Set `verification.signWithSecretKey` or verify by hand. |
 | `VerificationFailed` (`ZitiCA`) | The proof was rejected or could not be signed (wrong or missing `tls.key`). The message has the cause. |

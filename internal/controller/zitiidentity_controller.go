@@ -322,6 +322,12 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 				return r.trackCert(ctx, id, zc)
 			}
 		}
+		if mode == zitiv1alpha1.ManagementAdopt {
+			// The key lives with whoever enrolled the identity. Enrolling again would cut that holder off.
+			setCond(&id.Status.Conditions, id.Generation, CondReady, false, "", "IdentityFileUnavailable",
+				"the identity enrolled outside the operator, so there is no identity file to store. Re-enroll it in Ziti or use managementPolicy Manage")
+			return nil
+		}
 		// The private key exists only in identity.json. Without a working copy the identity is unusable, so start over.
 		if err := zc.Delete(ctx, ziti.Identities, zid.ID()); err != nil {
 			return err

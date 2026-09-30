@@ -743,3 +743,25 @@ func TestIdentityCreatesTheCertManagerCertificate(t *testing.T) {
 		}
 	}
 }
+
+func TestIdentityAdoptOperatorEnrolledNeverDeletesEnrolledIdentity(t *testing.T) {
+	e := operatorEnv(t)
+	setPolicy(t, e, zitiv1.ManagementAdopt)
+	id := handMade(e, map[string]any{"owner": "human"})
+	e.reconcile(t)
+
+	if e.zc.Objects[ziti.Identities][id] == nil {
+		t.Fatal("adopted identity was deleted")
+	}
+	for _, c := range e.zc.Calls {
+		if strings.HasPrefix(c, "delete") {
+			t.Errorf("unexpected write %q", c)
+		}
+	}
+	if c := findCond(e.get(t), CondReady); c.Status != metav1.ConditionFalse || c.Reason != "IdentityFileUnavailable" {
+		t.Errorf("ready = %+v", c)
+	}
+	if err := e.secretOrNil(t); err == nil {
+		t.Error("must not create a Secret")
+	}
+}

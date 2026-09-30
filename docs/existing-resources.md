@@ -41,4 +41,5 @@ Deleting the resource never deletes an adopted identity. The operator removes on
 
 ## Limits
 
+- The operator never creates a Secret for an identity that is already enrolled. The key stays where the identity enrolled. This holds for `Observe` and `Adopt`. With `Adopt` and `OperatorEnrolled`, `Ready` is `False` with reason `IdentityFileUnavailable`, and the identity stays untouched.
 - An app cannot be adopted. Changing an app from `Observe` to `Manage` gives `NameConflict`, because the service already exists.
