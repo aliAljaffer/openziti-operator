@@ -19,6 +19,11 @@ import (
 // A Secret with the same name that the owner does not control gives SecretConflict.
 // The manager cache holds only labeled Secrets, so an unlabeled Secret shows up as AlreadyExists on create.
 func upsertOwnedSecret(ctx context.Context, c client.Client, scheme *runtime.Scheme, owner client.Object, key types.NamespacedName, dataKey string, value []byte) error {
+	return upsertOwnedSecretKeys(ctx, c, scheme, owner, key, map[string][]byte{dataKey: value})
+}
+
+// upsertOwnedSecretKeys sets several keys of a Secret that the owner controls, in one write.
+func upsertOwnedSecretKeys(ctx context.Context, c client.Client, scheme *runtime.Scheme, owner client.Object, key types.NamespacedName, values map[string][]byte) error {
 	var secret corev1.Secret
 	err := c.Get(ctx, key, &secret)
 	switch {
@@ -28,7 +33,7 @@ func upsertOwnedSecret(ctx context.Context, c client.Client, scheme *runtime.Sch
 		if err := controllerutil.SetControllerReference(owner, &secret, scheme); err != nil {
 			return err
 		}
-		secret.Data = map[string][]byte{dataKey: value}
+		secret.Data = values
 		err = c.Create(ctx, &secret)
 		if apierrors.IsAlreadyExists(err) {
 			return secretConflict(key)
@@ -38,26 +43,42 @@ func upsertOwnedSecret(ctx context.Context, c client.Client, scheme *runtime.Sch
 		return err
 	case !metav1.IsControlledBy(&secret, owner):
 		return secretConflict(key)
-	case string(secret.Data[dataKey]) == string(value):
-		return nil
 	}
+	changed := false
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
-	secret.Data[dataKey] = value
+	for k, v := range values {
+		if string(secret.Data[k]) != string(v) {
+			secret.Data[k] = v
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
 	return c.Update(ctx, &secret)
 }
 
-// dropSecretKey removes one key from a Secret that the owner controls. A missing Secret or key is fine.
-func dropSecretKey(ctx context.Context, c client.Client, owner client.Object, key types.NamespacedName, dataKey string) error {
+// dropSecretKey removes keys from a Secret that the owner controls. A missing Secret or key is fine.
+func dropSecretKey(ctx context.Context, c client.Client, owner client.Object, key types.NamespacedName, dataKeys ...string) error {
 	var secret corev1.Secret
 	if err := c.Get(ctx, key, &secret); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	if _, ok := secret.Data[dataKey]; !ok || !metav1.IsControlledBy(&secret, owner) {
+	if !metav1.IsControlledBy(&secret, owner) {
 		return nil
 	}
-	delete(secret.Data, dataKey)
+	changed := false
+	for _, k := range dataKeys {
+		if _, ok := secret.Data[k]; ok {
+			delete(secret.Data, k)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
 	return c.Update(ctx, &secret)
 }
 

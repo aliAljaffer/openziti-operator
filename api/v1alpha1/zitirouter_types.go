@@ -60,10 +60,27 @@ type ZitiRouterSpec struct {
 
 	// enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
 	// Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
+	// With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml".
 	// The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires.
 	// Without it, the JWT stays in Ziti.
 	// +optional
 	EnrollmentSecretRef *SecretRef `json:"enrollmentSecretRef,omitempty"`
+
+	// advertisedAddress is the DNS name or IP where clients and other routers reach this router. The router needs it to start.
+	// With enrollmentSecretRef and this field, the operator also writes ready-made "docker-compose.yml" and
+	// "deployment.yaml" files to the Secret, so the router can be started on a VM or in a Kubernetes cluster without router configuration.
+	// Without it, only the JWT is written and the condition ManifestsReady says why.
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$`
+	// +optional
+	AdvertisedAddress string `json:"advertisedAddress,omitempty"`
+
+	// port is the port the router listens on for clients and links. It is used in the generated manifests.
+	// +kubebuilder:default=3022
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	Port int32 `json:"port,omitempty"`
 
 	// deletionPolicy Delete removes the router from Ziti when this resource is deleted.
 	// Orphan removes only the operator tags and keeps the router. It cannot change after creation.

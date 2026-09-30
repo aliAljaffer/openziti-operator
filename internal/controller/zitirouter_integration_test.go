@@ -86,7 +86,7 @@ func TestRouterAgainstRealController(t *testing.T) {
 	}
 }
 
-// Needs Docker and ZITI_DOCKER_NETWORK: the controller container on that network must advertise the name its
+// Runs the docker-compose.yml that the operator writes to the Secret. Needs Docker and ZITI_DOCKER_NETWORK: the controller container on that network must advertise the name its
 // router-address and ctrl-address use, so that the router container can resolve it.
 func TestRouterEnrollsWithDeliveredJWT(t *testing.T) {
 	mgmt, network := os.Getenv("ZITI_MGMT_URL"), os.Getenv("ZITI_DOCKER_NETWORK")
@@ -104,11 +104,26 @@ func TestRouterEnrollsWithDeliveredJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := setupRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.ZitiName = "it-enroll-router" })
+	e := setupRouter(t, func(r *zitiv1.ZitiRouter) {
+		r.Spec.ZitiName, r.Spec.AdvertisedAddress = "it-enroll-router", "it-enroll-router"
+	})
 	e.r.Clients = staticProvider{real}
+	version, err := real.Version(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = version
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
 	t.Cleanup(func() {
 		ctx := context.Background()
-		_ = exec.Command("docker", "rm", "-f", "it-enroll-router").Run()
+		_ = exec.Command("docker", "compose", "-p", "it-enroll", "-f", dir+"/docker-compose.yml", "-f", dir+"/override.yml", "down", "-v").Run()
 		var rt zitiv1.ZitiRouter
 		if e.k.Get(ctx, e.key, &rt) == nil {
 			_ = e.k.Delete(ctx, &rt)
@@ -121,15 +136,19 @@ func TestRouterEnrollsWithDeliveredJWT(t *testing.T) {
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-enrollment"}, &secret); err != nil {
 		t.Fatal(err)
 	}
-	jwt := string(secret.Data[SecretKeyJWT])
-	if jwt == "" {
-		t.Fatal("no JWT delivered")
+	compose := secret.Data[SecretKeyCompose]
+	if len(compose) == 0 {
+		t.Fatal("no docker-compose.yml delivered")
 	}
-	out, err := exec.Command("docker", "run", "-d", "--name", "it-enroll-router", "--network", network,
-		"-e", "ZITI_ENROLL_TOKEN="+jwt, "-e", "ZITI_ROUTER_ADVERTISED_ADDRESS=it-enroll-router", "-e", "ZITI_BOOTSTRAP=true", "-e", "ZITI_BOOTSTRAP_ENROLLMENT=true",
-		"openziti/ziti-router:2.0.4").CombinedOutput()
+	override := "services:\n  router:\n    container_name: it-enroll-router\n    networks: [default, zt]\nnetworks:\n  zt:\n    name: " + network + "\n    external: true\n"
+	for name, data := range map[string]string{"docker-compose.yml": string(compose), "override.yml": override} {
+		if err := os.WriteFile(dir+"/"+name, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := exec.Command("docker", "compose", "-p", "it-enroll", "-f", dir+"/docker-compose.yml", "-f", dir+"/override.yml", "up", "-d").CombinedOutput()
 	if err != nil {
-		t.Fatalf("docker run: %v: %s", err, out)
+		t.Fatalf("docker compose up: %v: %s", err, out)
 	}
 
 	var rt *zitiv1.ZitiRouter

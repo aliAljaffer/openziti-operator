@@ -226,3 +226,40 @@ func TestRouterSecretConflictNamespaceLimitAndDelete(t *testing.T) {
 		}
 	}
 }
+
+func TestRouterManifestsFollowTheAddressAndLeaveWithTheJWT(t *testing.T) {
+	e := setupRouter(t, nil)
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = "v2.0.4"
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+
+	e.reconcile(t)
+	s, _ := e.secret(t)
+	if c := string(s.Data[SecretKeyCompose]); !strings.Contains(c, "CHANGE_ME.invalid") || !strings.Contains(c, string(s.Data[SecretKeyJWT])) ||
+		!strings.Contains(c, "ziti-router:2.0.4") || len(s.Data[SecretKeyDeployment]) == 0 {
+		t.Errorf("manifests = %q", s.Data)
+	}
+
+	rt := e.reconcile(t)
+	rt.Spec.AdvertisedAddress, rt.Spec.Port = "vm1.example.com", 4000
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	s, _ = e.secret(t)
+	if c := string(s.Data[SecretKeyCompose]); !strings.Contains(c, "vm1.example.com") || !strings.Contains(c, `"4000:4000"`) || strings.Contains(c, "CHANGE_ME") {
+		t.Errorf("compose = %s", c)
+	}
+
+	e.router()["isVerified"] = true
+	e.reconcile(t)
+	s, _ = e.secret(t)
+	if len(s.Data[SecretKeyJWT])+len(s.Data[SecretKeyCompose])+len(s.Data[SecretKeyDeployment]) != 0 {
+		t.Errorf("the JWT and manifests must leave the Secret once the router has enrolled: %v", s.Data)
+	}
+}

@@ -25,14 +25,16 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
+| `spec.advertisedAddress` | string | no |  | advertisedAddress is the DNS name or IP where clients and other routers reach this router. The router needs it to start. With enrollmentSecretRef and this field, the operator also writes ready-made "docker-compose.yml" and "deployment.yaml" files to the Secret, so the router can be started on a VM or in a Kubernetes cluster without router configuration. Without it, only the JWT is written and the condition ManifestsReady says why. Maximum length 253. Must match `^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$`. |
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.cost` | integer | no |  | cost makes Ziti prefer routers with a lower cost. Minimum 0. Maximum 65535. |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the router from Ziti when this resource is deleted. Orphan removes only the operator tags and keeps the router. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.disabled` | boolean | no |  | disabled takes the router out of service without deleting it. |
-| `spec.enrollmentSecretRef` | object | no |  | enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt". Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart. The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti. |
+| `spec.enrollmentSecretRef` | object | no |  | enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt". Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart. With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml". The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti. |
 | `spec.enrollmentSecretRef.name` | string | yes |  | name of the Secret. |
 | `spec.enrollmentSecretRef.namespace` | string | yes |  | namespace of the Secret. |
 | `spec.noTraversal` | boolean | no |  | noTraversal keeps other traffic off this router. The router only serves its own edge connections. |
+| `spec.port` | integer | no | `3022` | port is the port the router listens on for clients and links. It is used in the generated manifests. Minimum 1. Maximum 65535. |
 | `spec.roleAttributes` | list of string | no |  | roleAttributes are the groups the router belongs to. Edge router policies select routers by them. They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter. |
 | `spec.tunnelerEnabled` | boolean | no |  | tunnelerEnabled lets the router host and dial services itself. Routers that host services need it. |
 | `spec.zitiName` | string | no |  | zitiName is the router name in Ziti. It defaults to the resource name. It cannot change later. Minimum length 1. Maximum length 1000. |
@@ -74,6 +76,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zitirouter-sample
 spec:
-  # TODO(user): Add fields here
+  roleAttributes: [edge]
+  tunnelerEnabled: true
+  advertisedAddress: vm1.example.com
+  enrollmentSecretRef: {namespace: default, name: zitirouter-sample-enrollment}
 ```
 

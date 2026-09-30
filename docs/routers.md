@@ -14,9 +14,38 @@ spec:
   roleAttributes: [edge]
   tunnelerEnabled: true
   enrollmentSecretRef: {namespace: routers, name: edge-1-enrollment}
+  advertisedAddress: vm1.example.com
 ```
 
 `kubectl get ztrouter` shows `ENROLLED`, `ONLINE`, and when the JWT expires.
+
+## Start the router on a VM or in a cluster
+
+The operator writes two ready-made files to the Secret, next to the JWT.
+
+| Secret key | Use |
+|---|---|
+| `docker-compose.yml` | Start the router on a VM with Docker Compose. |
+| `deployment.yaml` | Start the router in a Kubernetes cluster. It holds a Secret, a PersistentVolumeClaim, a Deployment, and a Service of type LoadBalancer. |
+
+On a VM:
+
+```sh
+kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.docker-compose\.yml}' | base64 -d > docker-compose.yml
+docker compose up -d
+```
+
+In a cluster:
+
+```sh
+kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.deployment\.yaml}' | base64 -d | kubectl apply -f -
+```
+
+Set `advertisedAddress` to the DNS name or IP where clients and other routers reach the router. If you leave it empty, the files contain `CHANGE_ME.invalid`. A router with that address enrolls and goes online. Clients cannot connect to it. Edit the address before clients use the router.
+
+Open the router port (default 3022, set it with `port`) to clients and other routers.
+
+The JWT works once and expires after about three hours. The operator writes new files when it issues a new JWT. It removes the JWT and both files when the router has enrolled. The files need the controller version, so the `ZitiConnection` must be connected.
 
 ## Give the JWT to the router
 
@@ -42,7 +71,9 @@ Without `enrollmentSecretRef` the JWT stays in Ziti and the operator writes no S
 | `roleAttributes` | Groups of the router. Edge router policies select routers by them. Used as written, in every role scope. |
 | `tunnelerEnabled` | The router can host and dial services. A router that hosts a `ZitiApp` needs it. |
 | `cost`, `noTraversal`, `disabled` | Ziti router settings. |
-| `enrollmentSecretRef` | Where the enrollment JWT goes. |
+| `enrollmentSecretRef` | Where the enrollment JWT and the ready-made files go. |
+| `advertisedAddress` | Where clients and other routers reach the router. Used in the ready-made files. |
+| `port` | The router port in the ready-made files. Default 3022. |
 | `deletionPolicy` | `Delete` (default) removes the router from Ziti with the resource. `Orphan` only removes the operator tags. |
 
 ## Conditions

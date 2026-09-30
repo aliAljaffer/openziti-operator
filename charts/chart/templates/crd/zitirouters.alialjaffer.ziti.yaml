@@ -66,6 +66,15 @@ spec:
           spec:
             description: spec defines the desired state of ZitiRouter
             properties:
+              advertisedAddress:
+                description: |-
+                  advertisedAddress is the DNS name or IP where clients and other routers reach this router. The router needs it to start.
+                  With enrollmentSecretRef and this field, the operator also writes ready-made "docker-compose.yml" and
+                  "deployment.yaml" files to the Secret, so the router can be started on a VM or in a Kubernetes cluster without router configuration.
+                  Without it, only the JWT is written and the condition ManifestsReady says why.
+                maxLength: 253
+                pattern: ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$
+                type: string
               connectionRef:
                 default: default
                 description: connectionRef is the name of the ZitiConnection to use.
@@ -94,6 +103,7 @@ spec:
                 description: |-
                   enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
                   Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
+                  With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml".
                   The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires.
                   Without it, the JWT stays in Ziti.
                 properties:
@@ -111,6 +121,14 @@ spec:
                 description: noTraversal keeps other traffic off this router. The
                   router only serves its own edge connections.
                 type: boolean
+              port:
+                default: 3022
+                description: port is the port the router listens on for clients and
+                  links. It is used in the generated manifests.
+                format: int32
+                maximum: 65535
+                minimum: 1
+                type: integer
               roleAttributes:
                 description: |-
                   roleAttributes are the groups the router belongs to. Edge router policies select routers by them.

@@ -40,8 +40,10 @@ import (
 )
 
 const (
-	CondEnrolled = "Enrolled"
-	CondOnline   = "Online"
+	SecretKeyCompose    = "docker-compose.yml"
+	SecretKeyDeployment = "deployment.yaml"
+	CondEnrolled        = "Enrolled"
+	CondOnline          = "Online"
 )
 
 var routerKinds = []ziti.Kind{ziti.EdgeRouters}
@@ -172,7 +174,7 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 	online, _ := list[0]["isOnline"].(bool)
 	rt.Status.RouterID, rt.Status.Enrolled, rt.Status.Online = id, enrolled, online
 
-	if err := r.deliverEnrollment(ctx, rt, zc, id, enrolled); err != nil {
+	if err := r.deliverEnrollment(ctx, rt, conn, zc, id, enrolled); err != nil {
 		return err
 	}
 
@@ -187,7 +189,7 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 }
 
 // deliverEnrollment keeps a valid enrollment JWT in the Secret until the router has enrolled, then removes it.
-func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, zc ziti.Client, id string, enrolled bool) error {
+func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client, id string, enrolled bool) error {
 	ref := rt.Spec.EnrollmentSecretRef
 	var key types.NamespacedName
 	if ref != nil {
@@ -198,7 +200,7 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 		if ref == nil {
 			return nil
 		}
-		return dropSecretKey(ctx, r.Client, rt, key, SecretKeyJWT)
+		return dropSecretKey(ctx, r.Client, rt, key, SecretKeyJWT, SecretKeyCompose, SecretKeyDeployment)
 	}
 
 	jwt, expires, err := zc.Enrollment(ctx, ziti.EdgeRouters, id)
@@ -220,7 +222,16 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 	if ref == nil || jwt == "" {
 		return nil
 	}
-	return upsertOwnedSecret(ctx, r.Client, r.Scheme, rt, key, SecretKeyJWT, []byte(jwt))
+	values := map[string][]byte{SecretKeyJWT: []byte(jwt)}
+	if conn.Status.ControllerVersion != "" {
+		port := rt.Spec.Port
+		if port == 0 {
+			port = 3022
+		}
+		m := desired.RouterManifest{Name: desired.RouterName(rt), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port}
+		values[SecretKeyCompose], values[SecretKeyDeployment] = []byte(m.Compose()), []byte(m.Deployment())
+	}
+	return upsertOwnedSecretKeys(ctx, r.Client, r.Scheme, rt, key, values)
 }
 
 func (r *ZitiRouterReconciler) SetupWithManager(mgr ctrl.Manager) error {
