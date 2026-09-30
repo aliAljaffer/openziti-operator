@@ -76,8 +76,9 @@ type ZitiRouterSpec struct {
 	AdvertisedAddress string `json:"advertisedAddress,omitempty"`
 
 	// port is the port the router listens on for clients and links. It is used in the generated manifests.
+	// It must be 1024 or higher, because the generated manifests drop all capabilities.
 	// +kubebuilder:default=3022
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=1024
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port int32 `json:"port,omitempty"`

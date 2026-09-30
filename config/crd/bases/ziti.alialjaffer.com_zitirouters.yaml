@@ -120,11 +120,12 @@ spec:
                 type: boolean
               port:
                 default: 3022
-                description: port is the port the router listens on for clients and
-                  links. It is used in the generated manifests.
+                description: |-
+                  port is the port the router listens on for clients and links. It is used in the generated manifests.
+                  It must be 1024 or higher, because the generated manifests drop all capabilities.
                 format: int32
                 maximum: 65535
-                minimum: 1
+                minimum: 1024
                 type: integer
               roleAttributes:
                 description: |-

@@ -151,6 +151,11 @@ var _ = Describe("CRD validation", func() {
 		Expect(k8sClient.Update(ctx, ok)).To(MatchError(ContainSubstring("service, router, and binding are immutable")))
 	})
 
+	It("rejects a ZitiRouter port below 1024", func() {
+		rt := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "low-port"}, Spec: zitiv1.ZitiRouterSpec{Port: 443}}
+		Expect(k8sClient.Create(ctx, rt)).To(MatchError(ContainSubstring("port")))
+	})
+
 	It("rejects a ZitiConnection with a non-https URL or no hostingRouters", func() {
 		conn := func(url string, routers []string) *zitiv1.ZitiConnection {
 			c := &zitiv1.ZitiConnection{
