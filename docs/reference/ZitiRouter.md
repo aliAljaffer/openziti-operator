@@ -36,6 +36,7 @@
 | `spec.noTraversal` | boolean | no |  | noTraversal keeps other traffic off this router. The router only serves its own edge connections. |
 | `spec.port` | integer | no | `3022` | port is the port the router listens on for clients and links. It is used in the generated manifests. Minimum 1. Maximum 65535. |
 | `spec.roleAttributes` | list of string | no |  | roleAttributes are the groups the router belongs to. Edge router policies select routers by them. They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter. |
+| `spec.storageClassName` | string | no |  | storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default. Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind. Maximum length 253. |
 | `spec.tunnelerEnabled` | boolean | no |  | tunnelerEnabled lets the router host and dial services itself. Routers that host services need it. |
 | `spec.zitiName` | string | no |  | zitiName is the router name in Ziti. It defaults to the resource name. It cannot change later. Minimum length 1. Maximum length 1000. |
 

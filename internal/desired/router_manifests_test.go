@@ -43,6 +43,21 @@ func TestRouterManifestsAreValidYAMLWithTheRightValues(t *testing.T) {
 			t.Errorf("deployment lacks %q", want)
 		}
 	}
+	if strings.Contains(dep, "storageClassName") {
+		t.Error("no storageClassName expected by default")
+	}
+	m.StorageClass = "fast"
+	if dep := m.Deployment(); !strings.Contains(dep, `storageClassName: "fast"`) {
+		t.Error("storageClassName missing")
+	} else {
+		for _, d := range strings.Split(dep, "\n---\n") {
+			var v map[string]any
+			if err := yaml.Unmarshal([]byte(d), &v); err != nil {
+				t.Fatalf("%v in:\n%s", err, d)
+			}
+		}
+	}
+	m.StorageClass = ""
 	if strings.Count(dep, "eyJ.abc.def") != 1 {
 		t.Error("the token must appear only in the Secret")
 	}

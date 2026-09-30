@@ -16,8 +16,8 @@ const routerUID = 2171
 
 // RouterManifest holds what a router needs to start on a VM or in a cluster.
 type RouterManifest struct {
-	Name, JWT, Address, Version string
-	Port                        int32
+	Name, JWT, Address, Version, StorageClass string
+	Port                                      int32
 }
 
 var nonDNS = regexp.MustCompile(`[^a-z0-9-]+`)
@@ -89,6 +89,13 @@ volumes:
 `, m.note(), routerUID, m.image(), m.Port, m.Port, env.String())
 }
 
+func (m RouterManifest) storageClass() string {
+	if m.StorageClass == "" {
+		return ""
+	}
+	return fmt.Sprintf("  storageClassName: %q\n", m.StorageClass)
+}
+
 // Deployment returns a Secret, Deployment, PersistentVolumeClaim, and Service that run the router in a cluster.
 func (m RouterManifest) Deployment() string {
 	n := m.k8sName()
@@ -108,7 +115,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: %[2]s-data
 spec:
-  accessModes: [ReadWriteOnce]
+%[8]s  accessModes: [ReadWriteOnce]
   resources:
     requests:
       storage: 100Mi
@@ -159,5 +166,5 @@ spec:
   ports:
     - port: %[6]d
       targetPort: %[6]d
-`, m.note(), n, m.JWT, routerUID, m.image(), m.Port, env.String())
+`, m.note(), n, m.JWT, routerUID, m.image(), m.Port, env.String(), m.storageClass())
 }

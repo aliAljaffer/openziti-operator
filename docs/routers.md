@@ -43,6 +43,8 @@ kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.deployment\.
 
 Set `advertisedAddress` to the DNS name or IP where clients and other routers reach the router. If you leave it empty, the files contain `CHANGE_ME.invalid`. A router with that address enrolls and goes online. Clients cannot connect to it. Edit the address before clients use the router.
 
+Check the reclaim policy of the StorageClass. With `Retain`, deleting the volume claim leaves the volume behind. Set `storageClassName` to use another class.
+
 Open the router port (default 3022, set it with `port`) to clients and other routers.
 
 The JWT works once and expires after about three hours. The operator writes new files when it issues a new JWT. It removes the JWT and both files when the router has enrolled. The files need the controller version, so the `ZitiConnection` must be connected.
@@ -74,6 +76,7 @@ Without `enrollmentSecretRef` the JWT stays in Ziti and the operator writes no S
 | `enrollmentSecretRef` | Where the enrollment JWT and the ready-made files go. |
 | `advertisedAddress` | Where clients and other routers reach the router. Used in the ready-made files. |
 | `port` | The router port in the ready-made files. Default 3022. |
+| `storageClassName` | StorageClass of the volume in `deployment.yaml`. Default: the cluster default. |
 | `deletionPolicy` | `Delete` (default) removes the router from Ziti with the resource. `Orphan` only removes the operator tags. |
 
 ## Conditions

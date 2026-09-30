@@ -228,7 +228,7 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 		if port == 0 {
 			port = 3022
 		}
-		m := desired.RouterManifest{Name: desired.RouterName(rt), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port}
+		m := desired.RouterManifest{Name: desired.RouterName(rt), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName}
 		values[SecretKeyCompose], values[SecretKeyDeployment] = []byte(m.Compose()), []byte(m.Deployment())
 	}
 	return upsertOwnedSecretKeys(ctx, r.Client, r.Scheme, rt, key, values)

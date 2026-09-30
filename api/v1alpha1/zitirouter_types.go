@@ -82,6 +82,12 @@ type ZitiRouterSpec struct {
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
+	// storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default.
+	// Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind.
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
+
 	// deletionPolicy Delete removes the router from Ziti when this resource is deleted.
 	// Orphan removes only the operator tags and keeps the router. It cannot change after creation.
 	// +kubebuilder:default=Delete

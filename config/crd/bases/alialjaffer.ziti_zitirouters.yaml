@@ -133,6 +133,12 @@ spec:
                 items:
                   type: string
                 type: array
+              storageClassName:
+                description: |-
+                  storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default.
+                  Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind.
+                maxLength: 253
+                type: string
               tunnelerEnabled:
                 description: tunnelerEnabled lets the router host and dial services
                   itself. Routers that host services need it.
