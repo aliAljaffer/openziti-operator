@@ -427,3 +427,39 @@ func TestBadPortRangeIsInvalidSpec(t *testing.T) {
 		t.Errorf("ready = %+v", c)
 	}
 }
+
+func TestAdoptTakesOverHandMadeServiceAndReleasesOnDelete(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) { s.Spec.ManagementPolicy = zitiv1.ManagementAdopt })
+	e.zc.Put(ziti.Services, ziti.Entity{"id": "hand-made", "name": "app.example.com", "tags": map[string]any{"team": "x"}})
+	e.reconcile(t)
+	s := e.get(t)
+	if s.Status.IDs.Service != "hand-made" {
+		t.Fatalf("service id = %q", s.Status.IDs.Service)
+	}
+	tags := e.zc.Objects[ziti.Services]["hand-made"].Tags()
+	if tags["team"] != "x" || tags["ziti-operator-adopted"] != "true" || tags["ziti-operator-uid"] != "uid-1" {
+		t.Errorf("tags = %v", tags)
+	}
+	e.reconcile(t)
+	before := len(e.writes())
+	e.reconcile(t)
+	if len(e.writes()) != before {
+		t.Errorf("second reconcile wrote: %v", e.writes()[before:])
+	}
+	if err := e.k.Delete(t.Context(), e.get(t)); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	svc, ok := e.zc.Objects[ziti.Services]["hand-made"]
+	if !ok {
+		t.Fatal("adopted service was deleted")
+	}
+	for k := range svc.Tags() {
+		if strings.HasPrefix(k, "ziti-operator-") {
+			t.Errorf("still carries %s", k)
+		}
+	}
+	if svc.Tags()["team"] != "x" || e.count(ziti.Services) != 1 {
+		t.Errorf("tags = %v", svc.Tags())
+	}
+}

@@ -110,10 +110,12 @@ type ZitiAppSpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
-	// managementPolicy Manage creates and updates the Ziti entities. Observe only reads the existing service
+	// managementPolicy Manage creates and updates the Ziti entities. Adopt does the same, and also takes over
+	// existing entities that have the names this app would create, replacing them with the desired state.
+	// Adopted entities are released on delete, never deleted. Observe only reads the existing service
 	// named zitiName and reports its status. It never writes to Ziti.
 	// +kubebuilder:default=Manage
-	// +kubebuilder:validation:Enum=Manage;Observe
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
 	// +optional
 	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
 

@@ -248,6 +248,7 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	if err != nil {
 		return nil, err
 	}
+	set.adopt = svc.Spec.ManagementPolicy == zitiv1alpha1.ManagementAdopt
 	ensure := set.ensure
 
 	var ids zitiv1alpha1.EntityIDs

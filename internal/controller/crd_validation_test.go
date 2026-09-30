@@ -67,7 +67,7 @@ var _ = Describe("CRD validation", func() {
 			s.ManagementPolicy = zitiv1.ManagementObserve
 			s.Expose, s.Targets = zitiv1.Expose{}, nil
 		}, ""),
-		Entry("adopt is not allowed for apps", func(s *zitiv1.ZitiAppSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, "Unsupported value"),
+		Entry("adopt is allowed for apps", func(s *zitiv1.ZitiAppSpec) { s.ManagementPolicy = zitiv1.ManagementAdopt }, ""),
 		Entry("no addresses", func(s *zitiv1.ZitiAppSpec) { s.Expose.Addresses = nil }, "addresses"),
 		Entry("unknown protocol", func(s *zitiv1.ZitiAppSpec) { s.Expose.Protocols = []string{"icmp"} }, "Unsupported value"),
 		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiAppSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
