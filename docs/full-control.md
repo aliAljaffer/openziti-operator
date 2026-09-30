@@ -113,8 +113,19 @@ There is no `ZitiTerminator`. The hosting router creates the terminators from th
 
 The kinds can live side by side. An entity is owned by one resource only. If a `ZitiApp` and a `ZitiService` want the same Ziti name, the second one shows `NameConflict`.
 
+## Existing objects
+
+Every kind has `managementPolicy`.
+
+| Value | What happens |
+|---|---|
+| `Manage` (default) | The operator creates the object. An object with the same name that it does not own gives `NameConflict`. |
+| `Adopt` | The operator takes over the existing object named `zitiName`. It updates only the fields the resource sets. An empty list counts as not set, so a hand-made value stays. Config `data` is replaced as a whole. Deleting the resource removes the operator tags and keeps the object. |
+| `Observe` | The operator only reads the object and reports `Ready`. It never writes to Ziti. Give the resource the same `zitiName`. |
+
+An adopted object cannot be cleared by leaving a field out. Change it in Ziti by hand or set the value.
+
 ## Limits
 
-- No `Adopt` or `Observe`. To watch an existing service, use a `ZitiApp` with `managementPolicy: Observe`.
 - Deleting a resource deletes the Ziti object, unless `deletionPolicy: Orphan`.
 - Tested: the whole example above, applied in one go, created a service that a client reached through Ziti.

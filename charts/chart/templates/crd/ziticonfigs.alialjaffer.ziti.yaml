@@ -83,6 +83,17 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
+                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
+                  Observe only reads the existing object and never writes to Ziti.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
               type:
                 description: type is the name of the Ziti config type, for example
                   intercept.v1, host.v1, or host.v2.

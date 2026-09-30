@@ -27,6 +27,7 @@
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the object from Ziti when this resource is deleted. Orphan removes only the operator tags and keeps the object. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.edgeRouterRoles` | list of string | yes |  | edgeRouterRoles select the edge routers the identities may connect to. "#attr" selects by role attribute, "#all" every router, "@name" one router. Minimum items 1. |
 | `spec.identityRoles` | list of string | yes |  | identityRoles select the identities. "#attr" selects by role attribute, "#all" every identity, "@name" one identity. Minimum items 1. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership tags and updates only the fields this resource sets, and it is released on delete, never deleted. Observe only reads the existing object and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.semantic` | string | no | `"AnyOf"` | semantic is AnyOf (an identity needs one of the roles) or AllOf (it needs all of them). One of: `AnyOf`, `AllOf`. |
 | `spec.zitiName` | string | no |  | zitiName is the name of the object in Ziti. It defaults to &lt;namespace&gt;.&lt;name&gt;. It cannot change later. Minimum length 1. Maximum length 1000. |
 

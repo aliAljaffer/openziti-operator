@@ -115,3 +115,87 @@ func TestOneToOneKindsAgainstRealController(t *testing.T) {
 		}
 	}
 }
+
+func TestOneToOneAdoptAndObserveAgainstRealController(t *testing.T) {
+	mgmt := os.Getenv("ZITI_MGMT_URL")
+	if mgmt == "" {
+		t.Skip("ZITI_MGMT_URL not set")
+	}
+	u, _ := url.Parse(mgmt)
+	pool, err := rest_util.GetControllerWellKnownCaPool("https://" + u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := rest_util.NewAuthenticatorUpdb(os.Getenv("ZITI_USERNAME"), os.Getenv("ZITI_PASSWORD"))
+	auth.RootCas = pool
+	real, err := ziti.NewREST(mgmt, auth, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wc := &writeCounter{Client: real}
+
+	// A hand-made policy with a posture check role, which the resource below does not set.
+	handID, err := real.Create(t.Context(), ziti.ServicePolicies, ziti.Entity{"name": "it-hand-dial", "type": "Dial", "semantic": "AnyOf",
+		"identityRoles": []string{"#old"}, "serviceRoles": []string{"#old"}, "postureCheckRoles": []string{"#mfa"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = real.Delete(context.Background(), ziti.ServicePolicies, handID) })
+
+	c := common()
+	c.ZitiName, c.ManagementPolicy = "it-hand-dial", zitiv1.ManagementAdopt
+	pol := &zitiv1.ZitiServicePolicy{ObjectMeta: entityMeta("it-adopt"), Spec: zitiv1.ZitiServicePolicySpec{EntitySpec: c, Type: "Dial",
+		IdentityRoles: []string{"#it-users"}, ServiceRoles: []string{"#it-web"}}}
+	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, pol)
+	r := newEntityReconciler(e.k, e.scheme, staticProvider{wc}, e.rec, "sp", ziti.ServicePolicies, func() *zitiv1.ZitiServicePolicy { return &zitiv1.ZitiServicePolicy{} }, buildServicePolicy)
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "it-adopt"}}
+	if _, err := r.Reconcile(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := real.List(t.Context(), ziti.ServicePolicies, `name="it-hand-dial"`)
+	if len(got) != 1 || got[0].ID() != handID || got[0].Tags()["ziti-operator-adopted"] != "true" ||
+		rolesOf(got[0], "identityRoles") != `["#it-users"]` || rolesOf(got[0], "postureCheckRoles") != `["#mfa"]` {
+		t.Fatalf("adopted = %v", got)
+	}
+	wc.writes = nil
+	if _, err := r.Reconcile(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	if len(wc.writes) != 0 {
+		t.Fatalf("second reconcile wrote: %v", wc.writes)
+	}
+
+	var cur zitiv1.ZitiServicePolicy
+	if err := e.k.Get(t.Context(), req.NamespacedName, &cur); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.k.Delete(t.Context(), &cur); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Reconcile(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = real.List(t.Context(), ziti.ServicePolicies, `name="it-hand-dial"`)
+	if len(got) != 1 || got[0].Tags()["ziti-operator-uid"] != nil || rolesOf(got[0], "postureCheckRoles") != `["#mfa"]` {
+		t.Fatalf("after delete: %v", got)
+	}
+
+	// Observe reads it and never writes.
+	oc := common()
+	oc.ZitiName, oc.ManagementPolicy = "it-hand-dial", zitiv1.ManagementObserve
+	obs := &zitiv1.ZitiServicePolicy{ObjectMeta: entityMeta("it-observe"), Spec: zitiv1.ZitiServicePolicySpec{EntitySpec: oc, Type: "Dial"}}
+	if err := e.k.Create(t.Context(), obs); err != nil {
+		t.Fatal(err)
+	}
+	wc.writes = nil
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "it-observe"}}); err != nil {
+		t.Fatal(err)
+	}
+	var seen zitiv1.ZitiServicePolicy
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "team-a", Name: "it-observe"}, &seen); err != nil {
+		t.Fatal(err)
+	}
+	if len(wc.writes) != 0 || seen.Status.ZitiID != handID {
+		t.Errorf("observe: writes %v, id %q", wc.writes, seen.Status.ZitiID)
+	}
+}

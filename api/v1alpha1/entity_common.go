@@ -31,6 +31,14 @@ type EntitySpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
+	// managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
+	// tags and updates only the fields this resource sets, and it is released on delete, never deleted.
+	// Observe only reads the existing object and never writes to Ziti.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
+
 	// deletionPolicy Delete removes the object from Ziti when this resource is deleted.
 	// Orphan removes only the operator tags and keeps the object. It cannot change after creation.
 	// +kubebuilder:default=Delete

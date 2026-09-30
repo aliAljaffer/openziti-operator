@@ -27,6 +27,7 @@
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the object from Ziti when this resource is deleted. Orphan removes only the operator tags and keeps the object. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.encryptionRequired` | boolean | no | `true` | encryptionRequired makes the traffic end-to-end encrypted. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership tags and updates only the fields this resource sets, and it is released on delete, never deleted. Observe only reads the existing object and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.maxIdleTimeMillis` | integer | no |  | maxIdleTimeMillis closes a circuit after this idle time. Zero means never. Minimum 0. |
 | `spec.roleAttributes` | list of string | no |  | roleAttributes are the groups the service belongs to. They follow the connection roleScope. |
 | `spec.terminatorStrategy` | string | no | `"smartrouting"` | terminatorStrategy is how Ziti picks a terminator: smartrouting, random, or another strategy your controller knows. |

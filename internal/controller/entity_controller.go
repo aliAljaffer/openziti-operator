@@ -83,7 +83,7 @@ func (r *entityReconciler[T]) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !obj.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, obj)
 	}
-	if controllerutil.AddFinalizer(obj, Finalizer) {
+	if obj.EntityCommon().ManagementPolicy != zitiv1.ManagementObserve && controllerutil.AddFinalizer(obj, Finalizer) {
 		if err := r.Update(ctx, obj); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -135,6 +135,10 @@ func (r *entityReconciler[T]) finalize(ctx context.Context, obj T) error {
 		return nil
 	}
 	c := obj.EntityCommon()
+	if c.ManagementPolicy == zitiv1.ManagementObserve {
+		controllerutil.RemoveFinalizer(obj, Finalizer)
+		return r.Update(ctx, obj)
+	}
 	_, zc, err := connect(ctx, r.Client, r.Clients, c.ConnectionRef)
 	if err != nil {
 		r.Recorder.Eventf(obj, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -161,6 +165,9 @@ func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.Ziti
 	if strings.ContainsAny(name, `"\`) {
 		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
 	}
+	if obj.EntityCommon().ManagementPolicy == zitiv1.ManagementObserve {
+		return r.observe(ctx, obj, zc, name)
+	}
 	res := &resolver{ctx: ctx, zc: zc}
 	body, err := r.Build(res, obj, conn)
 	if res.err != nil {
@@ -178,6 +185,7 @@ func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.Ziti
 	if err != nil {
 		return err
 	}
+	set.adopt = obj.EntityCommon().ManagementPolicy == zitiv1.ManagementAdopt
 	id, err := set.ensure(ctx, r.Kind, body)
 	if err != nil {
 		return err
@@ -189,6 +197,22 @@ func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.Ziti
 	st.ZitiID = id
 	setCond(&st.Conditions, obj.GetGeneration(), CondSynced, true, "Synced", "", "")
 	setCond(&st.Conditions, obj.GetGeneration(), CondReady, true, "Ready", "", "")
+	return nil
+}
+
+// observe reports on an object that was created outside this operator. It never writes to Ziti.
+func (r *entityReconciler[T]) observe(ctx context.Context, obj T, zc ziti.Client, name string) error {
+	found, err := zc.List(ctx, r.Kind, `name="`+name+`"`)
+	if err != nil {
+		return err
+	}
+	if len(found) == 0 {
+		return &specError{"NotFound", string(r.Kind) + " " + `"` + name + `"` + " not found in Ziti"}
+	}
+	st := obj.EntityState()
+	st.ZitiID = found[0].ID()
+	setCond(&st.Conditions, obj.GetGeneration(), CondSynced, true, "Observed", "", "")
+	setCond(&st.Conditions, obj.GetGeneration(), CondReady, true, "Observed", "", "")
 	return nil
 }
 

@@ -91,6 +91,17 @@ spec:
                   type: string
                 minItems: 1
                 type: array
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership
+                  tags and updates only the fields this resource sets, and it is released on delete, never deleted.
+                  Observe only reads the existing object and never writes to Ziti.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
               semantic:
                 default: AnyOf
                 description: semantic is AnyOf (an identity needs one of the roles)

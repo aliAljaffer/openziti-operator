@@ -27,6 +27,7 @@
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the object from Ziti when this resource is deleted. Orphan removes only the operator tags and keeps the object. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.identityRoles` | list of string | yes |  | identityRoles select the identities. "#attr" selects by role attribute, "#all" every identity, "@name" one identity. Minimum items 1. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the object. Adopt takes over an existing object named zitiName: it adds ownership tags and updates only the fields this resource sets, and it is released on delete, never deleted. Observe only reads the existing object and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.postureCheckRoles` | list of string | no |  | postureCheckRoles select the posture checks that identities must pass. |
 | `spec.semantic` | string | no | `"AnyOf"` | semantic is AnyOf (an identity needs one of the roles) or AllOf (it needs all of them). One of: `AnyOf`, `AllOf`. |
 | `spec.serviceRoles` | list of string | yes |  | serviceRoles select the services. "#attr" selects by role attribute, "#all" every service, "@name" one service. Minimum items 1. |

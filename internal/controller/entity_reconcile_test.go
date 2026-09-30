@@ -264,3 +264,66 @@ func TestEntityNameConflictDeleteAndOrphan(t *testing.T) {
 		}
 	}
 }
+
+func TestEntityAdoptTakesOverKeepsHandMadeFieldsAndReleasesOnDelete(t *testing.T) {
+	newObj := func() *zitiv1.ZitiServicePolicy { return &zitiv1.ZitiServicePolicy{} }
+	c := common()
+	c.ManagementPolicy = zitiv1.ManagementAdopt
+	pol := &zitiv1.ZitiServicePolicy{ObjectMeta: entityMeta("dial"), Spec: zitiv1.ZitiServicePolicySpec{EntitySpec: c, Type: "Dial",
+		IdentityRoles: []string{"#users"}, ServiceRoles: []string{"#web"}}}
+	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, pol)
+	e.zc.Put(ziti.ServicePolicies, ziti.Entity{"id": "hand", "name": "team-a.dial", "postureCheckRoles": []any{"#mfa"}, "tags": map[string]any{"team": "x"}})
+
+	obj, _ := reconcileEntity(t, e, "dial", ziti.ServicePolicies, newObj, buildServicePolicy)
+	if obj.Status.ZitiID != "hand" || readyOf(obj).Status != metav1.ConditionTrue {
+		t.Fatalf("status = %+v, ready %+v", obj.Status, readyOf(obj))
+	}
+	got := e.zc.Objects[ziti.ServicePolicies]["hand"]
+	if rolesOf(got, "postureCheckRoles") != `["#mfa"]` || rolesOf(got, "identityRoles") != `["#users"]` ||
+		got.Tags()["team"] != "x" || got.Tags()["ziti-operator-adopted"] != "true" {
+		t.Errorf("adopted = %v", got)
+	}
+
+	if err := e.k.Delete(t.Context(), obj); err != nil {
+		t.Fatal(err)
+	}
+	r := newEntityReconciler(e.k, e.scheme, staticProvider{e.zc}, e.rec, "test", ziti.ServicePolicies, newObj, buildServicePolicy)
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "dial"}}); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := e.zc.Objects[ziti.ServicePolicies]["hand"]
+	if !ok || got.Tags()["team"] != "x" || got.Tags()["ziti-operator-adopted"] != nil || got.Tags()["ziti-operator-uid"] != nil {
+		t.Errorf("after delete: %v", got)
+	}
+}
+
+func TestEntityObserveReadsWithoutWriting(t *testing.T) {
+	newObj := func() *zitiv1.ZitiService { return &zitiv1.ZitiService{} }
+	c := common()
+	c.ManagementPolicy, c.ZitiName = zitiv1.ManagementObserve, "legacy"
+	svc := &zitiv1.ZitiService{ObjectMeta: entityMeta("legacy"), Spec: zitiv1.ZitiServiceSpec{EntitySpec: c}}
+	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, svc)
+
+	obj, _ := reconcileEntity(t, e, "legacy", ziti.Services, newObj, buildService)
+	if obj.Status.ZitiID != "s-1" || readyOf(obj).Reason != "Observed" {
+		t.Fatalf("status = %+v, ready %+v", obj.Status, readyOf(obj))
+	}
+	for _, call := range e.zc.Calls {
+		if !strings.HasPrefix(call, "list") {
+			t.Errorf("observe wrote: %s", call)
+		}
+	}
+	if len(obj.Finalizers) != 0 {
+		t.Errorf("finalizers = %v", obj.Finalizers)
+	}
+
+	c.ZitiName = "nope"
+	obj.Spec.EntitySpec = c
+	if err := e.k.Update(t.Context(), obj); err != nil {
+		t.Fatal(err)
+	}
+	obj, _ = reconcileEntity(t, e, "legacy", ziti.Services, newObj, buildService)
+	if readyOf(obj).Reason != "NotFound" {
+		t.Errorf("missing object: %+v", readyOf(obj))
+	}
+}

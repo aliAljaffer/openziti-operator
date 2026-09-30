@@ -46,7 +46,7 @@ func (s *entitySet) ensure(ctx context.Context, kind ziti.Kind, body ziti.Entity
 	if ex, ok := s.existing[kind][body.Name()]; ok {
 		s.keep[kind][ex.ID()] = true
 		if isAdopted(ex) {
-			body["tags"] = adoptedTags(ex, body)
+			body = adoptedBody(ex, body)
 		}
 		if !desired.Matches(body, ex) {
 			if err := s.write(ctx, kind, ex.ID(), body, isAdopted(ex)); err != nil {
@@ -80,13 +80,30 @@ func (s *entitySet) adoptClash(ctx context.Context, kind ziti.Kind, body, clash 
 	if owner, _ := clash.Tags()[desired.TagUID].(string); owner != "" {
 		return "", &specError{"NameConflict", fmt.Sprintf("%s %q is already managed by another resource", kind, body.Name())}
 	}
-	body["tags"] = adoptedTags(clash, body)
+	body = adoptedBody(clash, body)
 	if err := s.write(ctx, kind, clash.ID(), body, true); err != nil {
 		return "", err
 	}
 	s.keep[kind][clash.ID()] = true
 	s.rec.Eventf(s.obj, "Normal", "Adopted", "adopted %s %s", kind, body.Name())
 	return clash.ID(), nil
+}
+
+// adoptedBody prepares the desired body for an adopted entity: the tags are merged, and an empty list counts as "not set",
+// so a hand-made value in that field stays. An empty list cannot clear a field of an adopted entity.
+func adoptedBody(existing, body ziti.Entity) ziti.Entity {
+	out := ziti.Entity{}
+	for k, v := range body {
+		if l, ok := v.([]string); ok && len(l) == 0 {
+			continue
+		}
+		if l, ok := v.([]any); ok && len(l) == 0 {
+			continue
+		}
+		out[k] = v
+	}
+	out["tags"] = adoptedTags(existing, body)
+	return out
 }
 
 // adoptedTags merges the existing tags, the desired tags, and the adopted mark. A PATCH on tags replaces the whole map.
