@@ -52,6 +52,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Publish the Helm chart
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="${REF_NAME#v}"
+          echo "$GH_TOKEN" | helm registry login ghcr.io --username "$ACTOR" --password-stdin
+          helm package charts/chart --version "$version" --app-version "$version" --destination "$RUNNER_TEMP/chart"
+          helm push "$RUNNER_TEMP/chart/ziti-operator-${version}.tgz" "oci://ghcr.io/${OWNER,,}/charts"
+
       - name: Create the GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
