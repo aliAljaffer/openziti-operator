@@ -375,9 +375,11 @@ func (r *ZitiCAReconciler) removeProofCertificate(ctx context.Context, ca *zitiv
 }
 
 func (r *ZitiCAReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiCA{}).
-		Named("zitica").
+		Named("zitica")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiCAList{} },
+		func(o *zitiv1alpha1.ZitiCA) string { return o.Spec.ConnectionRef }, false).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

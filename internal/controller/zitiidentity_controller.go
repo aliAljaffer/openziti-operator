@@ -601,10 +601,12 @@ func (r *ZitiIdentityReconciler) ensureCertificate(ctx context.Context, id *ziti
 }
 
 func (r *ZitiIdentityReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiIdentity{}).
 		Owns(&corev1.Secret{}).
-		Named("zitiidentity").
+		Named("zitiidentity")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiIdentityList{} },
+		func(o *zitiv1alpha1.ZitiIdentity) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).
 		Complete(r)
 }

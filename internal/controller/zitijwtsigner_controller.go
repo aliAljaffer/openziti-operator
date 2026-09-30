@@ -211,9 +211,11 @@ func (r *ZitiJwtSignerReconciler) sync(ctx context.Context, sg *zitiv1alpha1.Zit
 }
 
 func (r *ZitiJwtSignerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiJwtSigner{}).
-		Named("zitijwtsigner").
+		Named("zitijwtsigner")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiJwtSignerList{} },
+		func(o *zitiv1alpha1.ZitiJwtSigner) string { return o.Spec.ConnectionRef }, false).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

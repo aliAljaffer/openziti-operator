@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -216,9 +217,18 @@ func (r *entityReconciler[T]) observe(ctx context.Context, obj T, zc ziti.Client
 }
 
 func (r *entityReconciler[T]) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	gvk, err := apiutil.GVKForObject(r.New(), mgr.GetScheme())
+	if err != nil {
+		return err
+	}
+	gvk.Kind += "List"
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(r.New()).
-		Named(r.Name).
+		Named(r.Name)
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList {
+		l, _ := mgr.GetScheme().New(gvk)
+		return l.(client.ObjectList)
+	}, func(o T) string { return o.EntityCommon().ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

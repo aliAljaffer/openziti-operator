@@ -188,9 +188,11 @@ func (r *ZitiAccessPolicyReconciler) sync(ctx context.Context, ap *zitiv1alpha1.
 }
 
 func (r *ZitiAccessPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiAccessPolicy{}).
-		Named("zitiaccesspolicy").
+		Named("zitiaccesspolicy")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiAccessPolicyList{} },
+		func(o *zitiv1alpha1.ZitiAccessPolicy) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).
 		Complete(r)
 }

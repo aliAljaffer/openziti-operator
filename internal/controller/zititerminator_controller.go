@@ -202,9 +202,11 @@ func sameNumber(actual any, want int32) bool {
 }
 
 func (r *ZitiTerminatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiTerminator{}).
-		Named("zititerminator").
+		Named("zititerminator")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiTerminatorList{} },
+		func(o *zitiv1alpha1.ZitiTerminator) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

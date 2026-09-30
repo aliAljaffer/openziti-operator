@@ -235,9 +235,11 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 }
 
 func (r *ZitiRouterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiRouter{}).
-		Named("zitirouter").
+		Named("zitirouter")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiRouterList{} },
+		func(o *zitiv1alpha1.ZitiRouter) string { return o.Spec.ConnectionRef }, false).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

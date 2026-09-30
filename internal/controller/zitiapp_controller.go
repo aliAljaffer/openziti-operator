@@ -466,9 +466,11 @@ func markFailed(conds *[]metav1.Condition, gen int64, reason, msg string) {
 }
 
 func (r *ZitiAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiApp{}).
-		Named("zitiapp").
+		Named("zitiapp")
+	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiAppList{} },
+		func(o *zitiv1alpha1.ZitiApp) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).
 		Complete(r)
 }
