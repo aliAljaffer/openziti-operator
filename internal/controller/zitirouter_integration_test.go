@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -167,5 +168,89 @@ func TestRouterEnrollsWithDeliveredJWT(t *testing.T) {
 		if _, ok := secret.Data[SecretKeyJWT]; ok {
 			t.Error("the JWT must leave the Secret once the router has enrolled")
 		}
+	}
+}
+
+// Applies the deployment.yaml that the operator writes to the Secret. Needs ZITI_KUBECTL (kubectl and its cluster flags)
+// and ZITI_K8S_NAMESPACE, and a controller that the router pod can reach at the address in its enrollment JWT.
+func TestRouterKubernetesManifestOnCluster(t *testing.T) {
+	mgmt, kubectl, ns := os.Getenv("ZITI_MGMT_URL"), strings.Fields(os.Getenv("ZITI_KUBECTL")), os.Getenv("ZITI_K8S_NAMESPACE")
+	if mgmt == "" || len(kubectl) == 0 || ns == "" {
+		t.Skip("ZITI_MGMT_URL, ZITI_KUBECTL or ZITI_K8S_NAMESPACE not set")
+	}
+	u, _ := url.Parse(mgmt)
+	pool, err := rest_util.GetControllerWellKnownCaPool("https://" + u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := rest_util.NewAuthenticatorUpdb(os.Getenv("ZITI_USERNAME"), os.Getenv("ZITI_PASSWORD"))
+	auth.RootCas = pool
+	real, err := ziti.NewREST(mgmt, auth, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := func(stdin string, args ...string) ([]byte, error) {
+		cmd := exec.Command(kubectl[0], append(append([]string{}, kubectl[1:]...), append([]string{"-n", ns}, args...)...)...)
+		cmd.Stdin = strings.NewReader(stdin)
+		return cmd.CombinedOutput()
+	}
+
+	e := setupRouter(t, func(r *zitiv1.ZitiRouter) {
+		r.Spec.ZitiName, r.Spec.AdvertisedAddress = "it-k8s-router", "it-k8s-router."+ns+".svc"
+	})
+	e.r.Clients = staticProvider{real}
+	version, err := real.Version(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = version
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	var manifest string
+	t.Cleanup(func() {
+		ctx := context.Background()
+		if manifest != "" {
+			_, _ = k(manifest, "delete", "-f", "-", "--wait=true", "--timeout=60s")
+		}
+		var rt zitiv1.ZitiRouter
+		if e.k.Get(ctx, e.key, &rt) == nil {
+			_ = e.k.Delete(ctx, &rt)
+			_, _ = e.r.Reconcile(ctx, ctrl.Request{NamespacedName: e.key})
+		}
+	})
+
+	e.reconcile(t)
+	var secret corev1.Secret
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-enrollment"}, &secret); err != nil {
+		t.Fatal(err)
+	}
+	manifest = string(secret.Data[SecretKeyDeployment])
+	if manifest == "" {
+		t.Fatal("no deployment.yaml delivered")
+	}
+	if out, err := k(manifest, "apply", "-f", "-"); err != nil {
+		t.Fatalf("kubectl apply: %v: %s", err, out)
+	}
+
+	var rt *zitiv1.ZitiRouter
+	for range 90 {
+		rt = e.reconcile(t)
+		if rt.Status.Enrolled && rt.Status.Online {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if !rt.Status.Enrolled || !rt.Status.Online {
+		out, _ := k("", "get", "pods,pvc,svc", "-o", "wide")
+		logs, _ := k("", "logs", "deploy/it-k8s-router", "--tail=30")
+		t.Fatalf("status = %+v\n%s\nrouter log:\n%s", rt.Status, out, logs)
+	}
+	if out, err := k("", "rollout", "status", "deploy/it-k8s-router", "--timeout=60s"); err != nil {
+		t.Errorf("rollout: %v: %s", err, out)
 	}
 }
