@@ -17,7 +17,7 @@ manager:
   replicas: 2
 
   image:
-    repository: controller
+    repository: ghcr.io/alialjaffer/openziti-operator
     ## Image tag (defaults to Chart.appVersion if not set)
     ##
     # tag: ""
