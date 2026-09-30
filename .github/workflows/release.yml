@@ -8,8 +8,49 @@ on:
 permissions: {}
 
 jobs:
+  verify:
+    name: CI passed for this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for the tests of the tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          workflows=("Tests" "Lint" "Integration Tests" "E2E Tests" "Test Chart" "Data Hygiene")
+          deadline=$((SECONDS + ${VERIFY_TIMEOUT:-1800}))
+          while true; do
+            pending=0
+            for wf in "${workflows[@]}"; do
+              runs=$(gh run list --repo "$REPO" --commit "$SHA" --workflow "$wf" --json status,conclusion --limit 20)
+              ok=$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$runs")
+              running=$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")
+              if [ "$ok" -ge 1 ]; then
+                continue
+              elif [ "$running" -ge 1 ]; then
+                pending=1
+              else
+                echo "::error::No successful \"$wf\" run for commit $SHA. Push the commit to main, wait for CI, then re-run this workflow."
+                exit 1
+              fi
+            done
+            [ "$pending" -eq 0 ] && break
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::CI for commit $SHA did not finish in time."
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "CI passed for $SHA"
+
   image:
     name: Build and push the image
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write

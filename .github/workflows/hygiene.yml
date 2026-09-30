@@ -2,6 +2,7 @@ name: Data Hygiene
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions: {}
