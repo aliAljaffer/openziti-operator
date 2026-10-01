@@ -16,6 +16,7 @@ PAGES = {
     "README.md": "Home",
     "docs/install.md": "Installation",
     "docs/first-app.md": "Your-First-App",
+    "docs/ca-bundle.md": "CA-Bundle",
     "docs/service-account-tokens.md": "Service-Account-Tokens",
     "docs/cert-manager.md": "cert-manager-CA",
     "docs/full-control.md": "Full-Control",
@@ -44,6 +45,7 @@ SIDEBAR = """**[Home](Home)**
 **Get started**
 - [Installation](Installation)
 - [Your first app](Your-First-App)
+- [CA bundle](CA-Bundle)
 - [Role scope](Role-Scope)
 - [Existing Ziti resources](Existing-Resources)
 - [Service account tokens](Service-Account-Tokens)

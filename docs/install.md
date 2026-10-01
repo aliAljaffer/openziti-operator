@@ -4,7 +4,7 @@
 
 - A Ziti controller with the Edge Management API reachable from the cluster.
 - A Ziti identity that may call the management API. An admin identity works.
-- The controller CA certificate.
+- The controller CA certificate. See [CA bundle](ca-bundle.md) to extract it or to create your own.
 
 ## Install with Helm
 
