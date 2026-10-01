@@ -3,7 +3,27 @@ name: Tests
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.claude/**'
+      - '.devcontainer/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.github/FUNDING.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/wiki.yml'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.claude/**'
+      - '.devcontainer/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.github/FUNDING.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/wiki.yml'
 
 permissions: {}
 

@@ -22,20 +22,54 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          workflows=("Tests" "Lint" "Integration Tests" "E2E Tests" "Test Chart" "Data Hygiene")
+          sentinel="Data Hygiene"
+          workflows=("Tests" "Lint" "Integration Tests" "E2E Tests" "Test Chart")
           deadline=$((SECONDS + ${VERIFY_TIMEOUT:-1800}))
+
+          runs_of() {
+            gh run list --repo "$REPO" --commit "$SHA" --workflow "$1" \
+              --json status,conclusion --limit 20
+          }
+          succeeded() { jq -e 'any(.[]; .conclusion == "success")' >/dev/null <<<"$1"; }
+          running() { jq -e 'any(.[]; .status != "completed")' >/dev/null <<<"$1"; }
+
+          # Data Hygiene runs for every push to main, so it proves the commit
+          # reached CI. A path-filtered workflow has no run at all, which must
+          # not be mistaken for CI that never ran.
+          while true; do
+            runs=$(runs_of "$sentinel")
+            if succeeded "$runs"; then
+              break
+            fi
+            if [ "$(jq 'length' <<<"$runs")" -gt 0 ] && ! running "$runs"; then
+              echo "::error::$sentinel did not pass for commit $SHA."
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::CI for commit $SHA did not finish in time. Push the commit to main, wait for CI, then re-run this workflow."
+              exit 1
+            fi
+            sleep 30
+          done
+
+          # Let the other workflows register before treating a missing run as a
+          # path filter skip.
+          sleep 30
           while true; do
             pending=0
             for wf in "${workflows[@]}"; do
-              runs=$(gh run list --repo "$REPO" --commit "$SHA" --workflow "$wf" --json status,conclusion --limit 20)
-              ok=$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$runs")
-              running=$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")
-              if [ "$ok" -ge 1 ]; then
+              runs=$(runs_of "$wf")
+              if [ "$(jq 'length' <<<"$runs")" -eq 0 ]; then
+                echo "$wf was skipped for $SHA, the changed paths do not need it"
                 continue
-              elif [ "$running" -ge 1 ]; then
+              fi
+              if succeeded "$runs"; then
+                continue
+              fi
+              if running "$runs"; then
                 pending=1
               else
-                echo "::error::No successful \"$wf\" run for commit $SHA. Push the commit to main, wait for CI, then re-run this workflow."
+                echo "::error::$wf did not pass for commit $SHA."
                 exit 1
               fi
             done
