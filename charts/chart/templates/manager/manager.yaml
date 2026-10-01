@@ -90,6 +90,27 @@ spec:
         {{- if .Values.rbac.secretNamespaces }}
         - --secret-namespaces={{ include "ziti-operator.secretNamespaces" . }}
         {{- end }}
+        {{- if .Values.connection.managerCreates }}
+        - --create-connection
+        - --connection.management-url={{ .Values.connection.managementUrl }}
+        - --connection.ca-bundle-configmap={{ .Values.connection.caBundle.configMapName }}
+        - --connection.ca-bundle-key={{ .Values.connection.caBundle.key }}
+        - --connection.role-scope={{ .Values.connection.roleScope }}
+        - --connection.cluster-id={{ .Values.connection.clusterId }}
+        - --connection.hosting-routers={{ join "," .Values.connection.hostingRouters }}
+        {{- if .Values.connection.entryRouters }}
+        - --connection.entry-routers={{ join "," .Values.connection.entryRouters }}
+        {{- end }}
+        {{- if .Values.connection.defaultEdgeRouters }}
+        - --connection.default-edge-routers={{ join "," .Values.connection.defaultEdgeRouters }}
+        {{- end }}
+        {{- if .Values.connection.auth.updb.secretName }}
+        - --connection.auth.updb.secret={{ .Values.connection.auth.updb.secretName }}
+        {{- end }}
+        {{- if .Values.connection.auth.cert.secretName }}
+        - --connection.auth.cert.secret={{ .Values.connection.auth.cert.secretName }}
+        {{- end }}
+        {{- end }}
         {{- range .Values.manager.args }}
         - {{ tpl . $ }}
         {{- end }}
@@ -106,6 +127,13 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        env:
+        # The namespace the manager runs in, used by --create-connection to place
+        # the CA bundle and credential Secret references.
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         ports:
         - containerPort: {{ .Values.manager.healthProbe.port }}
           name: health

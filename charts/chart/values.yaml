@@ -128,6 +128,10 @@ operator:
 connection:
   create: false
   name: default
+  # When true the chart does not render a ZitiConnection hook; the manager
+  # creates one named "default" from the connection values below. Use this with
+  # GitOps so the connection is a normal, tracked resource.
+  managerCreates: false
   ## Edge Management API URL. Required when create is true. Must start with https://
   managementUrl: ""
   ## Controller CA certificate. The ConfigMap must be in the release namespace.

@@ -1,4 +1,4 @@
-{{- if .Values.connection.create }}
+{{- if and .Values.connection.create (not .Values.connection.managerCreates) }}
 {{- $c := .Values.connection }}
 {{- if not $c.managementUrl }}{{ fail "connection.managementUrl is required when connection.create is true" }}{{ end }}
 {{- if not $c.hostingRouters }}{{ fail "connection.hostingRouters needs at least one router when connection.create is true" }}{{ end }}

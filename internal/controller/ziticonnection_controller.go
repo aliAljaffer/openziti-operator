@@ -18,16 +18,20 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
 )
 
 const (
@@ -40,6 +44,16 @@ type ZitiConnectionReconciler struct {
 	client.Client
 	Scheme  *runtime.Scheme
 	Clients ClientProvider
+	// CreateConnection makes the reconciler create a ZitiConnection named
+	// "default" when none exists. The resource has no owner, so it survives the
+	// release being uninstalled. The spec is built from ConnectionFlags and
+	// Namespace.
+	CreateConnection bool
+	// ConnectionFlags defines the connection the manager creates and uses.
+	ConnectionFlags providerflags.Flags
+	// Namespace is the operator namespace, where the CA bundle ConfigMap and, by
+	// default, the credential Secret live.
+	Namespace string
 }
 
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections,verbs=get;list;watch;create;update;patch;delete
@@ -47,7 +61,38 @@ type ZitiConnectionReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonnections/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets;configmaps,verbs=get;list;watch
 
+// Reconcile ensures a ZitiConnection exists when Create is set, then reports
+// whether the controller is reachable.
 func (r *ZitiConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if r.CreateConnection {
+		if err := r.ensureDefaultConnection(ctx); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return r.reconcileConnection(ctx, req)
+}
+
+// ensureDefaultConnection creates the "default" ZitiConnection from the manager
+// flags when it is missing. It writes nothing if a connection already exists,
+// so a user may replace or add their own.
+func (r *ZitiConnectionReconciler) ensureDefaultConnection(ctx context.Context) error {
+	const name = "default"
+	var existing zitiv1alpha1.ZitiConnection
+	err := r.Get(ctx, types.NamespacedName{Name: name}, &existing)
+	if err == nil || !apierrors.IsNotFound(err) {
+		return err
+	}
+	spec, err := r.ConnectionFlags.Decode(r.Namespace)
+	if err != nil {
+		return fmt.Errorf("--create-connection: %w", err)
+	}
+	return r.Create(ctx, &zitiv1alpha1.ZitiConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       spec,
+	})
+}
+
+func (r *ZitiConnectionReconciler) reconcileConnection(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var conn zitiv1alpha1.ZitiConnection
 	if err := r.Get(ctx, req.NamespacedName, &conn); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

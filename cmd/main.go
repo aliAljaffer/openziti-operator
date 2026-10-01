@@ -44,6 +44,7 @@ import (
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
+	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -75,6 +76,8 @@ func main() {
 	var secretNamespaces string
 	var leaderElectionNamespace string
 	var orphanInterval time.Duration
+	var createZitiConnection bool
+	var connectionFlags providerflags.Flags
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -108,6 +111,10 @@ func main() {
 	flag.StringVar(&orphanPolicy, "orphan-policy", string(controller.OrphanReport),
 		"What to do with Ziti entities of this cluster whose owner resource is gone: report or delete.")
 	flag.DurationVar(&orphanInterval, "orphan-sweep-interval", time.Hour, "How often to look for orphaned Ziti entities.")
+	flag.BoolVar(&createZitiConnection, "create-connection", false,
+		"Create a ZitiConnection named \"default\" in the operator namespace from the connection flags if none exists. "+
+			"The generated resource has no owner, so it is not pruned when the release is uninstalled.")
+	connectionFlags.Bind(flag.CommandLine)
 	flag.Parse()
 	if orphanPolicy != string(controller.OrphanReport) && orphanPolicy != string(controller.OrphanDelete) {
 		setupLog.Error(nil, "Invalid --orphan-policy, use report or delete", "value", orphanPolicy)
@@ -215,9 +222,12 @@ func main() {
 
 	clients := &controller.SecretClientProvider{Reader: mgr.GetAPIReader(), RequestsPerSecond: zitiRequestsPerSecond}
 	if err := (&controller.ZitiConnectionReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Clients: clients,
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Clients:          clients,
+		CreateConnection: createZitiConnection,
+		ConnectionFlags:  connectionFlags,
+		Namespace:        operatorNamespace(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "ziticonnection")
 		os.Exit(1)
@@ -336,16 +346,6 @@ func main() {
 }
 
 // secretCache limits the Secret informer to labeled Secrets, and to the given namespaces when set.
-func splitList(v string) []string {
-	var out []string
-	for s := range strings.SplitSeq(v, ",") {
-		if s = strings.TrimSpace(s); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 func secretCache(namespaces string) cache.ByObject {
 	managed := labels.Set{controller.ManagedByLabel: controller.ManagedByLabelValue}
 	byObject := cache.ByObject{Label: labels.SelectorFromSet(managed)}
@@ -358,4 +358,28 @@ func secretCache(namespaces string) cache.ByObject {
 		}
 	}
 	return byObject
+}
+
+// operatorNamespace is the namespace the manager runs in. The manager sets
+// OPERATOR_NAMESPACE; the fallback reads the mounted service account namespace
+// so tests and out-of-cluster runs also work.
+func operatorNamespace() string {
+	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
+		return ns
+	}
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+	return ""
+}
+
+// splitList splits a comma separated flag into a trimmed, non-empty list.
+func splitList(v string) []string {
+	var out []string
+	for s := range strings.SplitSeq(v, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
