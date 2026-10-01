@@ -2,6 +2,8 @@
 
 Workloads can log in to Ziti with certificates that cert-manager issues and renews. There is no enrollment step, no JWT, and no identity file that the operator must keep. A renewed certificate finds its identity again because Ziti matches the name in the certificate, not the certificate itself.
 
+The CA bundle that the `ZitiConnection` uses to trust the controller is a different thing. To extract it or create your own, see [CA bundle](ca-bundle.md).
+
 ## How it works
 
 1. A cert-manager CA Issuer keeps a CA certificate and key in a Secret (`tls.crt`, `tls.key`).
