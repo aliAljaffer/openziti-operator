@@ -37,11 +37,11 @@
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy does not apply to adopted identities. Those are released, never deleted. One of: `Delete`, `Orphan`. |
 | `spec.enrollmentMode` | string | no | `"JwtOnly"` | enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it. OperatorEnrolled makes the operator enroll and write identity.json to the Secret. None creates an identity without enrollment. It logs in with a token, so authPolicy is required. One of: `JwtOnly`, `OperatorEnrolled`, `None`. |
 | `spec.externalId` | string | no |  | externalId is the value that a token claim must match to log in as this identity, for an identity provider other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject. Maximum length 1000. |
-| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName: it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity. Observe only reads the existing identity and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName. Set zitiName to the exact existing name, because the default name differs: it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity. Observe only reads the existing identity and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.roleAttributes` | list of string | no |  | roleAttributes follow the connection roleScope, like ZitiApp roleAttributes. |
 | `spec.secretName` | string | no |  | secretName receives "enrollment.jwt" or "identity.json", by enrollmentMode. It defaults to the CR name. Maximum length 253. |
 | `spec.serviceAccount` | string | no |  | serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity. It sets externalId to system:serviceaccount:&lt;namespace&gt;:&lt;name&gt;. Needs a ZitiJwtSigner and an authPolicy that allows it. Maximum length 253. |
-| `spec.zitiName` | string | no |  | zitiName defaults to &lt;namespace&gt;.&lt;name&gt;. Minimum length 1. Maximum length 1000. |
+| `spec.zitiName` | string | no |  | zitiName defaults to &lt;clusterId&gt;-&lt;namespace&gt;-&lt;name&gt;. Identities created before this default keep &lt;namespace&gt;.&lt;name&gt;. Minimum length 1. Maximum length 1000. |
 
 ## Validation rules
 
@@ -70,6 +70,7 @@ The API server rejects a resource that breaks one of these rules.
 | `status.enrollmentExpiresAt` | string |  |
 | `status.observedGeneration` | integer |  |
 | `status.zitiId` | string |  |
+| `status.zitiName` | string | zitiName is the name the identity has in Ziti. It is set once and does not change. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).
 

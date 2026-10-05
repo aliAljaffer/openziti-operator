@@ -33,7 +33,7 @@ type ZitiIdentitySpec struct {
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
 
-	// zitiName defaults to <namespace>.<name>.
+	// zitiName defaults to <clusterId>-<namespace>-<name>. Identities created before this default keep <namespace>.<name>.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000
 	// +optional
@@ -78,7 +78,7 @@ type ZitiIdentitySpec struct {
 	// +optional
 	Certificate *WorkloadCertificate `json:"certificate,omitempty"`
 
-	// managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName:
+	// managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName. Set zitiName to the exact existing name, because the default name differs:
 	// it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity.
 	// Observe only reads the existing identity and never writes to Ziti.
 	// +kubebuilder:default=Manage
@@ -129,6 +129,9 @@ const (
 type ZitiIdentityStatus struct {
 	// +optional
 	ZitiID string `json:"zitiId,omitempty"`
+	// zitiName is the name the identity has in Ziti. It is set once and does not change.
+	// +optional
+	ZitiName string `json:"zitiName,omitempty"`
 	// +optional
 	Enrolled bool `json:"enrolled,omitempty"`
 	// +optional

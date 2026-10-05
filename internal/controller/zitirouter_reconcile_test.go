@@ -88,7 +88,7 @@ func TestRouterIsCreatedAndItsJWTGoesToTheSecretOnly(t *testing.T) {
 	rt := e.reconcile(t)
 
 	got := e.router()
-	if got.Name() != "edge-1" || got["isTunnelerEnabled"] != true || got["cost"] != float64(10) && got["cost"] != int32(10) || got["noTraversal"] != false {
+	if got.Name() != "default-edge-1" || got["isTunnelerEnabled"] != true || got["cost"] != float64(10) && got["cost"] != int32(10) || got["noTraversal"] != false {
 		t.Errorf("router = %v", got)
 	}
 	s, err := e.secret(t)

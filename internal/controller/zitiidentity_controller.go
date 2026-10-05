@@ -182,7 +182,7 @@ func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "tru
 
 //nolint:gocyclo // one branch per enrollment mode and management policy, split when it grows
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
-	name := desired.IdentityName(id)
+	name := desired.IdentityName(id, conn)
 	if strings.ContainsAny(name, `"\`) {
 		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
 	}
@@ -277,7 +277,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		}
 	}
 
-	id.Status.ZitiID = zid.ID()
+	id.Status.ZitiID, id.Status.ZitiName = zid.ID(), name
 	setCond(&id.Status.Conditions, id.Generation, CondSynced, true, "Synced", "", "")
 
 	// The identity list shows a non-empty authenticators map after enrollment.

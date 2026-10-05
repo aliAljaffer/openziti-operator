@@ -131,7 +131,7 @@ func TestSignerAndTokenLoginAgainstRealController(t *testing.T) {
 	claims := func(aud, sub string) map[string]any {
 		return map[string]any{"iss": issuer, "aud": aud, "sub": sub, "exp": time.Now().Add(10 * time.Minute).Unix(), "iat": time.Now().Unix()}
 	}
-	if code, name := login(signRS256(t, key, "it-key", claims("ziti", "system:serviceaccount:team-a:web"))); code != http.StatusOK || name != "team-a.backend" {
+	if code, name := login(signRS256(t, key, "it-key", claims("ziti", "system:serviceaccount:team-a:web"))); code != http.StatusOK || name != "default-team-a-backend" {
 		t.Errorf("valid token: status %d, identity %q", code, name)
 	}
 	if code, _ := login(signRS256(t, key, "it-key", claims("other", "system:serviceaccount:team-a:web"))); code == http.StatusOK {

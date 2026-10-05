@@ -110,7 +110,7 @@ func TestIdentityCreatesAndPublishesJWTOnly(t *testing.T) {
 
 	z := e.get(t)
 	body := e.identity()
-	if body.Name() != "team-a.backend" || body["type"] != "Default" || body["isAdmin"] != false {
+	if body.Name() != "default-team-a-backend" || body["type"] != "Default" || body["isAdmin"] != false {
 		t.Fatalf("identity = %v", body)
 	}
 	if attrs, _ := json.Marshal(body["roleAttributes"]); string(attrs) != `["team-a.web"]` {
@@ -190,7 +190,7 @@ func TestIdentityEnrolledDropsJWT(t *testing.T) {
 
 func TestIdentityConflicts(t *testing.T) {
 	e := setupIdentity(t)
-	e.zc.Put(ziti.Identities, ziti.Entity{"name": "team-a.backend"})
+	e.zc.Put(ziti.Identities, ziti.Entity{"name": "default-team-a-backend"})
 	e.reconcile(t)
 	if c := findCond(e.get(t), CondSynced); c.Reason != "NameConflict" {
 		t.Errorf("synced = %+v", c)
@@ -376,7 +376,7 @@ func TestIdentityCertificateExpiry(t *testing.T) {
 
 func handMade(e *idEnv, tags map[string]any) string {
 	return e.zc.Put(ziti.Identities, ziti.Entity{
-		"name": "team-a.backend", "type": "Default", "roleAttributes": []string{"old"}, "authPolicyId": "default",
+		"name": "default-team-a-backend", "type": "Default", "roleAttributes": []string{"old"}, "authPolicyId": "default",
 		"externalId": "ext-1", "tags": tags, "authenticators": map[string]any{"cert": map[string]any{"id": "a1"}},
 	})
 }

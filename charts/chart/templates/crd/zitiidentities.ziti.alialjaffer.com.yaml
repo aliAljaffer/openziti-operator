@@ -142,7 +142,7 @@ spec:
               managementPolicy:
                 default: Manage
                 description: |-
-                  managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName:
+                  managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName. Set zitiName to the exact existing name, because the default name differs:
                   it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity.
                   Observe only reads the existing identity and never writes to Ziti.
                 enum:
@@ -168,7 +168,8 @@ spec:
                 maxLength: 253
                 type: string
               zitiName:
-                description: zitiName defaults to <namespace>.<name>.
+                description: zitiName defaults to <clusterId>-<namespace>-<name>.
+                  Identities created before this default keep <namespace>.<name>.
                 maxLength: 1000
                 minLength: 1
                 type: string
@@ -266,6 +267,10 @@ spec:
                 format: int64
                 type: integer
               zitiId:
+                type: string
+              zitiName:
+                description: zitiName is the name the identity has in Ziti. It is
+                  set once and does not change.
                 type: string
             type: object
         required:

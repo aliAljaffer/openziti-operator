@@ -144,7 +144,7 @@ func TestCAAndCertificateLoginAgainstRealController(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&out)
 		return resp.StatusCode, out.Data.Identity.Name
 	}
-	if code, name := login("workload-a"); code != http.StatusOK || name != "team-a.backend" {
+	if code, name := login("workload-a"); code != http.StatusOK || name != "default-team-a-backend" {
 		t.Errorf("certificate of the identity: status %d, identity %q", code, name)
 	}
 	if code, _ := login("someone-else"); code == http.StatusOK {

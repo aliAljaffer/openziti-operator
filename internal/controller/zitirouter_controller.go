@@ -146,7 +146,7 @@ func (r *ZitiRouterReconciler) finalize(ctx context.Context, rt *zitiv1alpha1.Zi
 }
 
 func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
-	name := desired.RouterName(rt)
+	name := desired.RouterName(rt, conn)
 	if strings.ContainsAny(name, `"\`) {
 		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
 	}
@@ -172,7 +172,7 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 	}
 	enrolled, _ := list[0]["isVerified"].(bool)
 	online, _ := list[0]["isOnline"].(bool)
-	rt.Status.RouterID, rt.Status.Enrolled, rt.Status.Online = id, enrolled, online
+	rt.Status.RouterID, rt.Status.ZitiName, rt.Status.Enrolled, rt.Status.Online = id, name, enrolled, online
 
 	if err := r.deliverEnrollment(ctx, rt, conn, zc, id, enrolled); err != nil {
 		return err
@@ -228,7 +228,7 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 		if port == 0 {
 			port = 3022
 		}
-		m := desired.RouterManifest{Name: desired.RouterName(rt), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName}
+		m := desired.RouterManifest{Name: desired.RouterName(rt, conn), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName}
 		values[SecretKeyCompose], values[SecretKeyDeployment] = []byte(m.Compose()), []byte(m.Deployment())
 	}
 	return upsertOwnedSecretKeys(ctx, r.Client, r.Scheme, rt, key, values)

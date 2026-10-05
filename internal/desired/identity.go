@@ -11,11 +11,18 @@ import (
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
-func IdentityName(id *zitiv1.ZitiIdentity) string {
-	if id.Spec.ZitiName != "" {
+// IdentityName keeps the stored name. An identity that exists without a stored name predates the
+// <clusterId>-<namespace>-<name> default and keeps <namespace>.<name>.
+func IdentityName(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection) string {
+	switch {
+	case id.Spec.ZitiName != "":
 		return id.Spec.ZitiName
+	case id.Status.ZitiName != "":
+		return id.Status.ZitiName
+	case id.Status.ZitiID != "":
+		return id.Namespace + "." + id.Name
 	}
-	return id.Namespace + "." + id.Name
+	return clusterOf(conn) + "-" + id.Namespace + "-" + id.Name
 }
 
 // Identity builds the body for create and update. It has no enrollment, so a PUT keeps the existing one.
@@ -29,7 +36,7 @@ func Identity(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection, authPolicyID
 		return nil, err
 	}
 	e := ziti.Entity{
-		"name":           IdentityName(id),
+		"name":           IdentityName(id, conn),
 		"type":           "Default",
 		"isAdmin":        false,
 		"roleAttributes": attrs,

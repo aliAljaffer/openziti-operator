@@ -149,7 +149,7 @@ func TestAdoptAgainstRealController(t *testing.T) {
 	}
 
 	zid, err := real.Create(t.Context(), ziti.Identities, ziti.Entity{
-		"name": "team-a.backend", "type": "Default", "isAdmin": false, "roleAttributes": []string{"old"},
+		"name": "default-team-a-backend", "type": "Default", "isAdmin": false, "roleAttributes": []string{"old"},
 		"externalId": "ext-adopt-test", "appData": map[string]any{"k": "v"}, "tags": map[string]any{"owner": "human"},
 		"enrollment": map[string]any{"ott": true},
 	})
@@ -163,7 +163,7 @@ func TestAdoptAgainstRealController(t *testing.T) {
 	setPolicy(t, e, zitiv1.ManagementAdopt)
 	e.reconcile(t)
 
-	got, _ := real.List(t.Context(), ziti.Identities, `name="team-a.backend"`)
+	got, _ := real.List(t.Context(), ziti.Identities, `name="default-team-a-backend"`)
 	if len(got) != 1 {
 		t.Fatalf("identities = %v", got)
 	}
@@ -185,7 +185,7 @@ func TestAdoptAgainstRealController(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.reconcile(t)
-	got, _ = real.List(t.Context(), ziti.Identities, `name="team-a.backend"`)
+	got, _ = real.List(t.Context(), ziti.Identities, `name="default-team-a-backend"`)
 	if len(got) != 1 || len(got[0].Tags()) != 1 || got[0].Tags()["owner"] != "human" {
 		t.Fatalf("after release: %v", got)
 	}

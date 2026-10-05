@@ -145,8 +145,9 @@ spec:
                   itself. Routers that host services need it.
                 type: boolean
               zitiName:
-                description: zitiName is the router name in Ziti. It defaults to the
-                  resource name. It cannot change later.
+                description: zitiName is the router name in Ziti. It defaults to <clusterId>-<name>.
+                  Routers created before this default keep the resource name. It cannot
+                  change later.
                 maxLength: 1000
                 minLength: 1
                 type: string
@@ -235,6 +236,10 @@ spec:
                 description: online is true while the router is connected to the controller.
                 type: boolean
               routerId:
+                type: string
+              zitiName:
+                description: zitiName is the name the router has in Ziti. It is set
+                  once and does not change.
                 type: string
             type: object
         required:

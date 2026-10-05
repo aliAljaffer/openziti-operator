@@ -29,7 +29,7 @@ type ZitiRouterSpec struct {
 	// +optional
 	ConnectionRef string `json:"connectionRef,omitempty"`
 
-	// zitiName is the router name in Ziti. It defaults to the resource name. It cannot change later.
+	// zitiName is the router name in Ziti. It defaults to <clusterId>-<name>. Routers created before this default keep the resource name. It cannot change later.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1000
 	// +optional
@@ -100,6 +100,9 @@ type ZitiRouterSpec struct {
 type ZitiRouterStatus struct {
 	// +optional
 	RouterID string `json:"routerId,omitempty"`
+	// zitiName is the name the router has in Ziti. It is set once and does not change.
+	// +optional
+	ZitiName string `json:"zitiName,omitempty"`
 	// enrolled is true once the router has enrolled with its JWT.
 	// +optional
 	Enrolled bool `json:"enrolled,omitempty"`

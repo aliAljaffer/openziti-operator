@@ -38,7 +38,7 @@
 | `spec.roleAttributes` | list of string | no |  | roleAttributes are the groups the router belongs to. Edge router policies select routers by them. They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter. |
 | `spec.storageClassName` | string | no |  | storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default. Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind. Maximum length 253. |
 | `spec.tunnelerEnabled` | boolean | no |  | tunnelerEnabled lets the router host and dial services itself. Routers that host services need it. |
-| `spec.zitiName` | string | no |  | zitiName is the router name in Ziti. It defaults to the resource name. It cannot change later. Minimum length 1. Maximum length 1000. |
+| `spec.zitiName` | string | no |  | zitiName is the router name in Ziti. It defaults to &lt;clusterId&gt;-&lt;name&gt;. Routers created before this default keep the resource name. It cannot change later. Minimum length 1. Maximum length 1000. |
 
 ## Validation rules
 
@@ -63,6 +63,7 @@ The API server rejects a resource that breaks one of these rules.
 | `status.observedGeneration` | integer |  |
 | `status.online` | boolean | online is true while the router is connected to the controller. |
 | `status.routerId` | string |  |
+| `status.zitiName` | string | zitiName is the name the router has in Ziti. It is set once and does not change. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).
 
