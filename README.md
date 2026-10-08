@@ -1,5 +1,8 @@
 # ziti-operator
 
+[![CI](https://github.com/aliAljaffer/openziti-operator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aliAljaffer/openziti-operator/actions/workflows/ci.yml)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](.github/dependabot.yml)
+
 A Kubernetes operator that makes routine [OpenZiti](https://openziti.io) work simple.
 
 You describe an app, an identity, or a router in YAML. The operator creates the Ziti configs, services, policies, and identities, then checks that the result works and reports it in `status`. Nobody on the team needs to know the OpenZiti model to publish an app, enroll an identity, or start a router.
