@@ -51,7 +51,8 @@
 | `connection.caBundle.configMapName` | `ziti-root-ca` | ConfigMap in the release namespace. |
 | `connection.roleScope`, `entryRouters`, `defaultEdgeRouters`, `clusterId`, `allowedNamespaces` | see below | Same as the `ZitiConnection` keys. |
 | `trustManager.enabled`, `trustManager.sources` | off | Copy the Ziti root CA into the release namespace with a trust-manager `Bundle`. |
-| `rbac.secretNamespaces` | empty | Limit Secret access to these namespaces plus the release namespace. Empty means cluster-wide. List every namespace that holds a `ZitiIdentity`. |
+| `rbac.secretNamespaces` | empty | Namespaces for Secret access, in addition to the release namespace. List every namespace that holds a `ZitiIdentity`. |
+| `rbac.clusterWideSecrets` | `false` | Set `true` to grant Secret access in all namespaces with a ClusterRole. Upgrade note: before this default, access was cluster-wide. |
 | `metrics.enabled`, `metrics.secure`, `prometheus.enabled` | on, on, off | Metrics endpoint and an optional ServiceMonitor. |
 | `crd.keep` | `true` | Keep the CRDs when the release is uninstalled. |
 

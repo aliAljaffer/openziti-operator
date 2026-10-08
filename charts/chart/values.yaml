@@ -181,8 +181,13 @@ rbac:
   ##
   namespaced: false
 
-  ## Limit Secret and ConfigMap access to these namespaces (the release namespace is always included).
-  ## Empty grants cluster-wide access. Every namespace that holds a ZitiIdentity must be listed,
+  ## Grant Secret and ConfigMap access cluster-wide with a ClusterRole.
+  ## false (default): namespaced Roles in the release namespace and in secretNamespaces only.
+  ##
+  clusterWideSecrets: false
+
+  ## Extra namespaces for Secret and ConfigMap access (the release namespace is always included).
+  ## Ignored when clusterWideSecrets is true. Every namespace that holds a ZitiIdentity must be listed,
   ## because the operator writes identity Secrets there.
   secretNamespaces: []
 

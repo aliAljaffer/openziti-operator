@@ -87,7 +87,7 @@ spec:
         - --ziti-requests-per-second={{ .Values.operator.zitiRequestsPerSecond }}
         - --orphan-policy={{ .Values.operator.orphanPolicy }}
         - --orphan-sweep-interval={{ .Values.operator.orphanSweepInterval }}
-        {{- if .Values.rbac.secretNamespaces }}
+        {{- if include "ziti-operator.limitSecrets" . }}
         - --secret-namespaces={{ include "ziti-operator.secretNamespaces" . }}
         {{- end }}
         {{- if .Values.connection.managerCreates }}
