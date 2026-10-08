@@ -18,7 +18,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  {{- if not .Values.rbac.secretNamespaces }}
+  {{- if not (include "ziti-operator.limitSecrets" .) }}
   - configmaps
   {{- end }}
   - namespaces
@@ -34,7 +34,7 @@ rules:
   verbs:
   - create
   - patch
-{{- if not .Values.rbac.secretNamespaces }}
+{{- if not (include "ziti-operator.limitSecrets" .) }}
 - apiGroups:
   - ""
   resources:

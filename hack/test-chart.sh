@@ -16,8 +16,11 @@ out=$(render)
 check "default: no ZitiConnection" '[ -z "$(yq "select(.kind==\"ZitiConnection\")" <<<"$out")" ]'
 check "default: no trust-manager Bundle" '[ -z "$(yq "select(.kind==\"Bundle\")" <<<"$out")" ]'
 check "default: two replicas" 'grep -q "replicas: 2" <<<"$out"'
-check "default: cluster-wide secrets rule" 'yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out" | grep -qx secrets'
-check "default: no --secret-namespaces flag" '! grep -q -- "--secret-namespaces" <<<"$out"'
+check "default: ClusterRole has no secrets" '! yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out" | grep -qx secrets'
+check "default: secrets limited to the release namespace" 'grep -q -- "--secret-namespaces=ns$" <<<"$out" && yq "select(.kind==\"Role\" and (.metadata.name|test(\"secret-access\"))) | .metadata.namespace" <<<"$out" | grep -qx ns'
+out_cw=$(render --set rbac.clusterWideSecrets=true)
+check "clusterWideSecrets: cluster-wide secrets rule" 'yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out_cw" | grep -qx secrets'
+check "clusterWideSecrets: no --secret-namespaces flag" '! grep -q -- "--secret-namespaces" <<<"$out_cw"'
 
 out=$(render "${conn[@]}" --set connection.auth.updb.secretName=cred --set connection.roleScope=Global --set 'connection.defaultEdgeRouters={edge-1}')
 zc=$(yq 'select(.kind=="ZitiConnection")' <<<"$out")
@@ -53,6 +56,6 @@ for crd in config/crd/bases/*.yaml; do
 done
 rules() { yq -o=json -I=0 '[.rules[] | {"g": ((.apiGroups // []) | sort), "r": ((.resources // []) | sort), "u": ((.nonResourceURLs // []) | sort), "v": (.verbs | sort)}] | sort_by(. | tostring)'; }
 want=$(yq 'select(.kind=="ClusterRole")' config/rbac/role.yaml | rules)
-have=$(helm template t "$chart" -n ns --show-only templates/rbac/manager-role.yaml | rules)
+have=$(helm template t "$chart" -n ns --set rbac.clusterWideSecrets=true --show-only templates/rbac/manager-role.yaml | rules)
 check "manager RBAC in the chart matches config/rbac/role.yaml" '[ -n "$want" ] && [ "$want" = "$have" ]'
 exit $fail

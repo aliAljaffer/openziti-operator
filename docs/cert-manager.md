@@ -38,7 +38,7 @@ The CA bundle that the `ZitiConnection` uses to trust the controller is a differ
    spec: {ca: {secretName: ziti-workload-ca}}
    ```
 
-2. Let the operator read the Secret. With the Helm chart, add the namespace to `rbac.secretNamespaces` (for example `cert-manager`). The default is cluster-wide access.
+2. Let the operator read the Secret. With the Helm chart, add the namespace to `rbac.secretNamespaces` (for example `cert-manager`).
 
 3. Register the CA.
 
