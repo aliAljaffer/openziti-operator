@@ -9,11 +9,15 @@ A `ZitiRouter` creates the edge router entity in Ziti and hands you its enrollme
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiRouter
-metadata: {name: edge-1}
+metadata:
+  name: edge-1
 spec:
-  roleAttributes: [edge]
+  roleAttributes:
+    - edge
   tunnelerEnabled: true
-  enrollmentSecretRef: {namespace: routers, name: edge-1-enrollment}
+  enrollmentSecretRef:
+    namespace: routers
+    name: edge-1-enrollment
   advertisedAddress: vm1.example.com
 ```
 

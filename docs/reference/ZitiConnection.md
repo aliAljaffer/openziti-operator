@@ -81,15 +81,23 @@ metadata:
 spec:
   managementUrl: https://ziti-controller-mgmt.ziti.svc:443/edge/management/v1
   caBundle:
-    configMapRef: {namespace: ziti-operator-system, name: ziti-root-ca, key: ca.crt}
+    configMapRef:
+      namespace: ziti-operator-system
+      name: ziti-root-ca
+      key: ca.crt
   auth:
     updb:
-      secretRef: {namespace: ziti-operator-system, name: ziti-operator-credential}
+      secretRef:
+        namespace: ziti-operator-system
+        name: ziti-operator-credential
   # Certificate login instead. The Secret has tls.crt and tls.key, for example from cert-manager.
   # auth:
   #   cert:
-  #     secretRef: {namespace: ziti-operator-system, name: ziti-operator-cert}
+  #     secretRef:
+  #       namespace: ziti-operator-system
+  #       name: ziti-operator-cert
   roleScope: Namespaced
-  hostingRouters: [router-a]
+  hostingRouters:
+    - router-a
 ```
 

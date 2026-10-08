@@ -21,3 +21,17 @@ jobs:
         env:
           HYGIENE_PATTERNS: ${{ secrets.HYGIENE_PATTERNS }}
         run: hack/check-hygiene.sh
+
+  conventions:
+    permissions:
+      contents: read
+    name: YAML style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check YAML style
+        run: make yaml-style

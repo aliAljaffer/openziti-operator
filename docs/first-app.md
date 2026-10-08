@@ -7,20 +7,28 @@
    ```yaml
    apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiApp
-   metadata: {name: billing, namespace: team-a}
+   metadata:
+     name: billing
+     namespace: team-a
    spec:
      expose:
-       addresses: [billing.example.com]
-       ports: [443, "8000-8005"]
+       addresses:
+         - billing.example.com
+       ports:
+         - 443
+         - "8000-8005"
      targets:
        - address: 10.0.0.5
        - kubernetesService: billing
          port: 8080
          cost: 10
      allow:
-       groups: [team-a]
-       identities: [alice]
-     entryRouters: [edge-1]
+       groups:
+         - team-a
+       identities:
+         - alice
+     entryRouters:
+       - edge-1
    ```
 
 2. Check the result.
