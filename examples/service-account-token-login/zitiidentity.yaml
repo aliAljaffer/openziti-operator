@@ -1,0 +1,11 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: web-bot
+  namespace: team-a
+spec:
+  enrollmentMode: None
+  serviceAccount: web-bot
+  authPolicy: k8s
+  roleAttributes:
+    - bots

@@ -1,0 +1,15 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: web
+  namespace: team-a
+spec:
+  enrollmentMode: None
+  externalId: team-a.web
+  authPolicy: Default
+  roleAttributes:
+    - web
+  certificate:
+    issuerRef:
+      name: ziti-workload-ca
+      kind: ClusterIssuer

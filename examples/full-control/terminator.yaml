@@ -1,0 +1,10 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiTerminator
+metadata:
+  name: web-via-edge-1
+  namespace: team-a
+spec:
+  service: web.team-a.example.com
+  router: edge-1
+  address: tcp:10.0.0.5:8080
+  cost: 10

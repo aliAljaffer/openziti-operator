@@ -1,0 +1,14 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiAccessPolicy
+metadata:
+  name: ops
+  namespace: team-a
+spec:
+  identityRoles:
+    - "#ops"
+  serviceRoles:
+    - "#ops"
+  postureCheckRoles:
+    - "#posix"
+  edgeRouters:
+    - edge-1
