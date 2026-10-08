@@ -1,17 +1,8 @@
 name: Security
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.claude/**'
-  pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.claude/**'
+  workflow_call:
+  workflow_dispatch:
   schedule:
     - cron: '0 6 * * 1'
 

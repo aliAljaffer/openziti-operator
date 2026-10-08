@@ -88,10 +88,18 @@ jobs:
       contents: read
     uses: ./.github/workflows/test-e2e.yml
 
+  security:
+    name: Security
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security.yml
+
   ci-ok:
     name: CI OK
     if: always()
-    needs: [hygiene, lint, test, integration, chart, e2e]
+    needs: [hygiene, lint, test, integration, chart, e2e, security]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
