@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: billing
+  namespace: team-a
+  annotations:
+    ziti.alialjaffer.com/expose: "true"
+    ziti.alialjaffer.com/allow-groups: finance
+spec:
+  rules:
+    - host: billing.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: billing
+                port:
+                  number: 80

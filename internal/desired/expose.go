@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -114,4 +115,116 @@ func AppSpec(svc *corev1.Service) (zitiv1.ZitiAppSpec, error) {
 		}
 	}
 	return spec, nil
+}
+
+// IngressAppSpec builds an app for an HTTP Ingress whose rules all target the same Service port.
+// Ziti cannot preserve path routing across different backends, so mixed backends and TLS termination
+// are rejected instead of silently changing the Ingress behavior.
+func IngressAppSpec(ing *networkingv1.Ingress, backend *corev1.Service) (zitiv1.ZitiAppSpec, error) {
+	if len(ing.Spec.TLS) > 0 {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("TLS Ingresses are not exposed automatically; use a ZitiApp to choose the TLS backend")
+	}
+
+	var hosts []string
+	var backendName string
+	var backendPort int32
+	setBackend := func(b networkingv1.IngressBackend) error {
+		if b.Service == nil || b.Resource != nil {
+			return fmt.Errorf("only Service backends are supported")
+		}
+		port, err := ingressServicePort(backend, b.Service.Port)
+		if err != nil {
+			return err
+		}
+		if backendName != "" && (backendName != b.Service.Name || backendPort != port) {
+			return fmt.Errorf("all Ingress paths must target the same Service and port")
+		}
+		backendName, backendPort = b.Service.Name, port
+		return nil
+	}
+
+	if ing.Spec.DefaultBackend != nil {
+		if err := setBackend(*ing.Spec.DefaultBackend); err != nil {
+			return zitiv1.ZitiAppSpec{}, err
+		}
+	}
+	for _, rule := range ing.Spec.Rules {
+		if rule.Host != "" {
+			hosts = append(hosts, rule.Host)
+		}
+		if rule.HTTP == nil || len(rule.HTTP.Paths) == 0 {
+			return zitiv1.ZitiAppSpec{}, fmt.Errorf("every Ingress rule needs an HTTP path")
+		}
+		for _, path := range rule.HTTP.Paths {
+			if err := setBackend(path.Backend); err != nil {
+				return zitiv1.ZitiAppSpec{}, err
+			}
+		}
+	}
+
+	if len(hosts) == 0 && len(list(ing.Annotations[AnnAddresses])) == 0 {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("ingress needs a host or the %s annotation", AnnAddresses)
+	}
+	if backendName == "" {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("ingress needs a Service backend")
+	}
+
+	fakeService := &corev1.Service{
+		Name: backendName, Namespace: ing.Namespace, Annotations: ing.Annotations,
+		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80, Protocol: corev1.ProtocolTCP}}},
+	}
+	spec, err := AppSpec(fakeService)
+	if err != nil {
+		return spec, err
+	}
+	if len(list(ing.Annotations[AnnAddresses])) == 0 {
+		slices.Sort(hosts)
+		spec.Expose.Addresses = slices.Compact(hosts)
+	}
+	spec.Targets = []zitiv1.Target{{KubernetesService: backendName, Port: backendPort}}
+	return spec, nil
+}
+
+// IngressBackendName returns the one Service all rules in an Ingress target. The full port and TLS checks
+// happen in IngressAppSpec once the controller has fetched that Service.
+func IngressBackendName(ing *networkingv1.Ingress) (string, error) {
+	name := ""
+	add := func(b networkingv1.IngressBackend) error {
+		if b.Service == nil || b.Resource != nil {
+			return fmt.Errorf("only Service backends are supported")
+		}
+		if name != "" && name != b.Service.Name {
+			return fmt.Errorf("all Ingress paths must target the same Service")
+		}
+		name = b.Service.Name
+		return nil
+	}
+	if ing.Spec.DefaultBackend != nil {
+		if err := add(*ing.Spec.DefaultBackend); err != nil {
+			return "", err
+		}
+	}
+	for _, rule := range ing.Spec.Rules {
+		if rule.HTTP == nil {
+			return "", fmt.Errorf("every Ingress rule needs an HTTP path")
+		}
+		for _, path := range rule.HTTP.Paths {
+			if err := add(path.Backend); err != nil {
+				return "", err
+			}
+		}
+	}
+	if name == "" {
+		return "", fmt.Errorf("ingress needs a Service backend")
+	}
+	return name, nil
+}
+
+func ingressServicePort(svc *corev1.Service, port networkingv1.ServiceBackendPort) (int32, error) {
+	for _, p := range svc.Spec.Ports {
+		if port.Name != "" && p.Name == port.Name || port.Number != 0 && p.Port == port.Number {
+			return p.Port, nil
+		}
+	}
+	return 0, fmt.Errorf("backend Service %q has no port matching the Ingress backend", svc.Name)
 }

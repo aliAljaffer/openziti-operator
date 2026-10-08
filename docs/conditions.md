@@ -117,4 +117,4 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `CertificateRenewed`, `RenewalFailed`, `CertificateExpiring` | Certificate lifecycle. |
 | `IdentityFileLost` | See above. |
 | `DeleteBlocked` | The operator cannot reach Ziti, so the resource cannot finish deleting. |
-| `AppConflict`, `InvalidAnnotations`, `Unexposed` | A Kubernetes Service with `ziti.alialjaffer.com/expose`. |
+| `AppConflict`, `InvalidAnnotations`, `Unexposed` | A Kubernetes Service or Ingress with `ziti.alialjaffer.com/expose`. |
