@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/onsi/ginkgo/v2 v2.27.4
-	github.com/onsi/gomega v1.39.0
+	github.com/onsi/gomega v1.44.0
 	github.com/openziti/edge-api v0.36.1
 	github.com/openziti/sdk-golang v1.8.2
 	github.com/prometheus/client_golang v1.24.0
