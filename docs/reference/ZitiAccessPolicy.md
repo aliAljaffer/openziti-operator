@@ -70,8 +70,11 @@ metadata:
   namespace: default
 spec:
   connectionRef: default
-  identityRoles: ["#team-a"]
-  serviceRoles: ["#team-a"]
-  edgeRouters: [router-a]
+  identityRoles:
+    - "#team-a"
+  serviceRoles:
+    - "#team-a"
+  edgeRouters:
+    - router-a
 ```
 

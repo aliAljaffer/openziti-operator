@@ -29,10 +29,42 @@ docker run -d --name ziti -p 1280:1280 openziti/ziti-cli:2.0.4 \
   edge quickstart --ctrl-address localhost --ctrl-port 1280 --password admin123
 ```
 
+## YAML style
+
+Lists are listed out and objects get one key per line. No flow style. This is wrong:
+
+```
+spec:
+  hostingRouters: [edge-1]
+  caBundle: {configMapRef: {namespace: ziti, name: root-ca, key: ca.crt}}
+```
+
+This is right:
+
+```yaml
+spec:
+  hostingRouters:
+    - edge-1
+  caBundle:
+    configMapRef:
+      namespace: ziti
+      name: root-ca
+      key: ca.crt
+```
+
+Install the commit hook once after cloning. It expands flow style and stops the commit so you can stage the result:
+
+```sh
+pre-commit install
+```
+
+Without the hook, run `make yaml-style-fix` to expand the files and `make yaml-style` to check them. CI runs the check.
+
 ## Rules
 
 - Do not add organization names, hostnames, IDs, or addresses to code, tests, or docs.
 - The operator changes only entities that carry its `ziti-operator-uid` tag.
+- Write YAML in block style. See [YAML style](#yaml-style).
 
 ## Generated files
 

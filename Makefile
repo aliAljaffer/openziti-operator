@@ -283,6 +283,14 @@ docs: manifests ## Generate the CRD reference in docs/reference.
 docs-check: ## Fail when docs/reference is out of date.
 	hack/gen-crd-docs.py --check
 
+.PHONY: yaml-style
+yaml-style: ## Fail when a YAML file uses flow style instead of block style.
+	hack/yaml-style.py --check
+
+.PHONY: yaml-style-fix
+yaml-style-fix: ## Expand flow style to block style in the YAML files.
+	hack/yaml-style.py
+
 .PHONY: install-helm
 install-helm: ## Install the latest version of Helm.
 	@command -v $(HELM) >/dev/null 2>&1 || { \

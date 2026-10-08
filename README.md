@@ -50,15 +50,27 @@ The chart is `oci://ghcr.io/alialjaffer/charts/ziti-operator` and the image is `
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiApp
-metadata: {name: billing, namespace: team-a}
+metadata:
+  name: billing
+  namespace: team-a
 spec:
-  expose: {addresses: [billing.example.com], ports: [443, "8000-8005"]}
+  expose:
+    addresses:
+      - billing.example.com
+    ports:
+      - 443
+      - "8000-8005"
   targets:
     - address: 10.0.0.5
     - address: 10.0.0.6
       cost: 10
-  allow: {groups: [team-a], identities: [alice]}
-  entryRouters: [edge-1]
+  allow:
+    groups:
+      - team-a
+    identities:
+      - alice
+  entryRouters:
+    - edge-1
 ```
 
 `kubectl get ztapp` shows `Hosted`, `Dialable`, `RoutePath`, and `Ready`. When something is wrong, the condition reason says what. See [Conditions and reasons](docs/conditions.md).

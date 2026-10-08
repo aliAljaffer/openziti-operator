@@ -15,7 +15,8 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
    ```yaml
    apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiJwtSigner
-   metadata: {name: k8s}
+   metadata:
+     name: k8s
    spec:
      audience: ziti
      keys:
@@ -29,12 +30,15 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
    ```yaml
    apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiIdentity
-   metadata: {name: web, namespace: team-a}
+   metadata:
+     name: web
+     namespace: team-a
    spec:
      enrollmentMode: None
      serviceAccount: web
      authPolicy: k8s
-     roleAttributes: [web]
+     roleAttributes:
+       - web
    ```
 
    `Ready` shows reason `TokenLogin`. No Secret is created.
@@ -48,7 +52,10 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
        - name: ziti-token
          projected:
            sources:
-             - serviceAccountToken: {audience: ziti, expirationSeconds: 3600, path: token}
+             - serviceAccountToken:
+                 audience: ziti
+                 expirationSeconds: 3600
+                 path: token
    ```
 
 4. The workload logs in with the token.

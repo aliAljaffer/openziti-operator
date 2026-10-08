@@ -1,0 +1,9 @@
+# Local hooks, so no download and no pinned version. Run `pre-commit install` once after cloning.
+repos:
+  - repo: local
+    hooks:
+      - id: yaml-style
+        name: YAML block style
+        entry: hack/yaml-style.py
+        language: script
+        files: \.(ya?ml|md)$

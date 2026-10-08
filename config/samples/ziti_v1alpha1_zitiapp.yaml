@@ -6,14 +6,21 @@ metadata:
 spec:
   zitiName: billing.example.com
   expose:
-    addresses: [billing.example.com]
-    ports: [443, "8000-8005"]
-    protocols: [tcp]
+    addresses:
+      - billing.example.com
+    ports:
+      - 443
+      - "8000-8005"
+    protocols:
+      - tcp
   targets:
     - address: 10.0.0.5
     - address: 10.0.0.6
       cost: 10
   allow:
-    groups: [team-a]
-    identities: [alice]
-  entryRouters: [edge-1]
+    groups:
+      - team-a
+    identities:
+      - alice
+  entryRouters:
+    - edge-1
