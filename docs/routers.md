@@ -60,9 +60,11 @@ Set `deployment` and the operator runs the router itself. You do not install any
 ```yaml
 spec:
   advertisedAddress: edge-1.example.com
-  roleAttributes: [edge]
+  roleAttributes:
+    - edge
   tunnelerEnabled: true
-  deployment: {namespace: routers}
+  deployment:
+    namespace: routers
 ```
 
 Set `advertisedAddress` before the first start. Ziti takes the router address from its certificate, and the image writes that certificate once and keeps it. A router that starts without an address enrolls and goes online under `CHANGE_ME.invalid`, and no client can reach it.
