@@ -60,7 +60,7 @@ func TestOneToOneKindsAgainstRealController(t *testing.T) {
 	provider := staticProvider{wc}
 	reconcile := func(t *testing.T, name string, run func(r ctrl.Request) error) {
 		t.Helper()
-		if err := run(ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: name}}); err != nil {
+		if err := run(ctrl.Request{Namespace: "team-a", Name: name}); err != nil {
 			t.Fatalf("reconcile %s: %v", name, err)
 		}
 	}
@@ -148,7 +148,7 @@ func TestOneToOneAdoptAndObserveAgainstRealController(t *testing.T) {
 		IdentityRoles: []string{"#it-users"}, ServiceRoles: []string{"#it-web"}}}
 	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, pol)
 	r := newEntityReconciler(e.k, e.scheme, staticProvider{wc}, e.rec, "sp", ziti.ServicePolicies, func() *zitiv1.ZitiServicePolicy { return &zitiv1.ZitiServicePolicy{} }, buildServicePolicy)
-	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "it-adopt"}}
+	req := ctrl.Request{Namespace: "team-a", Name: "it-adopt"}
 	if _, err := r.Reconcile(t.Context(), req); err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestOneToOneAdoptAndObserveAgainstRealController(t *testing.T) {
 		t.Fatal(err)
 	}
 	wc.writes = nil
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "it-observe"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Namespace: "team-a", Name: "it-observe"}); err != nil {
 		t.Fatal(err)
 	}
 	var seen zitiv1.ZitiServicePolicy

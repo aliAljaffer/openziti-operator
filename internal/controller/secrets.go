@@ -28,8 +28,8 @@ func upsertOwnedSecretKeys(ctx context.Context, c client.Client, scheme *runtime
 	err := c.Get(ctx, key, &secret)
 	switch {
 	case apierrors.IsNotFound(err):
-		secret = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name,
-			Labels: map[string]string{ManagedByLabel: ManagedByLabelValue}}}
+		secret = corev1.Secret{Namespace: key.Namespace, Name: key.Name,
+			Labels: map[string]string{ManagedByLabel: ManagedByLabelValue}}
 		if err := controllerutil.SetControllerReference(owner, &secret, scheme); err != nil {
 			return err
 		}

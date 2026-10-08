@@ -125,6 +125,9 @@ func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func jitter(d time.Duration) time.Duration {
+	if d < 10 {
+		return d
+	}
 	return d + time.Duration(rand.Int64N(int64(d/10)))
 }
 
