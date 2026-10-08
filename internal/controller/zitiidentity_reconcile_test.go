@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,58 @@ func TestIdentityCreatesAndPublishesJWTOnly(t *testing.T) {
 		if !strings.HasPrefix(c, "list") {
 			t.Errorf("second reconcile wrote: %s", c)
 		}
+	}
+}
+
+func TestIdentityReportsCurrentSessionsWithoutSessionTokens(t *testing.T) {
+	e := setupIdentity(t)
+	e.reconcile(t)
+	identityID := e.identity().ID()
+	e.zc.Put(ziti.Sessions, ziti.Entity{
+		"identityId": identityID,
+		"service":    map[string]any{"id": "svc-1", "name": "billing"},
+		"edgeRouters": []any{
+			map[string]any{"id": "router-2", "name": "edge-2"},
+			map[string]any{"id": "router-1", "name": "edge-1"},
+		},
+		"token": "sensitive-session-token",
+	})
+	e.zc.Put(ziti.Sessions, ziti.Entity{
+		"identityId":  identityID,
+		"service":     map[string]any{"id": "svc-2", "name": "orders"},
+		"edgeRouters": []any{map[string]any{"id": "router-1", "name": "edge-1"}},
+	})
+	e.zc.Put(ziti.Sessions, ziti.Entity{
+		"identityId": "another-identity",
+		"service":    map[string]any{"name": "ignored"},
+	})
+	e.reconcile(t)
+
+	id := e.get(t)
+	if id.Status.ActiveSessions != 2 || !slices.Equal(id.Status.ConnectedServices, []string{"billing", "orders"}) ||
+		!slices.Equal(id.Status.ConnectedRouters, []string{"edge-1", "edge-2"}) {
+		t.Errorf("session status = %+v", id.Status)
+	}
+	if condStatusOf(id, CondSessionsObserved) != metav1.ConditionTrue {
+		t.Errorf("sessions condition = %+v", id.Status.Conditions)
+	}
+	data, err := json.Marshal(id.Status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "sensitive-session-token") {
+		t.Error("session token must not be copied into status")
+	}
+}
+
+func TestSummarizeIdentitySessionsSortsAndFiltersByIdentity(t *testing.T) {
+	count, services, routers := summarizeIdentitySessions([]ziti.Entity{
+		{"identityId": "id", "service": map[string]any{"name": "z"}, "edgeRouters": []any{map[string]any{"name": "r2"}}},
+		{"identityId": "id", "service": map[string]any{"name": "a"}, "edgeRouters": []any{map[string]any{"name": "r1"}}},
+		{"identityId": "other", "service": map[string]any{"name": "ignore"}},
+	}, "id")
+	if count != 2 || !slices.Equal(services, []string{"a", "z"}) || !slices.Equal(routers, []string{"r1", "r2"}) {
+		t.Errorf("summary = %d %v %v", count, services, routers)
 	}
 }
 

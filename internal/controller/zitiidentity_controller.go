@@ -51,13 +51,14 @@ const (
 	SecretKeyJWT      = desired.EnrollTokenKey
 	SecretKeyIdentity = "identity.json"
 	// ManagedByLabel marks the Secrets this operator creates. The manager cache holds only those.
-	ManagedByLabel      = "app.kubernetes.io/managed-by"
-	ManagedByLabelValue = "ziti-operator"
-	defaultAuthPolicy   = "Default"
-	enrollmentTTL       = 24 * time.Hour
-	pendingRecheck      = time.Minute
-	certWarnBefore      = 30 * 24 * time.Hour
-	CondCertValid       = "CertificateValid"
+	ManagedByLabel       = "app.kubernetes.io/managed-by"
+	ManagedByLabelValue  = "ziti-operator"
+	defaultAuthPolicy    = "Default"
+	enrollmentTTL        = 24 * time.Hour
+	pendingRecheck       = time.Minute
+	certWarnBefore       = 30 * 24 * time.Hour
+	CondCertValid        = "CertificateValid"
+	CondSessionsObserved = "SessionsObserved"
 )
 
 type ZitiIdentityReconciler struct {
@@ -106,6 +107,9 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err == nil {
 		err = r.sync(ctx, &id, conn, zc)
 	}
+	if err == nil && id.Status.ZitiID != "" {
+		r.observeSessions(ctx, &id, zc)
+	}
 
 	var se *specError
 	var next ctrl.Result
@@ -135,6 +139,61 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 	return next, err
+}
+
+// observeSessions adds current session summaries without letting a sessions endpoint failure make the identity
+// itself NotReady. Session tokens are deliberately never copied into Kubernetes status.
+func (r *ZitiIdentityReconciler) observeSessions(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) {
+	sessions, err := zc.List(ctx, ziti.Sessions, "")
+	if err != nil {
+		id.Status.ActiveSessions = 0
+		id.Status.ConnectedServices = nil
+		id.Status.ConnectedRouters = nil
+		setCond(&id.Status.Conditions, id.Generation, CondSessionsObserved, false, "", "QueryFailed", err.Error())
+		return
+	}
+	id.Status.ActiveSessions, id.Status.ConnectedServices, id.Status.ConnectedRouters = summarizeIdentitySessions(sessions, id.Status.ZitiID)
+	setCond(&id.Status.Conditions, id.Generation, CondSessionsObserved, true, "Observed", "", "")
+}
+
+func summarizeIdentitySessions(sessions []ziti.Entity, identityID string) (int32, []string, []string) {
+	services, routers := map[string]bool{}, map[string]bool{}
+	var count int32
+	for _, session := range sessions {
+		id, _ := session["identityId"].(string)
+		if id != identityID {
+			continue
+		}
+		count++
+		if name := refName(session["service"]); name != "" {
+			services[name] = true
+		}
+		if edgeRouters, ok := session["edgeRouters"].([]any); ok {
+			for _, edgeRouter := range edgeRouters {
+				if name := refName(edgeRouter); name != "" {
+					routers[name] = true
+				}
+			}
+		}
+	}
+	return count, sortedIdentityNames(services), sortedIdentityNames(routers)
+}
+
+func sortedIdentityNames(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for name := range set {
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func refName(v any) string {
+	if ref, ok := v.(map[string]any); ok {
+		name, _ := ref["name"].(string)
+		return name
+	}
+	return ""
 }
 
 func (r *ZitiIdentityReconciler) finalize(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) error {

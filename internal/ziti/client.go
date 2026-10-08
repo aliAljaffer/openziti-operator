@@ -34,6 +34,7 @@ const (
 	EdgeRouters               Kind = "edge-routers"
 	Identities                Kind = "identities"
 	Terminators               Kind = "terminators"
+	Sessions                  Kind = "sessions"
 	Enrollments               Kind = "enrollments"
 	AuthPolicies              Kind = "auth-policies"
 	Authenticators            Kind = "authenticators"

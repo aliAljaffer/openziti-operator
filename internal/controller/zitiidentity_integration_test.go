@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/openziti/edge-api/rest_util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -46,6 +47,9 @@ func TestIdentityAgainstRealController(t *testing.T) {
 	z := e.get(t)
 	if z.Status.ZitiID == "" || z.Status.Enrolled || z.Status.EnrollmentExpiresAt == nil || len(e.secret(t).Data[SecretKeyJWT]) < 20 {
 		t.Fatalf("after create: %+v", z.Status)
+	}
+	if condStatusOf(z, CondSessionsObserved) != metav1.ConditionTrue || z.Status.ActiveSessions != 0 {
+		t.Fatalf("empty sessions should be observed: %+v", z.Status)
 	}
 	wc.writes = nil
 	e.reconcile(t)

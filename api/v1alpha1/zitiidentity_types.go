@@ -139,6 +139,15 @@ type ZitiIdentityStatus struct {
 	// certNotAfter is the earliest expiry of the identity's client certificates.
 	// +optional
 	CertNotAfter *metav1.Time `json:"certNotAfter,omitempty"`
+	// activeSessions is the number of current client sessions for this identity.
+	// +optional
+	ActiveSessions int32 `json:"activeSessions,omitempty"`
+	// connectedServices are the Ziti services with current sessions for this identity.
+	// +optional
+	ConnectedServices []string `json:"connectedServices,omitempty"`
+	// connectedRouters are the edge routers used by current sessions for this identity.
+	// +optional
+	ConnectedRouters []string `json:"connectedRouters,omitempty"`
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -156,6 +165,7 @@ type ZitiIdentityStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Enrollment Expires",type=string,JSONPath=".status.enrollmentExpiresAt"
 // +kubebuilder:printcolumn:name="Cert Expires",type=string,JSONPath=".status.certNotAfter"
+// +kubebuilder:printcolumn:name="Sessions",type=integer,JSONPath=".status.activeSessions"
 // +kubebuilder:printcolumn:name="Ziti ID",type=string,JSONPath=".status.zitiId",priority=1
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
