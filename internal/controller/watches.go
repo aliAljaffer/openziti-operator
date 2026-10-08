@@ -8,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -46,7 +45,7 @@ func listRequests[T client.Object](ctx context.Context, c client.Reader, newList
 	_ = meta.EachListItem(l, func(o runtime.Object) error {
 		obj := o.(T)
 		if keep(obj) {
-			out = append(out, reconcile.Request{NamespacedName: types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}})
+			out = append(out, reconcile.Request{Namespace: obj.GetNamespace(), Name: obj.GetName()})
 		}
 		return nil
 	})

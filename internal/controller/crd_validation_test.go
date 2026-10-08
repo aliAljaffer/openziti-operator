@@ -22,7 +22,7 @@ import (
 var _ = Describe("CRD validation", func() {
 	newService := func(name string, mut func(*zitiv1.ZitiAppSpec)) *zitiv1.ZitiApp {
 		s := &zitiv1.ZitiApp{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Name: name, Namespace: "default",
 			Spec: zitiv1.ZitiAppSpec{
 				Expose:  zitiv1.Expose{Addresses: []string{"app.example.com"}, Ports: []intstr.IntOrString{intstr.FromInt32(443)}},
 				Targets: []zitiv1.Target{{Address: "10.0.0.5", Port: 8443}},
@@ -89,8 +89,8 @@ var _ = Describe("CRD validation", func() {
 
 	It("makes ZitiIdentity zitiName, deletionPolicy and enrollmentMode immutable and applies defaults", func() {
 		id := &zitiv1.ZitiIdentity{
-			ObjectMeta: metav1.ObjectMeta{Name: "immutable-id", Namespace: "default"},
-			Spec:       zitiv1.ZitiIdentitySpec{ZitiName: "a"},
+			Name: "immutable-id", Namespace: "default",
+			Spec: zitiv1.ZitiIdentitySpec{ZitiName: "a"},
 		}
 		Expect(k8sClient.Create(ctx, id)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, id) })
@@ -113,8 +113,8 @@ var _ = Describe("CRD validation", func() {
 	It("allows a ZitiIdentity certificate only with enrollmentMode None and externalId", func() {
 		mk := func(name string, mut func(*zitiv1.ZitiIdentitySpec)) *zitiv1.ZitiIdentity {
 			id := &zitiv1.ZitiIdentity{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-				Spec:       zitiv1.ZitiIdentitySpec{Certificate: &zitiv1.WorkloadCertificate{IssuerRef: zitiv1.CertificateIssuerRef{Name: "ca"}}},
+				Name: name, Namespace: "default",
+				Spec: zitiv1.ZitiIdentitySpec{Certificate: &zitiv1.WorkloadCertificate{IssuerRef: zitiv1.CertificateIssuerRef{Name: "ca"}}},
 			}
 			mut(&id.Spec)
 			return id
@@ -133,7 +133,7 @@ var _ = Describe("CRD validation", func() {
 
 	It("checks the ZitiTerminator address, applies defaults, and keeps service, router, and binding fixed", func() {
 		term := func(name, address string) *zitiv1.ZitiTerminator {
-			return &zitiv1.ZitiTerminator{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			return &zitiv1.ZitiTerminator{Name: name, Namespace: "default",
 				Spec: zitiv1.ZitiTerminatorSpec{Service: "web", Router: "r", Address: address}}
 		}
 		Expect(k8sClient.Create(ctx, term("bad-addr", "10.0.0.5:80"))).To(MatchError(ContainSubstring("should match")))
@@ -152,15 +152,15 @@ var _ = Describe("CRD validation", func() {
 	})
 
 	It("rejects a ZitiRouter port below 1024", func() {
-		rt := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "low-port"}, Spec: zitiv1.ZitiRouterSpec{Port: 443}}
+		rt := &zitiv1.ZitiRouter{Name: "low-port", Spec: zitiv1.ZitiRouterSpec{Port: 443}}
 		Expect(k8sClient.Create(ctx, rt)).To(MatchError(ContainSubstring("port")))
 	})
 
 	It("rejects a ZitiConnection with a non-https URL or no hostingRouters", func() {
 		conn := func(url string, routers []string) *zitiv1.ZitiConnection {
 			c := &zitiv1.ZitiConnection{
-				ObjectMeta: metav1.ObjectMeta{Name: "conn-case"},
-				Spec:       zitiv1.ZitiConnectionSpec{ManagementURL: url, HostingRouters: routers},
+				Name: "conn-case",
+				Spec: zitiv1.ZitiConnectionSpec{ManagementURL: url, HostingRouters: routers},
 			}
 			c.Spec.CABundle.ConfigMapRef = zitiv1.ConfigMapKeyRef{Namespace: "n", Name: "c", Key: "k"}
 			c.Spec.Auth.Updb = &zitiv1.UpdbAuth{SecretRef: zitiv1.SecretRef{Namespace: "n", Name: "s"}}
@@ -188,8 +188,8 @@ var _ = Describe("CRD validation", func() {
 	It("validates ZitiAccessPolicy and makes zitiName and deletionPolicy immutable", func() {
 		mk := func(ident, svc []string) *zitiv1.ZitiAccessPolicy {
 			return &zitiv1.ZitiAccessPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "ap-case", Namespace: "default"},
-				Spec:       zitiv1.ZitiAccessPolicySpec{ZitiName: "a", IdentityRoles: ident, ServiceRoles: svc},
+				Name: "ap-case", Namespace: "default",
+				Spec: zitiv1.ZitiAccessPolicySpec{ZitiName: "a", IdentityRoles: ident, ServiceRoles: svc},
 			}
 		}
 		Expect(k8sClient.Create(ctx, mk(nil, []string{"#x"}))).To(MatchError(ContainSubstring("identityRoles")))
@@ -210,10 +210,10 @@ var _ = Describe("CRD validation", func() {
 var _ = Describe("Service exposure", func() {
 	It("creates a ZitiApp the API server accepts, follows annotation changes, and removes it", func() {
 		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "expose-case", Namespace: "default", Annotations: map[string]string{
+			Name: "expose-case", Namespace: "default", Annotations: map[string]string{
 				desired.AnnExpose: "true", desired.AnnPorts: "443, 8000-8005", desired.AnnAllowGroups: "staff",
 				desired.AnnAllowIdentites: "alice", desired.AnnEntryRouters: "edge-1",
-			}},
+			},
 			Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
 		}
 		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
@@ -258,8 +258,8 @@ var _ = Describe("Service exposure", func() {
 var _ = Describe("ZitiJwtSigner and token identities", func() {
 	signer := func(mut func(*zitiv1.ZitiJwtSignerSpec)) *zitiv1.ZitiJwtSigner {
 		sg := &zitiv1.ZitiJwtSigner{
-			ObjectMeta: metav1.ObjectMeta{Name: "signer-case"},
-			Spec:       zitiv1.ZitiJwtSignerSpec{Audience: "ziti", Keys: zitiv1.SignerKeys{Kubernetes: &zitiv1.KubernetesKeys{}}},
+			Name: "signer-case",
+			Spec: zitiv1.ZitiJwtSignerSpec{Audience: "ziti", Keys: zitiv1.SignerKeys{Kubernetes: &zitiv1.KubernetesKeys{}}},
 		}
 		if mut != nil {
 			mut(&sg.Spec)
@@ -312,7 +312,7 @@ var _ = Describe("ZitiJwtSigner and token identities", func() {
 
 	DescribeTable("ZitiIdentity token login rules",
 		func(mut func(*zitiv1.ZitiIdentitySpec), wantErr string) {
-			id := &zitiv1.ZitiIdentity{ObjectMeta: metav1.ObjectMeta{Name: "token-case", Namespace: "default"}}
+			id := &zitiv1.ZitiIdentity{Name: "token-case", Namespace: "default"}
 			mut(&id.Spec)
 			err := k8sClient.Create(ctx, id)
 			DeferCleanup(func() { _ = k8sClient.Delete(ctx, id) })
@@ -344,8 +344,8 @@ var _ = Describe("ZitiJwtSigner and token identities", func() {
 var _ = Describe("ZitiCA", func() {
 	ca := func(mut func(*zitiv1.ZitiCASpec)) *zitiv1.ZitiCA {
 		c := &zitiv1.ZitiCA{
-			ObjectMeta: metav1.ObjectMeta{Name: "ca-case"},
-			Spec:       zitiv1.ZitiCASpec{Certificate: zitiv1.CertificateSource{SecretRef: zitiv1.SecretRef{Namespace: "cert-manager", Name: "issuer"}}},
+			Name: "ca-case",
+			Spec: zitiv1.ZitiCASpec{Certificate: zitiv1.CertificateSource{SecretRef: zitiv1.SecretRef{Namespace: "cert-manager", Name: "issuer"}}},
 		}
 		if mut != nil {
 			mut(&c.Spec)
@@ -481,7 +481,7 @@ var _ = Describe("one-to-one kinds", func() {
 
 var _ = Describe("ZitiRouter", func() {
 	router := func(mut func(*zitiv1.ZitiRouterSpec)) *zitiv1.ZitiRouter {
-		r := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "router-case"}}
+		r := &zitiv1.ZitiRouter{Name: "router-case"}
 		if mut != nil {
 			mut(&r.Spec)
 		}

@@ -44,14 +44,14 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiApp)) *env {
 		t.Fatal(err)
 	}
 	conn := &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Name: "default",
 		Spec: zitiv1.ZitiConnectionSpec{
 			RoleScope:      zitiv1.RoleScopeGlobal,
 			HostingRouters: []string{"r-main"},
 		},
 	}
 	svc := &zitiv1.ZitiApp{
-		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "team-a", UID: "uid-1", Generation: 1},
+		Name: "app", Namespace: "team-a", UID: "uid-1", Generation: 1,
 		Spec: zitiv1.ZitiAppSpec{
 			ConnectionRef:  "default",
 			ZitiName:       "app.example.com",

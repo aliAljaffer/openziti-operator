@@ -30,7 +30,7 @@ func TestWorkloadCertificateIsIssuedByCertManager(t *testing.T) {
 	}
 	issuer := `{"apiVersion":"cert-manager.io/v1","kind":"Issuer","metadata":{"name":"it-selfsigned"},"spec":{"selfSigned":{}}}`
 	id := &zitiv1.ZitiIdentity{
-		ObjectMeta: metav1.ObjectMeta{Name: "it-workload", Namespace: ns},
+		Name: "it-workload", Namespace: ns,
 		Spec: zitiv1.ZitiIdentitySpec{
 			ExternalID:  "team-a.it-workload",
 			Certificate: &zitiv1.WorkloadCertificate{IssuerRef: zitiv1.CertificateIssuerRef{Name: "it-selfsigned", Kind: "Issuer"}, Duration: &metav1.Duration{Duration: 24 * time.Hour}},

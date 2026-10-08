@@ -87,8 +87,8 @@ func (r *ZitiConnectionReconciler) ensureDefaultConnection(ctx context.Context) 
 		return fmt.Errorf("--create-connection: %w", err)
 	}
 	return r.Create(ctx, &zitiv1alpha1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       spec,
+		Name: name,
+		Spec: spec,
 	})
 }
 

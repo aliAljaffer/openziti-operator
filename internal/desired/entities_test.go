@@ -17,8 +17,8 @@ import (
 
 func connWith(scope zitiv1.RoleScope) *zitiv1.ZitiConnection {
 	return &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
-		Spec:       zitiv1.ZitiConnectionSpec{RoleScope: scope, ClusterID: "c1"},
+		Name: "default",
+		Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope, ClusterID: "c1"},
 	}
 }
 

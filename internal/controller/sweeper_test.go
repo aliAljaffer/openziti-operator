@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -24,21 +23,21 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	if err := zitiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: zitiv1.ZitiConnectionSpec{ClusterID: "prod"}}
-	app := &zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "n", UID: "live-uid"}}
+	conn := &zitiv1.ZitiConnection{Name: "default", Spec: zitiv1.ZitiConnectionSpec{ClusterID: "prod"}}
+	app := &zitiv1.ZitiApp{Name: "a", Namespace: "n", UID: "live-uid"}
 	// One live owner of every other kind. Their entities must never count as orphans.
 	owners := []client.Object{
-		&zitiv1.ZitiIdentity{ObjectMeta: metav1.ObjectMeta{Name: "i", Namespace: "n", UID: "live-identity"}},
-		&zitiv1.ZitiAccessPolicy{ObjectMeta: metav1.ObjectMeta{Name: "ap", Namespace: "n", UID: "live-accesspolicy"}},
-		&zitiv1.ZitiJwtSigner{ObjectMeta: metav1.ObjectMeta{Name: "sg", UID: "live-signer"}},
-		&zitiv1.ZitiCA{ObjectMeta: metav1.ObjectMeta{Name: "ca", UID: "live-ca"}},
-		&zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "rt", UID: "live-router"}},
-		&zitiv1.ZitiConfig{ObjectMeta: metav1.ObjectMeta{Name: "cfg", Namespace: "n", UID: "live-config"}},
-		&zitiv1.ZitiService{ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "n", UID: "live-service"}},
-		&zitiv1.ZitiServicePolicy{ObjectMeta: metav1.ObjectMeta{Name: "sp", Namespace: "n", UID: "live-servicepolicy"}},
-		&zitiv1.ZitiEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "erp", Namespace: "n", UID: "live-erp"}},
-		&zitiv1.ZitiServiceEdgeRouterPolicy{ObjectMeta: metav1.ObjectMeta{Name: "serp", Namespace: "n", UID: "live-serp"}},
-		&zitiv1.ZitiTerminator{ObjectMeta: metav1.ObjectMeta{Name: "term", Namespace: "n", UID: "live-terminator"}},
+		&zitiv1.ZitiIdentity{Name: "i", Namespace: "n", UID: "live-identity"},
+		&zitiv1.ZitiAccessPolicy{Name: "ap", Namespace: "n", UID: "live-accesspolicy"},
+		&zitiv1.ZitiJwtSigner{Name: "sg", UID: "live-signer"},
+		&zitiv1.ZitiCA{Name: "ca", UID: "live-ca"},
+		&zitiv1.ZitiRouter{Name: "rt", UID: "live-router"},
+		&zitiv1.ZitiConfig{Name: "cfg", Namespace: "n", UID: "live-config"},
+		&zitiv1.ZitiService{Name: "svc", Namespace: "n", UID: "live-service"},
+		&zitiv1.ZitiServicePolicy{Name: "sp", Namespace: "n", UID: "live-servicepolicy"},
+		&zitiv1.ZitiEdgeRouterPolicy{Name: "erp", Namespace: "n", UID: "live-erp"},
+		&zitiv1.ZitiServiceEdgeRouterPolicy{Name: "serp", Namespace: "n", UID: "live-serp"},
+		&zitiv1.ZitiTerminator{Name: "term", Namespace: "n", UID: "live-terminator"},
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(owners, conn, app)...).Build()
 	zc := ziti.NewFake()

@@ -51,11 +51,11 @@ func setupIdentity(t *testing.T, objs ...client.Object) *idEnv {
 		t.Fatal(err)
 	}
 	conn := &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
-		Spec:       zitiv1.ZitiConnectionSpec{RoleScope: zitiv1.RoleScopeNamespaced},
+		Name: "default",
+		Spec: zitiv1.ZitiConnectionSpec{RoleScope: zitiv1.RoleScopeNamespaced},
 	}
 	zid := &zitiv1.ZitiIdentity{
-		ObjectMeta: metav1.ObjectMeta{Name: "backend", Namespace: "team-a", UID: "uid-1", Generation: 1},
+		Name: "backend", Namespace: "team-a", UID: "uid-1", Generation: 1,
 		Spec: zitiv1.ZitiIdentitySpec{
 			ConnectionRef: "default", RoleAttributes: []string{"web"}, DeletionPolicy: zitiv1.DeletionPolicyDelete,
 		},
@@ -199,7 +199,7 @@ func TestIdentityConflicts(t *testing.T) {
 		t.Errorf("identities = %d", n)
 	}
 
-	e = setupIdentity(t, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "backend", Namespace: "team-a"}})
+	e = setupIdentity(t, &corev1.Secret{Name: "backend", Namespace: "team-a"})
 	e.reconcile(t)
 	if c := findCond(e.get(t), CondSynced); c.Reason != "SecretConflict" {
 		t.Errorf("synced = %+v", c)
@@ -572,7 +572,7 @@ func TestIdentitySecretIsLabeledAndHiddenSecretIsAConflict(t *testing.T) {
 	}
 
 	// A filtered cache cannot see an unlabeled Secret: Get says not found, Create says already exists.
-	hidden := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "backend", Namespace: "team-a"}}
+	hidden := &corev1.Secret{Name: "backend", Namespace: "team-a"}
 	e2 := setupIdentity(t, hidden)
 	e2.r.Client = hideSecrets{e2.r.Client}
 	e2.reconcile(t)
