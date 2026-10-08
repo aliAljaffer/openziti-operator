@@ -67,8 +67,6 @@ spec:
     namespace: routers
 ```
 
-Set `advertisedAddress` before the first start. Ziti takes the router address from its certificate, and the image writes that certificate once and keeps it. A router that starts without an address enrolls and goes online under `CHANGE_ME.invalid`, and no client can reach it.
-
 The operator creates a `Deployment` and a volume claim in that namespace, and ties both to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter` shows `WORKLOAD` and `ENDPOINT`.
 
 The operator does **not** create the `Service`. Rewriting a Service anywhere in a cluster is a privilege escalation, so the operator does not ask for write access to them; you would not want the operator holding it either. The operator writes a ready-made `service.yaml` to the enrollment Secret instead:
@@ -78,6 +76,22 @@ kubectl -n routers get secret homelab-1-enrollment -o jsonpath='{.data.service\.
 ```
 
 Without a Service the router still starts and serves, but it has only a Pod address, which changes when the pod is rescheduled. Add the Service when you want a stable one.
+
+## Who needs a reachable address
+
+Ziti puts `advertisedAddress` in the router certificate on first start and never changes it. The image writes that certificate once and keeps it, so a later change to the field, or to `port`, has no effect.
+
+The address is only needed when something dials the router **by name**. It is not needed for the router to start, enroll, or host services.
+
+| Router | `advertisedAddress` |
+|---|---|
+| Clients connect to it directly, or other routers link to it | Required. Use the DNS name or IP clients use. |
+| It hosts services and clients arrive through other routers | Leave it empty. The operator uses the placeholder `CHANGE_ME.invalid`. |
+| `serviceType: NodePort` | Required, because a NodePort has no address of its own. Use a node IP or DNS name. |
+
+A router with an empty address still enrolls, goes online, and terminates services. Nothing can dial it by name, so it works only for clients whose path goes through another router. That is the normal shape for a hosting router behind an entry router.
+
+The tunneler needs an edge listener, and an edge listener needs an advertise value. A placeholder satisfies that, which is why an empty address starts at all.
 
 | Key | Meaning |
 |---|---|

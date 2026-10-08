@@ -21,6 +21,7 @@ import (
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
+	"github.com/aliAljaffer/openziti-operator/internal/desired"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -502,6 +503,36 @@ func TestRouterWithoutADeploymentHasNoWorkloadCondition(t *testing.T) {
 	var dep appsv1.Deployment
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err != nil {
 		t.Fatalf("the operator must not delete the workload itself: %v", err)
+	}
+}
+
+func TestRouterDeploymentStartsWithoutAnAdvertisedAddress(t *testing.T) {
+	e := setupDeployedRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.AdvertisedAddress = "" })
+	rt := e.reconcile(t)
+	if rt.Status.RouterID == "" {
+		t.Fatalf("status = %+v", rt.Status)
+	}
+
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err != nil {
+		t.Fatalf("deployment: %v", err)
+	}
+	// The tunneler needs an edge listener, and an edge listener needs an advertise value. A placeholder satisfies
+	// that, so a router nobody dials by name still starts and hosts.
+	var advertise string
+	for _, e := range dep.Spec.Template.Spec.Containers[0].Env {
+		if e.Name == "ZITI_ROUTER_ADVERTISED_ADDRESS" {
+			advertise = e.Value
+		}
+	}
+	if advertise != desired.AddressPlaceholder {
+		t.Errorf("advertise = %q, want the placeholder %q", advertise, desired.AddressPlaceholder)
+	}
+	if c := routerCond(rt, CondWorkload); c.Status != metav1.ConditionFalse || c.Reason != "DeploymentUnavailable" {
+		t.Errorf("workload = %+v", c)
+	}
+	if routerCond(rt, CondSynced).Status != metav1.ConditionTrue {
+		t.Errorf("an empty address must not fail the sync: %+v", routerCond(rt, CondSynced))
 	}
 }
 

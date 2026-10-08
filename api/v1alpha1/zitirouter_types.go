@@ -23,7 +23,6 @@ import (
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
-// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || has(self.advertisedAddress)",message="advertisedAddress is required with deployment: the address goes into the router certificate on first start and cannot change later"
 type ZitiRouterSpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -61,16 +60,17 @@ type ZitiRouterSpec struct {
 
 	// enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
 	// Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
-	// With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml".
-	// The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires.
-	// Without it, the JWT stays in Ziti.
+	// The Secret also holds the keys "docker-compose.yml" and "deployment.yaml", ready-made files for a router
+	// you install yourself. The operator removes all three keys once the router has enrolled, and issues a new
+	// JWT when an unused one expires. Without it, the JWT stays in Ziti.
 	// +optional
 	EnrollmentSecretRef *SecretRef `json:"enrollmentSecretRef,omitempty"`
 
-	// advertisedAddress is the DNS name or IP where clients and other routers reach this router. The router needs it to start.
-	// With enrollmentSecretRef and this field, the operator also writes ready-made "docker-compose.yml" and
-	// "deployment.yaml" files to the Secret, so the router can be started on a VM or in a Kubernetes cluster without router configuration.
-	// Without it, only the JWT is written and the condition ManifestsReady says why.
+	// advertisedAddress is the DNS name or IP where clients and other routers reach this router. Ziti puts it in the
+	// router certificate on first start and never changes it, so changing this later has no effect.
+	// Leave it empty for a router that only dials out and hosts services for clients who arrive through other
+	// routers: the operator uses the placeholder CHANGE_ME.invalid, which starts and serves, but which no client
+	// or router can dial by name. See docs/routers.md.
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$`
 	// +optional
@@ -78,6 +78,7 @@ type ZitiRouterSpec struct {
 
 	// port is the port the router listens on for clients and links. It is used in the generated manifests.
 	// It must be 1024 or higher, because the generated manifests drop all capabilities.
+	// The image writes its configuration on first start and keeps it, so a later change has no effect.
 	// +kubebuilder:default=3022
 	// +kubebuilder:validation:Minimum=1024
 	// +kubebuilder:validation:Maximum=65535
