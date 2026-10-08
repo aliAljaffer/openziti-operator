@@ -16,6 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
@@ -292,17 +293,29 @@ func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
 	if err := e.k.Get(t.Context(), key, &dep); err != nil {
 		t.Fatalf("deployment: %v", err)
 	}
-	var svc corev1.Service
-	if err := e.k.Get(t.Context(), key, &svc); err != nil {
-		t.Fatalf("service: %v", err)
-	}
 	var pvc corev1.PersistentVolumeClaim
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
 		t.Fatalf("claim: %v", err)
 	}
+	// The operator must not write Services, so the Service is a manifest in the Secret instead.
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err == nil {
+		t.Error("the operator must not create a Service, it has no cluster-wide write access to one")
+	}
+	secret, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want corev1.Service
+	if err := yaml.Unmarshal(secret.Data[SecretKeyService], &want); err != nil {
+		t.Fatalf("service.yaml: %v\n%s", err, secret.Data[SecretKeyService])
+	}
+	if want.Name != "edge-1" || want.Namespace != "routers" || len(want.Spec.Ports) != 1 {
+		t.Errorf("service manifest = %+v", want)
+	}
 	// The operator owns all three, so deleting the router removes them. A cluster-scoped owner of a namespaced
 	// object is allowed by Kubernetes garbage collection.
-	for _, o := range []client.Object{&dep, &svc, &pvc} {
+	for _, o := range []client.Object{&dep, &pvc} {
 		if !metav1.IsControlledBy(o, rt) {
 			t.Errorf("%s is not owned by the router", o.GetName())
 		}
@@ -368,12 +381,19 @@ func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	if err := e.k.Get(t.Context(), key, &dep); err != nil {
 		t.Fatal(err)
 	}
-	var svc corev1.Service
-	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+	if dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != 4100 {
+		t.Errorf("port not applied: %d", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+	}
+	secret, err := e.secret(t)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != 4100 || svc.Spec.Type != corev1.ServiceTypeNodePort {
-		t.Errorf("port/type not applied: %d %s", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort, svc.Spec.Type)
+	var manifest corev1.Service
+	if err := yaml.Unmarshal(secret.Data[SecretKeyService], &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Spec.Type != corev1.ServiceTypeNodePort || manifest.Spec.Ports[0].Port != 4100 {
+		t.Errorf("service manifest not applied: %+v", manifest.Spec)
 	}
 	// The claim spec is immutable, so a port change must not touch it.
 	var pvc corev1.PersistentVolumeClaim
@@ -385,32 +405,8 @@ func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	}
 }
 
-func TestRouterDeploymentKeepsTheClusterServiceAddress(t *testing.T) {
-	e := setupDeployedRouter(t, nil)
-	e.reconcile(t)
-	key := types.NamespacedName{Namespace: "routers", Name: "edge-1"}
-	var svc corev1.Service
-	if err := e.k.Get(t.Context(), key, &svc); err != nil {
-		t.Fatal(err)
-	}
-	// The API server assigns these. A reconcile that cleared them would ask for a new ClusterIP.
-	svc.Spec.ClusterIP, svc.Spec.ClusterIPs = "10.96.0.42", []string{"10.96.0.42"}
-	svc.Spec.Ports[0].NodePort = 31234
-	if err := e.k.Update(t.Context(), &svc); err != nil {
-		t.Fatal(err)
-	}
-	e.reconcile(t)
-	if err := e.k.Get(t.Context(), key, &svc); err != nil {
-		t.Fatal(err)
-	}
-	if svc.Spec.ClusterIP != "10.96.0.42" || svc.Spec.Ports[0].NodePort != 31234 {
-		t.Errorf("service lost its assigned address: %+v", svc.Spec)
-	}
-}
-
 func TestRouterDeploymentRefusesForeignObjects(t *testing.T) {
 	for _, foreign := range []client.Object{
-		&corev1.Service{Name: "edge-1", Namespace: "routers"},
 		&appsv1.Deployment{Name: "edge-1", Namespace: "routers"},
 		&corev1.PersistentVolumeClaim{Name: "edge-1-data", Namespace: "routers"},
 	} {

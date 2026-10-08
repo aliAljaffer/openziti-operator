@@ -67,14 +67,22 @@ spec:
 
 Set `advertisedAddress` before the first start. Ziti takes the router address from its certificate, and the image writes that certificate once and keeps it. A router that starts without an address enrolls and goes online under `CHANGE_ME.invalid`, and no client can reach it.
 
-The operator creates a `Deployment`, a `Service`, and a volume claim in that namespace, and ties all three to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter` shows `WORKLOAD` and `ENDPOINT`.
+The operator creates a `Deployment` and a volume claim in that namespace, and ties both to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter` shows `WORKLOAD` and `ENDPOINT`.
+
+The operator does **not** create the `Service`. Rewriting a Service anywhere in a cluster is a privilege escalation, so the operator does not ask for write access to them; you would not want the operator holding it either. The operator writes a ready-made `service.yaml` to the enrollment Secret instead:
+
+```sh
+kubectl -n routers get secret homelab-1-enrollment -o jsonpath='{.data.service\.yaml}' | base64 -d | kubectl apply -f -
+```
+
+Without a Service the router still starts and serves, but it has only a Pod address, which changes when the pod is rescheduled. Add the Service when you want a stable one.
 
 | Key | Meaning |
 |---|---|
 | `deployment.namespace` | Where the three objects go. The operator needs RBAC for `deployments`, `services`, and `persistentvolumeclaims` there. |
 | `deployment.image` | The router image. Defaults to the tested `openziti/ziti-router` image for the controller version. Set it for a private registry. |
 | `deployment.imagePullPolicy` | Default `IfNotPresent`. |
-| `deployment.serviceType` | `LoadBalancer` (default) or `NodePort`. Use `NodePort` where the cluster has no load balancer, then set `advertisedAddress` to a node address. |
+| `deployment.serviceType` | `LoadBalancer` (default) or `NodePort` in the `service.yaml` the operator writes. Use `NodePort` where the cluster has no load balancer, then set `advertisedAddress` to a node address. |
 
 Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollment`, in the same namespace, because the router pod reads the token from it. With `enrollmentSecretRef` the pod reads that Secret instead.
 

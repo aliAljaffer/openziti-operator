@@ -87,10 +87,13 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zitirouter-sample
 spec:
-  roleAttributes: [edge]
+  roleAttributes:
+    - edge
   tunnelerEnabled: true
   advertisedAddress: vm1.example.com
-  enrollmentSecretRef: {namespace: default, name: zitirouter-sample-enrollment}
+  enrollmentSecretRef:
+    namespace: default
+    name: zitirouter-sample-enrollment
   # Uncomment to let the operator run the router in this cluster instead of writing manifests to the Secret.
   # deployment:
   #   namespace: routers

@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/yaml"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
@@ -47,6 +48,7 @@ import (
 const (
 	SecretKeyCompose    = "docker-compose.yml"
 	SecretKeyDeployment = "deployment.yaml"
+	SecretKeyService    = "service.yaml"
 	CondEnrolled        = "Enrolled"
 	CondOnline          = "Online"
 	CondServing         = "Serving"
@@ -68,7 +70,7 @@ type ZitiRouterReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitirouters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitirouters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var rt zitiv1alpha1.ZitiRouter
@@ -243,10 +245,18 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 	if err := r.createOwned(ctx, rt, w.PersistentVolumeClaim()); err != nil {
 		return err
 	}
-	if err := r.applyOwned(ctx, rt, w.Service(), keepServiceFields); err != nil {
+	if err := r.applyOwned(ctx, rt, w.Deployment(name), nil); err != nil {
 		return err
 	}
-	if err := r.applyOwned(ctx, rt, w.Deployment(name), nil); err != nil {
+	// The operator does not get write access to Services cluster-wide, because rewriting one anywhere in the
+	// cluster is a privilege escalation. It writes the Service to the Secret instead.
+	manifest, err := yaml.Marshal(w.Service())
+	if err != nil {
+		return err
+	}
+	if err := upsertOwnedSecretKeys(ctx, r.Client, r.Scheme, rt,
+		types.NamespacedName{Namespace: w.Namespace, Name: w.SecretName()},
+		map[string][]byte{SecretKeyService: manifest}); err != nil {
 		return err
 	}
 
@@ -262,22 +272,6 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 	}
 	setCond(&rt.Status.Conditions, rt.Generation, CondWorkload, ready > 0, "Running", "DeploymentUnavailable", msg)
 	return nil
-}
-
-// keepServiceFields copies the fields the API server owns from the live Service onto the desired one. Without it
-// every reconcile would ask the cluster for a new ClusterIP.
-func keepServiceFields(cur, want client.Object) {
-	cs, ws := cur.(*corev1.Service), want.(*corev1.Service)
-	ws.Spec.ClusterIP = cs.Spec.ClusterIP
-	ws.Spec.ClusterIPs = cs.Spec.ClusterIPs
-	ws.Spec.IPFamilies = cs.Spec.IPFamilies
-	ws.Spec.IPFamilyPolicy = cs.Spec.IPFamilyPolicy
-	ws.Spec.HealthCheckNodePort = cs.Spec.HealthCheckNodePort
-	for i := range ws.Spec.Ports {
-		if i < len(cs.Spec.Ports) {
-			ws.Spec.Ports[i].NodePort = cs.Spec.Ports[i].NodePort
-		}
-	}
 }
 
 // createOwned creates obj when it is missing. An object that exists but belongs to someone else is a conflict.
