@@ -92,6 +92,12 @@ The pod runs one replica as uid 2171 with all capabilities dropped. The Deployme
 
 The enrollment token expires after about three hours. The operator removes it from the Secret once the router has enrolled, and the pod reads it as an optional key. A restarted pod starts from its volume with no token at all. If you delete the volume, the router needs a new enrollment: delete the resource and apply it again.
 
+A volume claim cannot change its storage class once it exists, so set `storageClassName` before the first reconcile. A later change leaves the `Workload` condition `False` with reason `StorageClassLocked`. Delete the claim to let the operator make a new one.
+
+Check the reclaim policy of the storage class. With `Retain`, deleting the resource leaves the volume behind, and a later `ZitiRouter` of the same name can pick it up with a certificate for a Ziti identity that no longer exists. That router never connects. Delete the volume as well when you delete the resource.
+
+The router needs one replica and a volume. It does not need CPU or memory requests, and the operator does not set them.
+
 The JWT works once and expires after about three hours. The operator writes new files when it issues a new JWT. It removes the JWT and both files when the router has enrolled. The files need the controller version, so the `ZitiConnection` must be connected.
 
 ## Give the JWT to the router
@@ -142,6 +148,6 @@ A `ZitiApp` names routers in `hostedBy` and `entryRouters`, and the connection l
 
 ## Limits
 
-- Tested: the operator creates the router, delivers the JWT Ziti issued, keeps the pending enrollment across updates, and issues a new JWT with re-enroll. It has not enrolled a real router with that JWT, so the Enrolled and Online transitions are tested against a fake controller only.
+- Tested against a real cluster: the operator created the router, Deployment, Service, and volume claim, the router enrolled and went online on its own, and it came back after the pod was deleted with no token left in the Secret.
 - A live router that this operator created is deleted from Ziti when you delete its resource (or, with the orphan sweeper in `delete` mode, when the resource is gone). Use `deletionPolicy: Orphan` for routers that must survive.
-- `deployment` was not run against a cluster. It is tested against a real Ziti controller with the same objects the reconciler builds, but not against a live Kubernetes cluster yet.
+- `deployment` was tested on a real cluster: one `ZitiRouter` with `spec.deployment` produced an enrolled, online router from a single applied resource. Deleting the pod brought it back with no token.

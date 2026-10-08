@@ -99,6 +99,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `IdentityNotFound` | `ZitiApp` `AccessResolved` | A name in `allow.identities` is not in Ziti. The policy still uses the identities that exist. |
 | `DeploymentUnavailable` | `ZitiRouter` `Workload` | The router pod has no ready replica. Look at the pod in `spec.deployment.namespace`. |
 | `ControllerVersionUnknown` | `ZitiRouter` `Workload` | The `ZitiConnection` has not reported a controller version, so the router image cannot be chosen. Set `spec.deployment.image`, or wait for the connection. |
+| `StorageClassLocked` | `ZitiRouter` `Workload` | The volume claim was created with another storage class and a bound claim cannot change. Delete the claim, or set `storageClassName` to the class it already has. |
 
 ## Events
 
