@@ -18,11 +18,27 @@ spec:
       labels:
         app: web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web
-          image: nginx:alpine
+          image: nginxinc/nginx-unprivileged:alpine
           ports:
             - containerPort: 8080
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: cache
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -64,6 +80,8 @@ spec:
   entryRouters:
     - edge-1
 ```
+
+The workload runs as a non-root user with a read-only root filesystem, the same hardening the chart gives the manager.
 
 `expose` is what clients dial. `targets` is where the app runs, one Ziti terminator each. `kubernetesService` becomes the address `<service>.<namespace>.svc`, so the Service above has to exist. `cost` decides which target wins; equal costs share the load.
 

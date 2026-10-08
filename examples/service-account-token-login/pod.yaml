@@ -11,12 +11,22 @@ metadata:
   namespace: team-a
 spec:
   serviceAccountName: web-bot
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: curl
       image: curlimages/curl
       command:
-        - "sleep"
+        - sleep
         - "3600"
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - name: ziti-token
           mountPath: /var/run/secrets/ziti

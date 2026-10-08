@@ -13,11 +13,27 @@ spec:
       labels:
         app: web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web
-          image: nginx:alpine
+          image: nginxinc/nginx-unprivileged:alpine
           ports:
             - containerPort: 8080
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: cache
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

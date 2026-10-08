@@ -35,6 +35,8 @@ spec:
 kubectl apply -k .
 ```
 
+The workload runs as a non-root user with a read-only root filesystem, the same hardening the chart gives the manager.
+
 The Pod asks for a token with the audience `ziti` and mounts it.
 
 ```yaml
@@ -51,12 +53,22 @@ metadata:
   namespace: team-a
 spec:
   serviceAccountName: web-bot
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: curl
       image: curlimages/curl
       command:
-        - "sleep"
+        - sleep
         - "3600"
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - name: ziti-token
           mountPath: /var/run/secrets/ziti

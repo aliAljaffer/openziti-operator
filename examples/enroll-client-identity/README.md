@@ -26,6 +26,8 @@ kubectl -n team-a get ztid alice      # ENROLLED True, CERT EXPIRES in the futur
 kubectl -n team-a get secret alice-identity
 ```
 
+The workload runs as a non-root user with a read-only root filesystem, the same hardening the chart gives the manager.
+
 The client Pod below mounts the Secret and proxies the Ziti service `team-a.web` on its own port 8080. The service name is the ZitiApp name in the form `<namespace>.<name>`.
 
 ```yaml
@@ -36,29 +38,49 @@ metadata:
   name: alice-client
   namespace: team-a
 spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: tunnel
       image: openziti/ziti-cli:2.0.4
       command:
-        - "ziti"
-        - "tunnel"
-        - "proxy"
-        - "-i"
-        - "/id/identity.json"
-        - "team-a.web:8080"
+        - ziti
+        - tunnel
+        - proxy
+        - -i
+        - /id/identity.json
+        - team-a.web:8080
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - name: identity
           mountPath: /id
           readOnly: true
+        - name: cache
+          mountPath: /tmp
     - name: curl
       image: curlimages/curl
       command:
-        - "sleep"
+        - sleep
         - "3600"
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
   volumes:
     - name: identity
       secret:
         secretName: alice-identity
+    - name: cache
+      emptyDir: {}
 ```
 
 Dial the app from the sidecar. The Ziti name resolves only for identities the app allows.
