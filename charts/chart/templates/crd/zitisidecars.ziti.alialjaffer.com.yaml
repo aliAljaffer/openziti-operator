@@ -1,0 +1,210 @@
+{{- if .Values.crd.enabled }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.22.0
+  name: zitisidecars.ziti.alialjaffer.com
+spec:
+  group: ziti.alialjaffer.com
+  names:
+    categories:
+    - ziti
+    kind: ZitiSidecar
+    listKind: ZitiSidecarList
+    plural: zitisidecars
+    shortNames:
+    - ztc
+    singular: zitisidecar
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.identityRef
+      name: Identity
+      type: string
+    - jsonPath: .spec.mode
+      name: Mode
+      type: string
+    - jsonPath: .status.identityEnrolled
+      name: Identity Ready
+      type: boolean
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].message
+      name: Message
+      priority: 1
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ZitiSidecar is the Schema for the zitisidecars API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of ZitiSidecar
+            properties:
+              connectionRef:
+                default: default
+                description: connectionRef is the name of the ZitiConnection to use.
+                  It defaults to "default".
+                type: string
+              identityRef:
+                description: |-
+                  identityRef is the name of the ZitiIdentity in this namespace whose identity file the tunneler uses.
+                  It cannot change later.
+                maxLength: 253
+                minLength: 1
+                type: string
+              manifestSecretRef:
+                description: |-
+                  manifestSecretRef names the Secret that receives the patch under the key "sidecar-patch.yaml".
+                  Without it the operator writes nothing and only reports.
+                properties:
+                  name:
+                    description: name of the Secret.
+                    type: string
+                  namespace:
+                    description: namespace of the Secret.
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+              mode:
+                default: Host
+                description: |-
+                  mode is Host for tproxy interception, which needs NET_ADMIN and usually hostNetwork, or Proxy for a
+                  transparent proxy that needs neither. It cannot change later.
+                enum:
+                - Host
+                - Proxy
+                type: string
+              resolver:
+                default: udp://kube-dns.kube-system.svc.cluster.local:53
+                description: |-
+                  resolver is the DNS upstream the tunneler uses. The default is the cluster DNS, which the image default
+                  of 127.0.0.1 cannot reach.
+                maxLength: 253
+                type: string
+              servicePollRate:
+                default: 15
+                description: servicePollRate is how often the tunneler asks Ziti for
+                  service changes, in seconds.
+                format: int32
+                maximum: 3600
+                minimum: 1
+                type: integer
+            required:
+            - identityRef
+            type: object
+            x-kubernetes-validations:
+            - message: connectionRef is immutable
+              rule: self.connectionRef == oldSelf.connectionRef
+            - message: identityRef is immutable
+              rule: self.identityRef == oldSelf.identityRef
+            - message: mode is immutable
+              rule: self.mode == oldSelf.mode
+          status:
+            description: status defines the observed state of ZitiSidecar
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              identityEnrolled:
+                description: identityEnrolled is true once the identity has an identity
+                  file for the tunneler to use.
+                type: boolean
+              observedGeneration:
+                format: int64
+                type: integer
+              zitiName:
+                description: zitiName is the identity name in Ziti.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end }}
