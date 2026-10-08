@@ -39,6 +39,23 @@
 
 Field help is built in: `kubectl explain ztapp.spec.targets`. The full field list is in the [ZitiApp reference](reference/ZitiApp.md).
 
+## Derive targets from Kubernetes Services
+
+For several backend Services with the same labels, set `expose.selector` instead of listing addresses, ports, and targets. The operator selects Services in this namespace and derives the DNS names, ports, and terminators from them.
+
+```yaml
+spec:
+  expose:
+    selector:
+      matchLabels:
+        app: billing
+  allow:
+    groups:
+      - finance
+```
+
+The selector matches **Services**, not Deployments. Services provide stable addresses while pods restart or move. Each selected Service must have ports, and at most 16 Service ports can match. `expose.addresses` and `expose.ports` can override the derived values; do not set `targets` with a selector.
+
 ## Keys
 
 | Key | Meaning |
@@ -47,6 +64,7 @@ Field help is built in: `kubectl explain ztapp.spec.targets`. The full field lis
 | `expose.addresses` | What clients dial: hostnames, IPs, or CIDRs. |
 | `expose.ports` | Numbers or `"low-high"` ranges. |
 | `expose.protocols` | `tcp` (default) and `udp`. |
+| `expose.selector` | Selects Services in this namespace and derives addresses, ports, and targets. |
 | `targets` | Where the app runs. Each target is one Ziti terminator. |
 | `targets[].address` or `kubernetesService` | Set exactly one. |
 | `targets[].port` | Port on the target. Without it, the port the client dialed is used. |

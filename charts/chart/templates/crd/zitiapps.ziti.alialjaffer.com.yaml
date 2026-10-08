@@ -115,16 +115,18 @@ spec:
                   managementPolicy is Observe.
                 properties:
                   addresses:
-                    description: addresses are the hostnames, IPs, or CIDRs clients
-                      dial.
+                    description: |-
+                      addresses are the hostnames, IPs, or CIDRs clients dial.
+                      When selector is set and addresses are empty, the operator uses the DNS names of selected Services.
                     items:
                       type: string
-                    minItems: 1
+                    maxItems: 16
                     type: array
                   ports:
                     description: |-
                       ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
-                      The operator checks range syntax and reports InvalidSpec.
+                      The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
+                      the operator uses the selected Services' ports.
                     items:
                       anyOf:
                       - type: integer
@@ -134,11 +136,8 @@ spec:
                       - message: a port is 1-65535
                         rule: type(self) != int || (self >= 1 && self <= 65535)
                     maxItems: 16
-                    minItems: 1
                     type: array
                   protocols:
-                    default:
-                    - tcp
                     description: protocols the clients may use. The targets always
                       accept the same protocols.
                     items:
@@ -148,10 +147,64 @@ spec:
                       type: string
                     minItems: 1
                     type: array
-                required:
-                - addresses
-                - ports
+                  selector:
+                    description: |-
+                      selector selects Kubernetes Services in this namespace. When set, the operator derives default
+                      addresses, ports, and targets from the matching Services. Do not set targets with selector.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    x-kubernetes-validations:
+                    - message: selector must have at least one label or expression
+                      rule: (has(self.matchLabels) && size(self.matchLabels) > 0)
+                        || (has(self.matchExpressions) && size(self.matchExpressions)
+                        > 0)
                 type: object
+                x-kubernetes-validations:
+                - message: expose needs addresses and ports unless selector is set
+                  rule: has(self.selector) || (has(self.addresses) && size(self.addresses)
+                    > 0 && has(self.ports) && size(self.ports) > 0)
               hostedBy:
                 description: |-
                   hostedBy is the router that runs the targets. It must be in the connection hostingRouters.
@@ -226,10 +279,13 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
-            - message: expose and targets are required unless managementPolicy is
-                Observe
-              rule: self.managementPolicy == 'Observe' || (has(self.expose) && has(self.targets)
-                && size(self.targets) > 0)
+            - message: expose and targets or expose.selector are required unless managementPolicy
+                is Observe
+              rule: self.managementPolicy == 'Observe' || (has(self.expose) && (has(self.expose.selector)
+                || (has(self.targets) && size(self.targets) > 0)))
+            - message: expose.selector derives targets; do not set targets
+              rule: '!has(self.expose) || !has(self.expose.selector) || !has(self.targets)
+                || size(self.targets) == 0'
           status:
             description: status defines the observed state of ZitiApp
             properties:
