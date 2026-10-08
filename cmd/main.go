@@ -121,6 +121,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if orphanInterval <= 0 {
+		setupLog.Error(nil, "Invalid --orphan-sweep-interval, use a duration above zero", "value", orphanInterval.String())
+		os.Exit(1)
+	}
+
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
