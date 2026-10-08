@@ -13,3 +13,7 @@ spec:
   enrollmentSecretRef:
     namespace: default
     name: zitirouter-sample-enrollment
+  # Uncomment to let the operator run the router in this cluster instead of writing manifests to the Secret.
+  # deployment:
+  #   namespace: routers
+  #   serviceType: LoadBalancer

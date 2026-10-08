@@ -23,10 +23,19 @@ for crd in config/crd/bases/*.yaml; do
   } >"$out/$name.yaml"
 done
 
-# The manager role keeps the rules of config/rbac/role.yaml. With rbac.secretNamespaces set, the Secret rule and the
-# ConfigMap entry move to per-namespace Roles (templates/rbac/secret-roles.yaml).
+# The manager role keeps the rules of config/rbac/role.yaml. With rbac.secretNamespaces set, or with
+# rbac.clusterWideSecrets turned off, secrets and configmaps move to per-namespace Roles
+# (templates/rbac/secret-roles.yaml). The ziti-operator.limitSecrets helper covers both.
+#
+# controller-gen merges rules that share an apiGroup and a verb set, so secrets can land in the same rule as
+# services or persistentvolumeclaims. Guard the resource line, not the rule, or the ClusterRole would keep Secret
+# access in the mode that exists to remove it. A rule made only of guarded resources is dropped whole.
 python3 - <<'PY'
 import re
+
+GUARDED = ("secrets", "configmaps")
+GUARD = '{{- if not (include "ziti-operator.limitSecrets" .) }}'
+
 src = open("config/rbac/role.yaml").read()
 rules = src.split("\nrules:\n", 1)[1].strip("\n").split("\n")
 blocks, cur = [], []
@@ -37,15 +46,33 @@ for line in rules:
     cur.append(line)
 blocks.append(cur)
 
+def resources(b):
+    """Returns (start, end, names) of the resources list of one rule block."""
+    start = next((i for i, l in enumerate(b) if l == "  resources:"), None)
+    if start is None:
+        return None
+    end = start + 1
+    while end < len(b) and b[end].startswith("  - "):
+        end += 1
+    return start, end, [l[4:] for l in b[start + 1:end]]
+
 out = []
 for b in blocks:
-    text = "\n".join(b)
-    only_secrets = re.search(r"^  resources:\n  - secrets\n  verbs:", text, re.M)
-    if only_secrets:
-        out.append("{{- if not .Values.rbac.secretNamespaces }}\n" + text + "\n{{- end }}")
-        continue
-    text = text.replace("  - configmaps\n", "  {{- if not .Values.rbac.secretNamespaces }}\n  - configmaps\n  {{- end }}\n")
-    out.append(text)
+    found = resources(b)
+    names = found[2] if found else []
+    if not found or not any(n in GUARDED for n in names):
+        out.append("\n".join(b))
+    elif all(n in GUARDED for n in names):
+        out.append(GUARD + "\n" + "\n".join(b) + "\n{{- end }}")
+    else:
+        start, end, _ = found
+        lines = []
+        for n in names:
+            if n in GUARDED:
+                lines += [GUARD, "  - " + n, "{{- end }}"]
+            else:
+                lines.append("  - " + n)
+        out.append("\n".join(b[:start + 1] + lines + b[end:]))
 
 path = "charts/chart/templates/rbac/manager-role.yaml"
 tpl = open(path).read()

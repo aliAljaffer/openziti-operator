@@ -17,6 +17,7 @@
 | `Enrolled` | always | `.status.enrolled` |
 | `Online` | always | `.status.online` |
 | `Serving` | always | `.status.conditions[?(@.type=='Serving')].status` |
+| `Endpoint` | always | `.spec.advertisedAddress` |
 | `Enrollment Expires` | always | `.status.enrollmentExpiresAt` |
 | `Ready` | always | `.status.conditions[?(@.type=='Ready')].status` |
 | `Message` | with `-o wide` | `.status.conditions[?(@.type=='Ready')].message` |
@@ -30,6 +31,11 @@
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.cost` | integer | no |  | cost makes Ziti prefer routers with a lower cost. Minimum 0. Maximum 65535. |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the router from Ziti when this resource is deleted. Orphan removes only the operator tags and keeps the router. It cannot change after creation. One of: `Delete`, `Orphan`. |
+| `spec.deployment` | object | no |  | deployment runs the router as a workload in this cluster. The operator creates the Deployment, the Service, and the volume claim, and reports the ready replica in the Workload condition. Without it the router runs somewhere else and the operator only writes the manifests. |
+| `spec.deployment.image` | string | no |  | image overrides the router image. It defaults to the tested openziti/ziti-router image for the controller version. Set it for a private registry, and set imagePullPolicy to match. Maximum length 512. |
+| `spec.deployment.imagePullPolicy` | string | no | `"IfNotPresent"` | imagePullPolicy for the router image. Default IfNotPresent. One of: `Always`, `IfNotPresent`, `Never`. |
+| `spec.deployment.namespace` | string | yes |  | namespace is where the Deployment, Service, and volume claim go. Every namespace but the ones in rbac.secretNamespaces must allow the operator to manage these three kinds. Minimum length 1. Maximum length 63. Must match `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`. |
+| `spec.deployment.serviceType` | string | no | `"LoadBalancer"` | serviceType for the Service that clients and other routers reach. Default LoadBalancer. Use NodePort where the cluster has no load balancer, then set advertisedAddress to a node address. One of: `LoadBalancer`, `NodePort`. |
 | `spec.disabled` | boolean | no |  | disabled takes the router out of service without deleting it. |
 | `spec.enrollmentSecretRef` | object | no |  | enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt". Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart. With advertisedAddress set, the Secret also holds the keys "docker-compose.yml" and "deployment.yaml". The operator removes the key once the router has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti. |
 | `spec.enrollmentSecretRef.name` | string | yes |  | name of the Secret. |
@@ -47,6 +53,7 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
+- `spec`: advertisedAddress is required with deployment
 
 ## Status
 
@@ -80,12 +87,13 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zitirouter-sample
 spec:
-  roleAttributes:
-    - edge
+  roleAttributes: [edge]
   tunnelerEnabled: true
   advertisedAddress: vm1.example.com
-  enrollmentSecretRef:
-    namespace: default
-    name: zitirouter-sample-enrollment
+  enrollmentSecretRef: {namespace: default, name: zitirouter-sample-enrollment}
+  # Uncomment to let the operator run the router in this cluster instead of writing manifests to the Secret.
+  # deployment:
+  #   namespace: routers
+  #   serviceType: LoadBalancer
 ```
 
