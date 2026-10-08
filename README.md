@@ -23,6 +23,7 @@ This is an independent community project. It is not an official OpenZiti or NetF
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
 | Log a workload in through a Ziti tunneler | A `ZitiSidecar`. It writes the patch that adds the tunneler, so you do not hand-write the container, identity mount, or resolver. |
 | Expose an HTTP Ingress | Annotate it with `ziti.alialjaffer.com/expose: "true"`; the operator creates a `ZitiApp` for its host and backend Service. |
+| Forward a local port to a Ziti service | A `ZitiPortForward` runs a proxy Deployment. Then use `kubectl port-forward` from your workstation. |
 | Let a workload log in with a certificate or a service account token | `ZitiCA` and `ZitiJwtSigner`, with cert-manager or your cluster issuer. |
 
 Annotate a Kubernetes Service or supported HTTP Ingress with `ziti.alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it. See [Expose an Ingress](docs/ingress.md) for supported Ingress routes.
@@ -97,6 +98,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. |
 | `ZitiSidecar` | `ztc` | namespace | Writes the patch that adds a Ziti tunneler to a workload. See [Sidecar tunneler](docs/sidecar.md). |
+| `ZitiPortForward` | `ztpf` | namespace | Runs a proxy Deployment for `kubectl port-forward` to a Ziti service. See [Port forward](docs/port-forward.md). |
 | `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `ztcfg`, `ztsvc`, `ztsp`, `zterp`, `ztserp`, `ztterm` | namespace | One resource per Ziti object. |
 
 ## Safe by default

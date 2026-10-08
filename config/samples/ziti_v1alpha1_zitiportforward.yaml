@@ -1,0 +1,9 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiPortForward
+metadata:
+  name: billing
+  namespace: team-a
+spec:
+  identityRef: billing-client
+  service: billing
+  port: 8080

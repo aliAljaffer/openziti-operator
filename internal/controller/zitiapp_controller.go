@@ -44,15 +44,16 @@ import (
 )
 
 const (
-	Finalizer         = "ziti.alialjaffer.com/finalizer"
-	CondSynced        = "Synced"
-	CondHosted        = "Hosted"
-	CondDialable      = "Dialable"
-	CondRoutePath     = "RoutePath"
-	CondReady         = "Ready"
-	CondAccess        = "AccessResolved"
-	serviceResync     = 10 * time.Minute
-	maxConcurrentSvcs = 2
+	Finalizer          = "ziti.alialjaffer.com/finalizer"
+	ReasonNameConflict = "NameConflict"
+	CondSynced         = "Synced"
+	CondHosted         = "Hosted"
+	CondDialable       = "Dialable"
+	CondRoutePath      = "RoutePath"
+	CondReady          = "Ready"
+	CondAccess         = "AccessResolved"
+	serviceResync      = 10 * time.Minute
+	maxConcurrentSvcs  = 2
 )
 
 var deleteOrder = []ziti.Kind{ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Services, ziti.Configs}

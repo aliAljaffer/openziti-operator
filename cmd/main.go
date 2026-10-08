@@ -331,6 +331,16 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitisidecar")
 		os.Exit(1)
 	}
+	if err := (&controller.ZitiPortForwardReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Clients:          clients,
+		Recorder:         mgr.GetEventRecorderFor("ziti-operator"),
+		SecretNamespaces: splitList(secretNamespaces),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "zitiportforward")
+		os.Exit(1)
+	}
 	if err := (&controller.ZitiRouterReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
