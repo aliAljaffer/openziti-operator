@@ -1,0 +1,24 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: ops-runner
+  namespace: team-a
+spec:
+  roleAttributes:
+    - ops
+  enrollmentMode: OperatorEnrolled
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiApp
+metadata:
+  name: ops-console
+  namespace: team-a
+spec:
+  expose:
+    addresses:
+      - ops-console.team-a.example.com
+    ports:
+      - 22
+  targets:
+    - address: 10.0.0.9
+      port: 22

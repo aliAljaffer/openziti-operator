@@ -1,0 +1,10 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: alice
+  namespace: team-a
+spec:
+  roleAttributes:
+    - staff
+  enrollmentMode: OperatorEnrolled
+  secretName: alice-identity

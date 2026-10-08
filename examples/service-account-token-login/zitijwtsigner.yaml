@@ -1,0 +1,8 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiJwtSigner
+metadata:
+  name: k8s
+spec:
+  audience: ziti
+  keys:
+    kubernetes: {}

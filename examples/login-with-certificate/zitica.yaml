@@ -1,0 +1,11 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiCA
+metadata:
+  name: workloads
+spec:
+  certificate:
+    secretRef:
+      namespace: cert-manager
+      name: ziti-workload-ca
+  verification:
+    signWithSecretKey: true

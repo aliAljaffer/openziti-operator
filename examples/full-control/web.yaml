@@ -1,0 +1,93 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiConfig
+metadata:
+  name: web-intercept
+  namespace: team-a
+spec:
+  zitiName: web-intercept
+  type: intercept.v1
+  data:
+    protocols:
+      - tcp
+    addresses:
+      - web.team-a.example.com
+    portRanges:
+      - low: 8080
+        high: 8080
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiConfig
+metadata:
+  name: web-host
+  namespace: team-a
+spec:
+  zitiName: web-host
+  type: host.v2
+  data:
+    terminators:
+      - address: 10.0.0.5
+        port: 8080
+        protocol: tcp
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiService
+metadata:
+  name: web
+  namespace: team-a
+spec:
+  zitiName: web.team-a.example.com
+  configs:
+    - web-intercept
+    - web-host
+  roleAttributes:
+    - web
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiServicePolicy
+metadata:
+  name: web-bind
+  namespace: team-a
+spec:
+  zitiName: web-bind
+  type: Bind
+  identityRoles:
+    - "@edge-1"
+  serviceRoles:
+    - "@web.team-a.example.com"
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiServicePolicy
+metadata:
+  name: web-dial
+  namespace: team-a
+spec:
+  zitiName: web-dial
+  type: Dial
+  identityRoles:
+    - "#staff"
+  serviceRoles:
+    - "#web"
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiServiceEdgeRouterPolicy
+metadata:
+  name: web-serp
+  namespace: team-a
+spec:
+  zitiName: web-serp
+  serviceRoles:
+    - "#web"
+  edgeRouterRoles:
+    - "@edge-1"
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiEdgeRouterPolicy
+metadata:
+  name: web-erp
+  namespace: team-a
+spec:
+  zitiName: web-erp
+  identityRoles:
+    - "#staff"
+  edgeRouterRoles:
+    - "@edge-1"

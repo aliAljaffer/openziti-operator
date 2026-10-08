@@ -1,0 +1,31 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: alice
+  namespace: team-b
+spec:
+  connectionRef: shared
+  roleAttributes:
+    - staff
+  enrollmentMode: OperatorEnrolled
+---
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiApp
+metadata:
+  name: web
+  namespace: team-b
+spec:
+  connectionRef: shared
+  expose:
+    addresses:
+      - web.team-b.example.com
+    ports:
+      - 8080
+  targets:
+    - address: 10.0.0.6
+      port: 8080
+  allow:
+    groups:
+      - staff
+  entryRouters:
+    - edge-1

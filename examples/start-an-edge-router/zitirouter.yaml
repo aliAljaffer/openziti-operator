@@ -1,0 +1,17 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiRouter
+metadata:
+  name: edge-1
+spec:
+  roleAttributes:
+    - edge
+  tunnelerEnabled: true
+  enrollmentSecretRef:
+    namespace: routers
+    name: edge-1-enrollment
+  advertisedAddress: edge-1.example.com
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: routers

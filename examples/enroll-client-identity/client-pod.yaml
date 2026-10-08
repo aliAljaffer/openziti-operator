@@ -1,0 +1,50 @@
+# The Pod stays Pending until the operator writes the identity.json key. That is the hand-over point.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alice-client
+  namespace: team-a
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: tunnel
+      image: openziti/ziti-cli:2.0.4
+      command:
+        - ziti
+        - tunnel
+        - proxy
+        - -i
+        - /id/identity.json
+        - team-a.web:8080
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: identity
+          mountPath: /id
+          readOnly: true
+        - name: cache
+          mountPath: /tmp
+    - name: curl
+      image: curlimages/curl
+      command:
+        - sleep
+        - "3600"
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+  volumes:
+    - name: identity
+      secret:
+        secretName: alice-identity
+    - name: cache
+      emptyDir: {}

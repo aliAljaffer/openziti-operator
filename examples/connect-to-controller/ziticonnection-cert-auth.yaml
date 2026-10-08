@@ -1,0 +1,22 @@
+# Certificate login instead of username and password. Apply on its own, not with the file above.
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiConnection
+metadata:
+  name: default
+spec:
+  managementUrl: https://ziti-controller-mgmt.example.com/edge/management/v1
+  caBundle:
+    configMapRef:
+      namespace: ziti-operator-system
+      name: ziti-root-ca
+      key: ca.crt
+  auth:
+    cert:
+      secretRef:
+        namespace: ziti-operator-system
+        name: ziti-operator-cert
+  roleScope: Namespaced
+  hostingRouters:
+    - edge-1
+  entryRouters:
+    - edge-1

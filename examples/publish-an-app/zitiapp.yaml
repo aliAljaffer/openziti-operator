@@ -1,0 +1,20 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiApp
+metadata:
+  name: web
+  namespace: team-a
+spec:
+  expose:
+    addresses:
+      - web.team-a.example.com
+    ports:
+      - 8080
+  targets:
+    - address: 10.0.0.5
+    - kubernetesService: web
+      port: 8080
+  allow:
+    groups:
+      - staff
+  entryRouters:
+    - edge-1
