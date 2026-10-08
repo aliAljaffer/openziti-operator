@@ -15,7 +15,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -42,7 +41,7 @@ func clientCertSecret(t *testing.T, ca *ecdsa.PrivateKey, caCert *x509.Certifica
 	der, _ := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, ca)
 	keyDER, _ := x509.MarshalECPrivateKey(key)
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "cred", Namespace: "ns"},
+		Name: "cred", Namespace: "ns",
 		Data: map[string][]byte{
 			corev1.TLSCertKey:       pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
 			corev1.TLSPrivateKeyKey: pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}),
@@ -54,7 +53,7 @@ func providerFor(t *testing.T, secret *corev1.Secret, ca string) *SecretClientPr
 	t.Helper()
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "ca", Namespace: "ns"}, Data: map[string]string{"ca.crt": ca}}
+	cm := &corev1.ConfigMap{Name: "ca", Namespace: "ns", Data: map[string]string{"ca.crt": ca}}
 	objs := []client.Object{cm}
 	if secret != nil {
 		objs = append(objs, secret)
@@ -63,7 +62,7 @@ func providerFor(t *testing.T, secret *corev1.Secret, ca string) *SecretClientPr
 }
 
 func connWith(auth zitiv1.ConnectionAuth) *zitiv1.ZitiConnection {
-	c := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default", UID: "u"}, Spec: zitiv1.ZitiConnectionSpec{ManagementURL: "https://ctrl.invalid/edge/management/v1", Auth: auth}}
+	c := &zitiv1.ZitiConnection{Name: "default", UID: "u", Spec: zitiv1.ZitiConnectionSpec{ManagementURL: "https://ctrl.invalid/edge/management/v1", Auth: auth}}
 	c.Spec.CABundle.ConfigMapRef = zitiv1.ConfigMapKeyRef{Namespace: "ns", Name: "ca", Key: "ca.crt"}
 	return c
 }
@@ -90,11 +89,11 @@ func TestProviderCertAuth(t *testing.T) {
 func TestProviderUpdbAndMissingAuth(t *testing.T) {
 	ca, _, _ := caPEM(t)
 	updb := zitiv1.ConnectionAuth{Updb: &zitiv1.UpdbAuth{SecretRef: zitiv1.SecretRef{Namespace: "ns", Name: "cred"}}}
-	good := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "cred", Namespace: "ns"}, Data: map[string][]byte{"username": []byte("u"), "password": []byte("p")}}
+	good := &corev1.Secret{Name: "cred", Namespace: "ns", Data: map[string][]byte{"username": []byte("u"), "password": []byte("p")}}
 	if c, err := providerFor(t, good, ca).For(t.Context(), connWith(updb)); err != nil || c == nil {
 		t.Fatalf("updb: %v", err)
 	}
-	empty := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "cred", Namespace: "ns"}}
+	empty := &corev1.Secret{Name: "cred", Namespace: "ns"}
 	if _, err := providerFor(t, empty, ca).For(t.Context(), connWith(updb)); err == nil || !strings.Contains(err.Error(), "username and password") {
 		t.Errorf("empty updb secret: %v", err)
 	}

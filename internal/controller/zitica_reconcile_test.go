@@ -46,7 +46,7 @@ func caSecret(t *testing.T, isCA bool, withKey bool) *corev1.Secret {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "issuer-ca", Namespace: "cert-manager"},
+	s := &corev1.Secret{Name: "issuer-ca", Namespace: "cert-manager",
 		Data: map[string][]byte{corev1.TLSCertKey: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}}
 	if withKey {
 		der, _ := x509.MarshalECPrivateKey(key)
@@ -64,9 +64,9 @@ func setupCA(t *testing.T, secret *corev1.Secret, mut func(*zitiv1.ZitiCA)) *caE
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	conn := &zitiv1.ZitiConnection{Name: "default"}
 	ca := &zitiv1.ZitiCA{
-		ObjectMeta: metav1.ObjectMeta{Name: "cm", UID: "uid-ca", Generation: 1},
+		Name: "cm", UID: "uid-ca", Generation: 1,
 		Spec: zitiv1.ZitiCASpec{
 			ConnectionRef: "default", DeletionPolicy: zitiv1.DeletionPolicyDelete,
 			Certificate: zitiv1.CertificateSource{SecretRef: zitiv1.SecretRef{Namespace: "cert-manager", Name: "issuer-ca"}},
@@ -309,8 +309,8 @@ func TestCAVerifiesThroughCertManagerWithoutReadingTheKey(t *testing.T) {
 	if err := e.k.Update(t.Context(), cert); err != nil {
 		t.Fatal(err)
 	}
-	leafSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "cert-manager", Name: "cm-verify",
-		Annotations: map[string]string{"cert-manager.io/certificate-name": "cm-verify"}}, Data: map[string][]byte{corev1.TLSCertKey: []byte(proof)}}
+	leafSecret := &corev1.Secret{Namespace: "cert-manager", Name: "cm-verify",
+		Annotations: map[string]string{"cert-manager.io/certificate-name": "cm-verify"}, Data: map[string][]byte{corev1.TLSCertKey: []byte(proof)}}
 	if err := e.k.Create(t.Context(), leafSecret); err != nil {
 		t.Fatal(err)
 	}

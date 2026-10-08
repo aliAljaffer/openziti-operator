@@ -38,8 +38,8 @@ func setupExpose(t *testing.T, ann map[string]string, objs ...client.Object) *ex
 		t.Fatal(err)
 	}
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "team-a", UID: "svc-uid", Annotations: ann},
-		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80, Protocol: corev1.ProtocolTCP}}},
+		Name: "web", Namespace: "team-a", UID: "svc-uid", Annotations: ann,
+		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80, Protocol: corev1.ProtocolTCP}}},
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(objs, svc)...).Build()
 	rec := record.NewFakeRecorder(10)
@@ -74,7 +74,7 @@ func TestExposeCreatesOwnedAppAndFollowsAnnotations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !metav1.IsControlledBy(app, &corev1.Service{ObjectMeta: metav1.ObjectMeta{UID: "svc-uid"}}) {
+	if !metav1.IsControlledBy(app, &corev1.Service{UID: "svc-uid"}) {
 		t.Errorf("owner refs = %v", app.OwnerReferences)
 	}
 	if app.Spec.Targets[0].Address != "web.team-a.svc" || app.Spec.Allow.Groups[0] != "staff" {
@@ -106,7 +106,7 @@ func TestExposeCreatesOwnedAppAndFollowsAnnotations(t *testing.T) {
 }
 
 func TestExposeNeverTouchesForeignApp(t *testing.T) {
-	foreign := &zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "team-a"}, Spec: zitiv1.ZitiAppSpec{ZitiName: "hand-made"}}
+	foreign := &zitiv1.ZitiApp{Name: "web", Namespace: "team-a", Spec: zitiv1.ZitiAppSpec{ZitiName: "hand-made"}}
 	e := setupExpose(t, map[string]string{desired.AnnExpose: "true"}, foreign)
 	e.reconcile(t)
 	app, _ := e.app()

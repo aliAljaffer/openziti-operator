@@ -68,9 +68,9 @@ func setupSigner(t *testing.T, mut func(*zitiv1.ZitiJwtSigner), set jwksSet, tok
 	if err := zitiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	conn := &zitiv1.ZitiConnection{Name: "default"}
 	sg := &zitiv1.ZitiJwtSigner{
-		ObjectMeta: metav1.ObjectMeta{Name: "k8s", UID: "uid-sg", Generation: 1},
+		Name: "k8s", UID: "uid-sg", Generation: 1,
 		Spec: zitiv1.ZitiJwtSignerSpec{
 			ConnectionRef: "default", Audience: "ziti", DeletionPolicy: zitiv1.DeletionPolicyDelete,
 			Keys: zitiv1.SignerKeys{Kubernetes: &zitiv1.KubernetesKeys{}},

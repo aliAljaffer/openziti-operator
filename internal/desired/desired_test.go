@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -17,14 +16,14 @@ import (
 
 func builder(mut func(*zitiv1.ZitiApp, *zitiv1.ZitiConnection)) *Builder {
 	svc := &zitiv1.ZitiApp{
-		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "team-a", UID: "uid-1"},
+		Name: "app", Namespace: "team-a", UID: "uid-1",
 		Spec: zitiv1.ZitiAppSpec{
 			Expose:  zitiv1.Expose{Addresses: []string{"app.example.com"}, Ports: []intstr.IntOrString{intstr.FromInt32(443)}, Protocols: []string{"tcp"}},
 			Targets: []zitiv1.Target{{Address: "10.0.0.5", Port: 8443}},
 		},
 	}
 	conn := &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Name: "default",
 		Spec: zitiv1.ZitiConnectionSpec{
 			HostingRouters:     []string{"r-main", "r-admin"},
 			DefaultEdgeRouters: []string{"r-admin"},

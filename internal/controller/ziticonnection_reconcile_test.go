@@ -5,7 +5,6 @@ package controller
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,7 +44,7 @@ func TestConnectionReconcilerCreatesDefaultFromFlags(t *testing.T) {
 		CreateConnection: true, ConnectionFlags: connectionFlags(), Namespace: "ziti-operator-system",
 	}
 
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "default"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Name: "default"}); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
 
@@ -62,7 +61,7 @@ func TestConnectionReconcilerCreatesDefaultFromFlags(t *testing.T) {
 	if conn.Spec.Auth.Updb == nil || conn.Spec.Auth.Updb.SecretRef.Name != "ziti-operator-credential" {
 		t.Errorf("auth = %+v", conn.Spec.Auth)
 	}
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "default"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Name: "default"}); err != nil {
 		t.Fatalf("second Reconcile: %v", err)
 	}
 }
@@ -70,8 +69,8 @@ func TestConnectionReconcilerCreatesDefaultFromFlags(t *testing.T) {
 func TestConnectionReconcilerLeavesAnExistingConnectionAlone(t *testing.T) {
 	scheme := newConnectionScheme(t)
 	existing := &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
-		Spec:       zitiv1.ZitiConnectionSpec{ManagementURL: "https://mine/edge/management/v1"},
+		Name: "default",
+		Spec: zitiv1.ZitiConnectionSpec{ManagementURL: "https://mine/edge/management/v1"},
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).WithStatusSubresource(&zitiv1.ZitiConnection{}).Build()
 	r := &ZitiConnectionReconciler{
@@ -79,7 +78,7 @@ func TestConnectionReconcilerLeavesAnExistingConnectionAlone(t *testing.T) {
 		CreateConnection: true, ConnectionFlags: connectionFlags(), Namespace: "ziti-operator-system",
 	}
 
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "default"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Name: "default"}); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
 
@@ -97,7 +96,7 @@ func TestConnectionReconcilerDoesNotCreateByDefault(t *testing.T) {
 	k := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&zitiv1.ZitiConnection{}).Build()
 	r := &ZitiConnectionReconciler{Client: k, Scheme: scheme, Clients: staticProvider{ziti.NewFake()}}
 
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "default"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Name: "default"}); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
 	var list zitiv1.ZitiConnectionList

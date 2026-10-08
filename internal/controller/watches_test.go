@@ -6,7 +6,6 @@ import (
 	"context"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -18,7 +17,7 @@ func TestListRequests(t *testing.T) {
 	s := runtime.NewScheme()
 	_ = zitiv1.AddToScheme(s)
 	app := func(ns, name, ref string) *zitiv1.ZitiApp {
-		return &zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name}, Spec: zitiv1.ZitiAppSpec{ConnectionRef: ref}}
+		return &zitiv1.ZitiApp{Namespace: ns, Name: name, Spec: zitiv1.ZitiAppSpec{ConnectionRef: ref}}
 	}
 	c := fake.NewClientBuilder().WithScheme(s).WithObjects(app("a", "x", ""), app("a", "y", "other"), app("b", "z", "")).Build()
 	newList := func() client.ObjectList { return &zitiv1.ZitiAppList{} }
