@@ -114,7 +114,7 @@ func TestRouterName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "edge", UID: "u"}}
+			r := &zitiv1.ZitiRouter{Name: "edge", UID: "u"}
 			tt.mut(r)
 			if got := RouterName(r, conn); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
@@ -124,7 +124,7 @@ func TestRouterName(t *testing.T) {
 }
 
 func TestRouterEntity(t *testing.T) {
-	r := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "edge", UID: "u"}, Spec: zitiv1.ZitiRouterSpec{
+	r := &zitiv1.ZitiRouter{Name: "edge", UID: "u", Spec: zitiv1.ZitiRouterSpec{
 		RoleAttributes: []string{"public"}, TunnelerEnabled: true, Cost: 5, NoTraversal: true, Disabled: true,
 	}}
 	e := Router(r, connWith(""))

@@ -28,7 +28,7 @@ func TestDefaultNames(t *testing.T) {
 		t.Errorf("explicit identity = %q", got)
 	}
 
-	rt := &zitiv1.ZitiRouter{ObjectMeta: metav1.ObjectMeta{Name: "edge-1"}}
+	rt := &zitiv1.ZitiRouter{Name: "edge-1"}
 	if got := RouterName(rt, conn); got != "prod-edge-1" {
 		t.Errorf("new router = %q", got)
 	}

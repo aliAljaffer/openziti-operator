@@ -36,9 +36,9 @@ func setupAccess(t *testing.T, scope zitiv1.RoleScope, mut func(*zitiv1.ZitiAcce
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
+	conn := &zitiv1.ZitiConnection{Name: "default", Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
 	ap := &zitiv1.ZitiAccessPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "team", Namespace: "a", UID: "uid-ap", Generation: 1},
+		Name: "team", Namespace: "a", UID: "uid-ap", Generation: 1,
 		Spec: zitiv1.ZitiAccessPolicySpec{
 			ConnectionRef: "default", IdentityRoles: []string{"#users"}, ServiceRoles: []string{"#web"},
 			DeletionPolicy: zitiv1.DeletionPolicyDelete,
@@ -48,7 +48,7 @@ func setupAccess(t *testing.T, scope zitiv1.RoleScope, mut func(*zitiv1.ZitiAcce
 		mut(ap, conn)
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(conn, ap, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "a", Labels: map[string]string{"tier": "gold"}}}).
+		WithObjects(conn, ap, &corev1.Namespace{Name: "a", Labels: map[string]string{"tier": "gold"}}).
 		WithStatusSubresource(&zitiv1.ZitiAccessPolicy{}).Build()
 	zc := ziti.NewFake()
 	zc.Put(ziti.EdgeRouters, ziti.Entity{"id": "id-r", "name": "r-entry", "isOnline": true})

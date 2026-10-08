@@ -8,14 +8,13 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func svc(ann map[string]string, ports ...corev1.ServicePort) *corev1.Service {
 	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "team-a", Annotations: ann},
-		Spec:       corev1.ServiceSpec{Ports: ports},
+		Name: "web", Namespace: "team-a", Annotations: ann,
+		Spec: corev1.ServiceSpec{Ports: ports},
 	}
 }
 
@@ -64,7 +63,7 @@ func TestAppSpecErrors(t *testing.T) {
 		s   *corev1.Service
 		err string
 	}{
-		"external name": {&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "x", Namespace: "n"}, Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeExternalName}}, "ExternalName"},
+		"external name": {&corev1.Service{Name: "x", Namespace: "n", Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeExternalName}}, "ExternalName"},
 		"no ports":      {svc(map[string]string{AnnExpose: "true"}), "no ports"},
 		"bad range":     {svc(map[string]string{AnnPorts: "9000-8000"}, corev1.ServicePort{Port: 80}), "low must not exceed high"},
 		"bad protocol":  {svc(map[string]string{AnnProtocols: "icmp"}, corev1.ServicePort{Port: 80}), "not tcp or udp"},

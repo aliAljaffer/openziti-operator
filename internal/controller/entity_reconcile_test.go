@@ -33,7 +33,7 @@ func newEntityEnv(t *testing.T, scope zitiv1.RoleScope, objs ...client.Object) *
 	if err := zitiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
+	conn := &zitiv1.ZitiConnection{Name: "default", Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(objs, conn)...).
 		WithStatusSubresource(&zitiv1.ZitiConfig{}, &zitiv1.ZitiService{}, &zitiv1.ZitiServicePolicy{},
 			&zitiv1.ZitiEdgeRouterPolicy{}, &zitiv1.ZitiServiceEdgeRouterPolicy{}).Build()
@@ -59,7 +59,7 @@ func reconcileEntity[T interface {
 }](t *testing.T, e *entityEnv, name string, kind ziti.Kind, newObj func() T, build func(*resolver, T, *zitiv1.ZitiConnection) (ziti.Entity, error)) (T, ctrl.Result) {
 	t.Helper()
 	r := newEntityReconciler(e.k, e.scheme, staticProvider{e.zc}, e.rec, "test", kind, newObj, build)
-	res, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: name}})
+	res, err := r.Reconcile(t.Context(), ctrl.Request{Namespace: "team-a", Name: name})
 	if err != nil {
 		t.Fatalf("reconcile: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestEntityNameConflictDeleteAndOrphan(t *testing.T) {
 			t.Fatal(err)
 		}
 		r := newEntityReconciler(e.k, e.scheme, staticProvider{e.zc}, e.rec, "test", ziti.Configs, newObj, buildConfig)
-		if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "cfg"}}); err != nil {
+		if _, err := r.Reconcile(t.Context(), ctrl.Request{Namespace: "team-a", Name: "cfg"}); err != nil {
 			t.Fatal(err)
 		}
 		want := 0
@@ -288,7 +288,7 @@ func TestEntityAdoptTakesOverKeepsHandMadeFieldsAndReleasesOnDelete(t *testing.T
 		t.Fatal(err)
 	}
 	r := newEntityReconciler(e.k, e.scheme, staticProvider{e.zc}, e.rec, "test", ziti.ServicePolicies, newObj, buildServicePolicy)
-	if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "team-a", Name: "dial"}}); err != nil {
+	if _, err := r.Reconcile(t.Context(), ctrl.Request{Namespace: "team-a", Name: "dial"}); err != nil {
 		t.Fatal(err)
 	}
 	got, ok := e.zc.Objects[ziti.ServicePolicies]["hand"]

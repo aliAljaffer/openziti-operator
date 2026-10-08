@@ -13,7 +13,6 @@ import (
 
 	"github.com/openziti/edge-api/rest_util"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,7 +69,7 @@ func TestCAVerifiedByCertManagerAgainstRealController(t *testing.T) {
 	}
 
 	// The fake cluster holds the CA certificate only. The operator never sees the CA key.
-	caSec := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "issuer-ca", Namespace: "cert-manager"}, Data: map[string][]byte{corev1.TLSCertKey: crt}}
+	caSec := &corev1.Secret{Name: "issuer-ca", Namespace: "cert-manager", Data: map[string][]byte{corev1.TLSCertKey: crt}}
 	ce := setupCA(t, caSec, func(ca *zitiv1.ZitiCA) {
 		ca.Spec.ZitiName = "it-cm-ca"
 		ca.Spec.Verification.IssuerRef = &zitiv1.VerificationIssuer{Name: "it-ca", Kind: "Issuer", Namespace: ns}
@@ -108,8 +107,8 @@ func TestCAVerifiedByCertManagerAgainstRealController(t *testing.T) {
 	if err := ce.k.Update(t.Context(), fake); err != nil {
 		t.Fatal(err)
 	}
-	if err := ce.k.Create(t.Context(), &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "cm-verify",
-		Annotations: map[string]string{"cert-manager.io/certificate-name": "cm-verify"}}, Data: map[string][]byte{corev1.TLSCertKey: leaf}}); err != nil {
+	if err := ce.k.Create(t.Context(), &corev1.Secret{Namespace: ns, Name: "cm-verify",
+		Annotations: map[string]string{"cert-manager.io/certificate-name": "cm-verify"}, Data: map[string][]byte{corev1.TLSCertKey: leaf}}); err != nil {
 		t.Fatal(err)
 	}
 

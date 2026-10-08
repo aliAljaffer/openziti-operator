@@ -70,10 +70,10 @@ func TestConditionCollectorCountsByKindTypeAndStatus(t *testing.T) {
 		return []metav1.Condition{{Type: "Ready", Status: s}}
 	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
-		&zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "n"}, Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
-		&zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "n"}, Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
-		&zitiv1.ZitiApp{ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "n"}, Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionFalse)}},
-		&zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Status: zitiv1.ZitiConnectionStatus{Conditions: ready(metav1.ConditionTrue)}},
+		&zitiv1.ZitiApp{Name: "a", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
+		&zitiv1.ZitiApp{Name: "b", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
+		&zitiv1.ZitiApp{Name: "c", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionFalse)}},
+		&zitiv1.ZitiConnection{Name: "default", Status: zitiv1.ZitiConnectionStatus{Conditions: ready(metav1.ConditionTrue)}},
 	).Build()
 
 	reg := prometheus.NewPedanticRegistry()

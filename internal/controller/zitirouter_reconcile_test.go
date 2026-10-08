@@ -36,9 +36,9 @@ func setupRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Obje
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	conn := &zitiv1.ZitiConnection{Name: "default"}
 	rt := &zitiv1.ZitiRouter{
-		ObjectMeta: metav1.ObjectMeta{Name: "edge-1", UID: "uid-rt", Generation: 1},
+		Name: "edge-1", UID: "uid-rt", Generation: 1,
 		Spec: zitiv1.ZitiRouterSpec{
 			ConnectionRef: "default", DeletionPolicy: zitiv1.DeletionPolicyDelete, RoleAttributes: []string{"edge"}, TunnelerEnabled: true, Cost: 10,
 			EnrollmentSecretRef: &zitiv1.SecretRef{Namespace: "routers", Name: "edge-1-enrollment"},
@@ -190,7 +190,7 @@ func TestRouterSpecChangesReachZitiWithoutLosingTheEnrollment(t *testing.T) {
 }
 
 func TestRouterSecretConflictNamespaceLimitAndDelete(t *testing.T) {
-	foreign := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "edge-1-enrollment", Namespace: "routers"}}
+	foreign := &corev1.Secret{Name: "edge-1-enrollment", Namespace: "routers"}
 	e := setupRouter(t, nil, foreign)
 	if c := routerCond(e.reconcile(t), CondSynced); c.Reason != "SecretConflict" {
 		t.Errorf("foreign Secret: %+v", c)

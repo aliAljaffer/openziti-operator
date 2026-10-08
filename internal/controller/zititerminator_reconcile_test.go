@@ -31,8 +31,8 @@ func setupTerminator(t *testing.T, scope zitiv1.RoleScope, mut func(*zitiv1.Ziti
 	if err := zitiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	conn := &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
-	term := &zitiv1.ZitiTerminator{ObjectMeta: metav1.ObjectMeta{Name: "web-term", Namespace: "team-a", UID: "uid-term", Generation: 1},
+	conn := &zitiv1.ZitiConnection{Name: "default", Spec: zitiv1.ZitiConnectionSpec{RoleScope: scope}}
+	term := &zitiv1.ZitiTerminator{Name: "web-term", Namespace: "team-a", UID: "uid-term", Generation: 1,
 		Spec: zitiv1.ZitiTerminatorSpec{ConnectionRef: "default", Service: "web", Router: "router-a", Address: "tcp:10.0.0.5:8443",
 			Binding: "transport", Precedence: "default", DeletionPolicy: zitiv1.DeletionPolicyDelete}}
 	if mut != nil {
