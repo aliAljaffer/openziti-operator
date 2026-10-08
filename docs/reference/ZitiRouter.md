@@ -53,7 +53,7 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
-- `spec`: advertisedAddress is required with deployment
+- `spec`: advertisedAddress is required with deployment: the address goes into the router certificate on first start and cannot change later
 
 ## Status
 

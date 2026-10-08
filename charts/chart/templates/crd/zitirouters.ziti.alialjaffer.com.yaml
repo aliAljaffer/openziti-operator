@@ -207,7 +207,9 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
-            - message: advertisedAddress is required with deployment
+            - message: 'advertisedAddress is required with deployment: the address
+                goes into the router certificate on first start and cannot change
+                later'
               rule: '!has(self.deployment) || has(self.advertisedAddress)'
           status:
             description: status defines the observed state of ZitiRouter
