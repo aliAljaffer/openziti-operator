@@ -13,7 +13,7 @@ It needs `ZITI_USERNAME` and `ZITI_PASSWORD` in the environment. Without `--ca-f
 
 | Code | Meaning |
 |---|---|
-| `NoTerminator` | The service has no terminator. |
+| `NoTerminator` | The service has no terminator, or the router is in the service edge router policy but has none for it. |
 | `NoBind` | No Bind policy selects a hosting identity. |
 | `InertBind` | A router binds the service but is not in its router policy, so it makes no terminator. |
 | `NoDialer` | No Dial policy selects an identity. |
@@ -24,3 +24,5 @@ It needs `ZITI_USERNAME` and `ZITI_PASSWORD` in the environment. Without `--ca-f
 | `UnusedConfig` | No service uses the config. |
 | `EmptyRoles` | A policy selects nothing. |
 | `ExpiredEnrollment` | An identity has an expired one-time token. |
+
+Every finding also shows up in `status` of the resource that owns the entity: `NoTerminator` and `InertBind` on the `ZitiApp` and on the `ZitiRouter` it names, `UnusedConfig` on the `ZitiConfig`. See [Conditions and reasons](conditions.md). The command stays useful for entities no resource owns.

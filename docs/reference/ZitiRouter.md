@@ -16,6 +16,7 @@
 |---|---|---|
 | `Enrolled` | always | `.status.enrolled` |
 | `Online` | always | `.status.online` |
+| `Serving` | always | `.status.conditions[?(@.type=='Serving')].status` |
 | `Enrollment Expires` | always | `.status.enrollmentExpiresAt` |
 | `Ready` | always | `.status.conditions[?(@.type=='Ready')].status` |
 | `Message` | with `-o wide` | `.status.conditions[?(@.type=='Ready')].message` |
@@ -63,6 +64,7 @@ The API server rejects a resource that breaks one of these rules.
 | `status.observedGeneration` | integer |  |
 | `status.online` | boolean | online is true while the router is connected to the controller. |
 | `status.routerId` | string |  |
+| `status.services` | list of string | services are the names of the services that have a terminator on this router. |
 | `status.zitiName` | string | zitiName is the name the router has in Ziti. It is set once and does not change. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).

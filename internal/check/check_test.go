@@ -149,6 +149,98 @@ func TestServiceProblems(t *testing.T) {
 	}
 }
 
+func TestRouterReport(t *testing.T) {
+	tests := []struct {
+		name     string
+		mut      func(*Graph)
+		router   int
+		services []string
+		expected []string
+		missing  []string
+	}{
+		{"terminates what it was picked for", nil, 0, []string{"s"}, []string{"s"}, nil},
+		{"picked for a service it does not terminate", nil, 1, nil, []string{"s"}, []string{"s"}},
+		{"no serp picks this router", func(g *Graph) {
+			g.SERPs[0]["edgeRouterRoles"] = l("@r-host")
+		}, 1, nil, nil, nil},
+		{"picked by attribute", func(g *Graph) {
+			g.SERPs[0]["edgeRouterRoles"] = l("#edge")
+			g.Routers[1]["roleAttributes"] = l("edge")
+		}, 1, nil, []string{"s"}, []string{"s"}},
+		{"terminator for an unknown service is ignored", func(g *Graph) {
+			g.Terminators = append(g.Terminators, e("id", "t2", "serviceId", "gone", "routerId", "r-host"))
+		}, 0, []string{"s"}, []string{"s"}, nil},
+		{"terminator on another router is ignored", func(g *Graph) {
+			g.Terminators = append(g.Terminators, e("id", "t3", "serviceId", "s", "routerId", "r-other"))
+		}, 0, []string{"s"}, []string{"s"}, nil},
+		{"two services, one missing", func(g *Graph) {
+			g.Services = append(g.Services, e("id", "s2", "name", "s2"))
+			g.SERPs[0]["serviceRoles"] = l("@s", "@s2")
+		}, 0, []string{"s"}, []string{"s", "s2"}, []string{"s2"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			g := healthy()
+			if tc.mut != nil {
+				tc.mut(g)
+			}
+			rt := g.Routers[tc.router]
+			r := g.Router(rt)
+			if !slices.Equal(r.Services, tc.services) {
+				t.Errorf("services = %v, want %v", r.Services, tc.services)
+			}
+			if !slices.Equal(r.Expected, tc.expected) {
+				t.Errorf("expected = %v, want %v", r.Expected, tc.expected)
+			}
+			if !slices.Equal(r.Missing(), tc.missing) {
+				t.Errorf("missing = %v, want %v", r.Missing(), tc.missing)
+			}
+		})
+	}
+}
+
+func TestRouterNotTerminating(t *testing.T) {
+	g := healthy()
+	fs := g.Router(g.Routers[1]).NotTerminating(str(g.Routers[1], "name"))
+	if len(fs) != 1 || fs[0].Code != NoTerminator || fs[0].Entity != "r-entry" {
+		t.Errorf("findings = %+v", fs)
+	}
+	if fs := g.Router(g.Routers[0]).NotTerminating("r-host"); len(fs) != 0 {
+		t.Errorf("findings = %+v", fs)
+	}
+}
+
+func TestConfigUsers(t *testing.T) {
+	g := healthy()
+	if got := ConfigUsers(g.Services, "ci"); !slices.Equal(got, []string{"s"}) {
+		t.Errorf("users = %v", got)
+	}
+	if got := ConfigUsers(g.Services, "nope"); len(got) != 0 {
+		t.Errorf("users = %v", got)
+	}
+	g.Services = append(g.Services, e("id", "s2", "name", "a-svc", "configs", l("ci", "ch")))
+	if got := ConfigUsers(g.Services, "ci"); !slices.Equal(got, []string{"a-svc", "s"}) {
+		t.Errorf("users = %v, want sorted", got)
+	}
+}
+
+func TestLoadInto(t *testing.T) {
+	f := ziti.NewFake()
+	f.Put(ziti.Services, ziti.Entity{"id": "s", "name": "s", "configs": []any{"ci"}})
+	f.Put(ziti.Configs, ziti.Entity{"id": "ci", "name": "c"})
+	f.Put(ziti.EdgeRouters, ziti.Entity{"id": "r", "name": "r"})
+	var g Graph
+	if err := LoadInto(t.Context(), f, &g, ziti.Services, ziti.Configs, ziti.EdgeRouters, ziti.Kind("unknown")); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.Services) != 1 || len(g.Configs) != 1 || len(g.Routers) != 1 || g.Terminators != nil {
+		t.Errorf("graph = %+v", g)
+	}
+	if got := ConfigUsers(g.Services, "ci"); !slices.Equal(got, []string{"s"}) {
+		t.Errorf("users = %v", got)
+	}
+}
+
 func TestAudit(t *testing.T) {
 	g := healthy()
 	g.Configs = append(g.Configs, e("id", "cx", "name", "orphan", "configTypeId", "ti"))
@@ -159,7 +251,7 @@ func TestAudit(t *testing.T) {
 		e("id", "u3", "name", "pending", "roleAttributes", l(), "enrollment", map[string]any{"ott": map[string]any{"expiresAt": "2027-01-01T00:00:00Z"}}),
 	)
 	got := codes(g.Audit(time.Date(2026, 9, 29, 0, 0, 0, 0, time.UTC)))
-	want := []string{EmptyRoles, ExpiredEnroll, UnusedConfig}
+	want := []string{EmptyRoles, ExpiredEnroll, NoTerminator, UnusedConfig}
 	if !slices.Equal(got, want) {
 		t.Errorf("codes = %v, want %v", got, want)
 	}

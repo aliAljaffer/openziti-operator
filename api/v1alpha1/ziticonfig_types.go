@@ -47,6 +47,7 @@ type ZitiConfigStatus struct {
 // +kubebuilder:resource:shortName=ztcfg,categories=ziti
 // +kubebuilder:printcolumn:name="Type",type=string,JSONPath=".spec.type"
 // +kubebuilder:printcolumn:name="Ziti ID",type=string,JSONPath=".status.zitiId",priority=1
+// +kubebuilder:printcolumn:name="InUse",type=string,JSONPath=".status.conditions[?(@.type=='InUse')].status"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"

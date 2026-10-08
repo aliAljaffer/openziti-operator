@@ -26,6 +26,9 @@ spec:
       name: Ziti ID
       priority: 1
       type: string
+    - jsonPath: .status.conditions[?(@.type=='InUse')].status
+      name: InUse
+      type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
       type: string

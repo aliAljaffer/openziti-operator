@@ -16,6 +16,7 @@
 |---|---|---|
 | `Type` | always | `.spec.type` |
 | `Ziti ID` | with `-o wide` | `.status.zitiId` |
+| `InUse` | always | `.status.conditions[?(@.type=='InUse')].status` |
 | `Ready` | always | `.status.conditions[?(@.type=='Ready')].status` |
 | `Message` | with `-o wide` | `.status.conditions[?(@.type=='Ready')].message` |
 | `Age` | always | `.metadata.creationTimestamp` |

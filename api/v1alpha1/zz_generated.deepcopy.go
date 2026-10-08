@@ -1410,6 +1410,11 @@ func (in *ZitiRouterStatus) DeepCopyInto(out *ZitiRouterStatus) {
 		in, out := &in.EnrollmentExpiresAt, &out.EnrollmentExpiresAt
 		*out = (*in).DeepCopy()
 	}
+	if in.Services != nil {
+		in, out := &in.Services, &out.Services
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]v1.Condition, len(*in))

@@ -376,21 +376,10 @@ func withID(e ziti.Entity, id string) ziti.Entity {
 func (r *ZitiAppReconciler) observe(ctx context.Context, zc ziti.Client, name string, ids zitiv1alpha1.EntityIDs,
 	routers, configTypes, configs []ziti.Entity, svc ziti.Entity) (*syncResult, error) {
 	g := &check.Graph{Services: []ziti.Entity{svc}, Configs: configs, ConfigTypes: configTypes, Routers: routers}
-	for _, l := range []struct {
-		kind ziti.Kind
-		dst  *[]ziti.Entity
-	}{
-		{ziti.ServicePolicies, &g.ServicePolicies},
-		{ziti.ServiceEdgeRouterPolicies, &g.SERPs},
-		{ziti.EdgeRouterPolicies, &g.ERPs},
-		{ziti.Identities, &g.Identities},
-		{ziti.Terminators, &g.Terminators},
-	} {
-		list, err := zc.List(ctx, l.kind, "")
-		if err != nil {
-			return nil, err
-		}
-		*l.dst = list
+	err := check.LoadInto(ctx, zc, g,
+		ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Identities, ziti.Terminators)
+	if err != nil {
+		return nil, err
 	}
 	out := &syncResult{name: name, ids: ids, report: g.Service(svc)}
 	routerNames := map[string]string{}

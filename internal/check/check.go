@@ -336,6 +336,9 @@ func (g *Graph) Audit(now time.Time) []Finding {
 	for _, s := range g.Services {
 		out = append(out, g.Service(s).Findings...)
 	}
+	for _, r := range g.Routers {
+		out = append(out, g.Router(r).NotTerminating(str(r, "name"))...)
+	}
 
 	used := map[string]bool{}
 	for _, s := range g.Services {

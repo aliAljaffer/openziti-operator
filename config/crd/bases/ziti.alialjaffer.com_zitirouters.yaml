@@ -25,6 +25,9 @@ spec:
     - jsonPath: .status.online
       name: Online
       type: boolean
+    - jsonPath: .status.conditions[?(@.type=='Serving')].status
+      name: Serving
+      type: string
     - jsonPath: .status.enrollmentExpiresAt
       name: Enrollment Expires
       type: string
@@ -237,6 +240,12 @@ spec:
                 type: boolean
               routerId:
                 type: string
+              services:
+                description: services are the names of the services that have a terminator
+                  on this router.
+                items:
+                  type: string
+                type: array
               zitiName:
                 description: zitiName is the name the router has in Ziti. It is set
                   once and does not change.
