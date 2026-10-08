@@ -84,7 +84,8 @@ metadata:
   namespace: default
 spec:
   connectionRef: default
-  roleAttributes: [team-a]
+  roleAttributes:
+    - team-a
   # JwtOnly (default) writes enrollment.jwt to the Secret. OperatorEnrolled writes identity.json and renews the certificate.
   enrollmentMode: OperatorEnrolled
 ```

@@ -8,6 +8,8 @@ metadata:
     ziti.alialjaffer.com/expose: "true"
     ziti.alialjaffer.com/allow-groups: team-a
 spec:
-  selector: {app: web}
+  selector:
+    app: web
   ports:
-    - {name: https, port: 443}
+    - name: https
+      port: 443

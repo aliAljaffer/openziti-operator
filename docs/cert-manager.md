@@ -19,23 +19,35 @@ The CA bundle that the `ZitiConnection` uses to trust the controller is a differ
    ```yaml
    apiVersion: cert-manager.io/v1
    kind: Issuer
-   metadata: {name: ziti-bootstrap, namespace: cert-manager}
-   spec: {selfSigned: {}}
+   metadata:
+     name: ziti-bootstrap
+     namespace: cert-manager
+   spec:
+     selfSigned: {}
    ---
    apiVersion: cert-manager.io/v1
    kind: Certificate
-   metadata: {name: ziti-workload-ca, namespace: cert-manager}
+   metadata:
+     name: ziti-workload-ca
+     namespace: cert-manager
    spec:
      isCA: true
      commonName: ziti-workload-ca
      secretName: ziti-workload-ca
-     privateKey: {algorithm: ECDSA, size: 256}
-     issuerRef: {name: ziti-bootstrap, kind: Issuer}
+     privateKey:
+       algorithm: ECDSA
+       size: 256
+     issuerRef:
+       name: ziti-bootstrap
+       kind: Issuer
    ---
    apiVersion: cert-manager.io/v1
    kind: ClusterIssuer
-   metadata: {name: ziti-workload-ca}
-   spec: {ca: {secretName: ziti-workload-ca}}
+   metadata:
+     name: ziti-workload-ca
+   spec:
+     ca:
+       secretName: ziti-workload-ca
    ```
 
 2. Let the operator read the Secret. With the Helm chart, add the namespace to `rbac.secretNamespaces` (for example `cert-manager`).
@@ -45,10 +57,13 @@ The CA bundle that the `ZitiConnection` uses to trust the controller is a differ
    ```yaml
    apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiCA
-   metadata: {name: workloads}
+   metadata:
+     name: workloads
    spec:
      certificate:
-       secretRef: {namespace: cert-manager, name: ziti-workload-ca}
+       secretRef:
+         namespace: cert-manager
+         name: ziti-workload-ca
      verification:
        signWithSecretKey: true
    ```
@@ -60,14 +75,19 @@ The CA bundle that the `ZitiConnection` uses to trust the controller is a differ
    ```yaml
    apiVersion: ziti.alialjaffer.com/v1alpha1
    kind: ZitiIdentity
-   metadata: {name: web, namespace: team-a}
+   metadata:
+     name: web
+     namespace: team-a
    spec:
      enrollmentMode: None
      externalId: team-a.web
      authPolicy: Default
-     roleAttributes: [web]
+     roleAttributes:
+       - web
      certificate:
-       issuerRef: {name: ziti-workload-ca, kind: ClusterIssuer}
+       issuerRef:
+         name: ziti-workload-ca
+         kind: ClusterIssuer
    ```
 
    `kubectl get ztid web` shows `Ready` `true` when cert-manager has issued the certificate. Skip step 5 in this case. Use `duration` to set the lifetime. The operator needs no access to the Secret, because cert-manager writes it.
@@ -77,13 +97,20 @@ The CA bundle that the `ZitiConnection` uses to trust the controller is a differ
    ```yaml
    apiVersion: cert-manager.io/v1
    kind: Certificate
-   metadata: {name: ziti-web, namespace: team-a}
+   metadata:
+     name: ziti-web
+     namespace: team-a
    spec:
      commonName: team-a.web
      secretName: ziti-web-cert
-     usages: [client auth]
-     privateKey: {algorithm: ECDSA, size: 256}
-     issuerRef: {name: ziti-workload-ca, kind: ClusterIssuer}
+     usages:
+       - client auth
+     privateKey:
+       algorithm: ECDSA
+       size: 256
+     issuerRef:
+       name: ziti-workload-ca
+       kind: ClusterIssuer
    ```
 
 6. The workload logs in with the certificate from `ziti-web-cert`.
@@ -99,12 +126,18 @@ Use `issuerRef` when the operator must not read the CA key. The operator asks th
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiCA
-metadata: {name: workloads}
+metadata:
+  name: workloads
 spec:
   certificate:
-    secretRef: {namespace: cert-manager, name: ziti-workload-ca}
+    secretRef:
+      namespace: cert-manager
+      name: ziti-workload-ca
   verification:
-    issuerRef: {name: ziti-workload-ca, kind: ClusterIssuer, namespace: cert-manager}
+    issuerRef:
+      name: ziti-workload-ca
+      kind: ClusterIssuer
+      namespace: cert-manager
 ```
 
 - `issuerRef.name` must be the issuer whose CA certificate this `ZitiCA` registers.

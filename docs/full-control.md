@@ -40,66 +40,97 @@ Apply the resources in any order. A resource that names an object that does not 
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiConfig
-metadata: {name: web-intercept, namespace: team-a}
+metadata:
+  name: web-intercept
+  namespace: team-a
 spec:
   zitiName: web-intercept
   type: intercept.v1
   data:
-    protocols: [tcp]
-    addresses: [web.example.com]
-    portRanges: [{low: 80, high: 80}]
+    protocols:
+      - tcp
+    addresses:
+      - web.example.com
+    portRanges:
+      - low: 80
+        high: 80
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiConfig
-metadata: {name: web-host, namespace: team-a}
+metadata:
+  name: web-host
+  namespace: team-a
 spec:
   zitiName: web-host
   type: host.v2
   data:
     terminators:
-      - {address: 10.0.0.5, port: 8443, protocol: tcp}
+      - address: 10.0.0.5
+        port: 8443
+        protocol: tcp
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiService
-metadata: {name: web, namespace: team-a}
+metadata:
+  name: web
+  namespace: team-a
 spec:
   zitiName: web.example.com
-  configs: [web-intercept, web-host]
-  roleAttributes: [web]
+  configs:
+    - web-intercept
+    - web-host
+  roleAttributes:
+    - web
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiServicePolicy
-metadata: {name: web-bind, namespace: team-a}
+metadata:
+  name: web-bind
+  namespace: team-a
 spec:
   zitiName: web-bind
   type: Bind
-  identityRoles: ["@router-a"]
-  serviceRoles: ["@web.example.com"]
+  identityRoles:
+    - "@router-a"
+  serviceRoles:
+    - "@web.example.com"
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiServicePolicy
-metadata: {name: web-dial, namespace: team-a}
+metadata:
+  name: web-dial
+  namespace: team-a
 spec:
   zitiName: web-dial
   type: Dial
-  identityRoles: ["#staff"]
-  serviceRoles: ["#web"]
+  identityRoles:
+    - "#staff"
+  serviceRoles:
+    - "#web"
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiServiceEdgeRouterPolicy
-metadata: {name: web-serp, namespace: team-a}
+metadata:
+  name: web-serp
+  namespace: team-a
 spec:
   zitiName: web-serp
-  serviceRoles: ["#web"]
-  edgeRouterRoles: ["@router-a"]
+  serviceRoles:
+    - "#web"
+  edgeRouterRoles:
+    - "@router-a"
 ---
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiEdgeRouterPolicy
-metadata: {name: web-erp, namespace: team-a}
+metadata:
+  name: web-erp
+  namespace: team-a
 spec:
   zitiName: web-erp
-  identityRoles: ["#staff"]
-  edgeRouterRoles: ["@router-a"]
+  identityRoles:
+    - "#staff"
+  edgeRouterRoles:
+    - "@router-a"
 ```
 
 The `@router-a` role selects the identity of the router that hosts the service. A router in tunnel mode has an identity with the same name as the router. The bind policy and the service edge router policy must both include the hosting router, or the service gets no terminator.
@@ -115,7 +146,9 @@ Use a `ZitiTerminator` for a fixed route: a router that forwards a service to on
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiTerminator
-metadata: {name: web-via-router-a, namespace: team-a}
+metadata:
+  name: web-via-router-a
+  namespace: team-a
 spec:
   service: web.example.com
   router: router-a

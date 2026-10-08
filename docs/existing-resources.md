@@ -15,7 +15,9 @@ Use it first. It shows the state of an existing service or identity with no risk
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiApp
-metadata: {name: legacy, namespace: team-a}
+metadata:
+  name: legacy
+  namespace: team-a
 spec:
   zitiName: legacy.example.com
   managementPolicy: Observe
@@ -28,11 +30,14 @@ spec:
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiIdentity
-metadata: {name: alice, namespace: team-a}
+metadata:
+  name: alice
+  namespace: team-a
 spec:
   zitiName: alice
   managementPolicy: Adopt
-  roleAttributes: [staff]
+  roleAttributes:
+    - staff
 ```
 
 The identity must exist and must not belong to another resource. The operator sets role attributes and the auth policy. It adds ownership tags next to your tags. It keeps fields such as `externalId`.

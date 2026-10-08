@@ -78,9 +78,12 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zitirouter-sample
 spec:
-  roleAttributes: [edge]
+  roleAttributes:
+    - edge
   tunnelerEnabled: true
   advertisedAddress: vm1.example.com
-  enrollmentSecretRef: {namespace: default, name: zitirouter-sample-enrollment}
+  enrollmentSecretRef:
+    namespace: default
+    name: zitirouter-sample-enrollment
 ```
 

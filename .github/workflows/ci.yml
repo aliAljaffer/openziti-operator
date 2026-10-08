@@ -102,7 +102,14 @@ jobs:
   ci-ok:
     name: CI OK
     if: always()
-    needs: [hygiene, lint, test, integration, chart, e2e, security]
+    needs:
+      - hygiene
+      - lint
+      - test
+      - integration
+      - chart
+      - e2e
+      - security
     runs-on: ubuntu-latest
     permissions: {}
     steps:

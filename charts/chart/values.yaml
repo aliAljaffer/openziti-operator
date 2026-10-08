@@ -170,7 +170,9 @@ trustManager:
   key: ca.crt
   sources: []
   # sources:
-  #   - secret: {name: ziti-controller-root-secret, key: ca.crt}
+  #   - secret:
+  #       name: ziti-controller-root-secret
+  #       key: ca.crt
 
 ## RBAC configuration
 ##

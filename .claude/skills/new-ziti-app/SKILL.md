@@ -42,19 +42,27 @@ If the original intercepts `udp` but the host config allows only `tcp`, use `tcp
 ```yaml
 apiVersion: ziti.alialjaffer.com/v1alpha1
 kind: ZitiApp
-metadata: {name: <short-name>, namespace: <apps-namespace>}
+metadata:
+  name: <short-name>
+  namespace: <apps-namespace>
 spec:
   zitiName: <service name in Ziti>
   expose:
-    addresses: [<dns name clients dial>]
-    ports: [443]
-    protocols: [tcp]
+    addresses:
+      - <dns name clients dial>
+    ports:
+      - 443
+    protocols:
+      - tcp
   targets:
     - address: <ip or host reachable from the hosting router>
       port: 443
-  memberOf: [<group>]
+  memberOf:
+    - <group>
   allow:
-    groups: [<group>, <zitiName>]
+    groups:
+      - <group>
+      - <zitiName>
 ```
 
 The target must be reachable from the hosting router pod, not from the operator.
