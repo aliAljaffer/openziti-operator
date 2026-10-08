@@ -72,3 +72,10 @@ Namespaces where the operator may use Secrets: the release namespace plus rbac.s
 {{- define "ziti-operator.secretNamespaces" -}}
 {{ include "ziti-operator.secretNamespaceList" . }}
 {{- end }}
+
+{{/*
+Renders "true" when Secret access is limited to namespaced Roles (the default).
+*/}}
+{{- define "ziti-operator.limitSecrets" -}}
+{{- if or (not .Values.rbac.clusterWideSecrets) .Values.rbac.secretNamespaces }}true{{ end }}
+{{- end }}
