@@ -11,7 +11,7 @@ It drives the Ziti Edge Management API. It does not install or run the Ziti cont
 
 This is an independent community project. It is not an official OpenZiti or NetFoundry product.
 
-**Status:** `v0.1.2`, API `v1alpha1`. Tested with Ziti controller and router v2.0.4 and Kubernetes v1.36. See [Compatibility](docs/compatibility.md).
+**Status:** `v0.2.0`, API `v1alpha1`. Tested with Ziti controller and router v2.0.4 and Kubernetes v1.36. See [Compatibility](docs/compatibility.md).
 
 ## What it does for you
 
@@ -40,7 +40,7 @@ kubectl -n ziti-operator-system create configmap ziti-root-ca --from-file=ca.crt
 kubectl -n ziti-operator-system create secret generic ziti-operator-credential \
   --from-literal=username=<user> --from-literal=password=<password>
 
-helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.1.2 -n ziti-operator-system \
+helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.2.0 -n ziti-operator-system \
   --set connection.create=true \
   --set connection.managementUrl=https://<controller>/edge/management/v1 \
   --set 'connection.hostingRouters={<router>}' \
