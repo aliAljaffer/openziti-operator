@@ -21,6 +21,9 @@ PAGES = {
     "docs/cert-manager.md": "cert-manager-CA",
     "docs/full-control.md": "Full-Control",
     "docs/routers.md": "Edge-Routers",
+    "docs/sidecar.md": "Sidecar-Tunneler",
+    "docs/ingress.md": "Ingress",
+    "docs/port-forward.md": "Port-Forward",
     "docs/role-scope.md": "Role-Scope",
     "docs/existing-resources.md": "Existing-Resources",
     "docs/audit.md": "Audit",
@@ -52,6 +55,9 @@ SIDEBAR = """**[Home](Home)**
 - [cert-manager CA](cert-manager-CA)
 - [Full control (one resource per Ziti object)](Full-Control)
 - [Edge routers](Edge-Routers)
+- [Sidecar tunneler](Sidecar-Tunneler)
+- [Expose an Ingress](Ingress)
+- [Port forward](Port-Forward)
 
 **Resource reference**
 - [ZitiConnection](ZitiConnection)
