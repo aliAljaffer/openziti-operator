@@ -124,20 +124,23 @@ spec:
                     type: string
                   namespace:
                     description: |-
-                      namespace is where the Deployment, Service, and volume claim go. Every namespace but the ones in
-                      rbac.secretNamespaces must allow the operator to manage these three kinds.
+                      namespace is where the Deployment, Service, and volume claim go. The operator may only use Secrets in
+                      rbac.secretNamespaces and the release namespace, and may only write Services in rbac.serviceNamespaces
+                      when that list is set.
                     maxLength: 63
                     minLength: 1
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                   serviceType:
-                    default: LoadBalancer
+                    default: ClusterIP
                     description: |-
-                      serviceType for the Service that clients and other routers reach. Default LoadBalancer.
-                      Use NodePort where the cluster has no load balancer, then set advertisedAddress to a node address.
+                      serviceType for the Service that clients and other routers reach. Default ClusterIP, which only clients
+                      inside the cluster reach. Use LoadBalancer where the cluster has one, or NodePort, then set
+                      advertisedAddress to a node address.
                     enum:
-                    - LoadBalancer
+                    - ClusterIP
                     - NodePort
+                    - LoadBalancer
                     type: string
                 required:
                 - namespace

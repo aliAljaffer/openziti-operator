@@ -107,8 +107,9 @@ type ZitiRouterSpec struct {
 
 // ZitiRouterDeployment runs the router in the cluster instead of on a VM.
 type ZitiRouterDeployment struct {
-	// namespace is where the Deployment, Service, and volume claim go. Every namespace but the ones in
-	// rbac.secretNamespaces must allow the operator to manage these three kinds.
+	// namespace is where the Deployment, Service, and volume claim go. The operator may only use Secrets in
+	// rbac.secretNamespaces and the release namespace, and may only write Services in rbac.serviceNamespaces
+	// when that list is set.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
@@ -126,10 +127,11 @@ type ZitiRouterDeployment struct {
 	// +optional
 	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
 
-	// serviceType for the Service that clients and other routers reach. Default LoadBalancer.
-	// Use NodePort where the cluster has no load balancer, then set advertisedAddress to a node address.
-	// +kubebuilder:validation:Enum=LoadBalancer;NodePort
-	// +kubebuilder:default=LoadBalancer
+	// serviceType for the Service that clients and other routers reach. Default ClusterIP, which only clients
+	// inside the cluster reach. Use LoadBalancer where the cluster has one, or NodePort, then set
+	// advertisedAddress to a node address.
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	// +kubebuilder:default=ClusterIP
 	// +optional
 	ServiceType string `json:"serviceType,omitempty"`
 }

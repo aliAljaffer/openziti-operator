@@ -53,6 +53,7 @@
 | `trustManager.enabled`, `trustManager.sources` | off | Copy the Ziti root CA into the release namespace with a trust-manager `Bundle`. |
 | `rbac.secretNamespaces` | empty | Namespaces for Secret access, in addition to the release namespace. List every namespace that holds a `ZitiIdentity`. |
 | `rbac.clusterWideSecrets` | `false` | Set `true` to grant Secret access in all namespaces with a ClusterRole. Upgrade note: before this default, access was cluster-wide. |
+| `rbac.serviceNamespaces` | empty | Namespaces where the operator may create the Service for an in-cluster router. Empty leaves the ClusterRole able to write Services everywhere. Deployment and volume claim access is not scoped by this. |
 | `metrics.enabled`, `metrics.secure`, `prometheus.enabled` | on, on, off | Metrics endpoint and an optional ServiceMonitor. |
 | `crd.keep` | `true` | Keep the CRDs when the release is uninstalled. |
 
