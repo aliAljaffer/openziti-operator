@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ import (
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
+	"github.com/aliAljaffer/openziti-operator/internal/desired"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -284,6 +286,34 @@ func setupDeployedRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...cli
 	return e
 }
 
+func TestRouterEnrollmentIsNotReplacedWhileItIsStillValid(t *testing.T) {
+	e := setupRouter(t, nil)
+	e.reconcile(t)
+
+	// The router takes the JWT and Ziti stops returning one, but isVerified is not true yet. That is the window in
+	// which re-enrolling destroys an enrollment that is about to succeed.
+	e.router()["enrollmentJwt"] = nil
+	e.zc.Calls = nil
+	e.reconcile(t)
+	for _, c := range e.zc.Calls {
+		if strings.HasPrefix(c, "re-enroll") {
+			t.Errorf("a consumed JWT with a live enrollment must not be replaced: %v", e.zc.Calls)
+		}
+	}
+
+	// Once the enrollment itself has run out, a new JWT is due.
+	e.router()["enrollmentExpiresAt"] = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	e.zc.Calls = nil
+	e.reconcile(t)
+	var reenrolled bool
+	for _, c := range e.zc.Calls {
+		reenrolled = reenrolled || strings.HasPrefix(c, "re-enroll")
+	}
+	if !reenrolled {
+		t.Errorf("an expired unused JWT must be replaced by Ziti: %v", e.zc.Calls)
+	}
+}
+
 func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
 	e := setupDeployedRouter(t, nil)
 	rt := e.reconcile(t)
@@ -474,6 +504,104 @@ func TestRouterWithoutADeploymentHasNoWorkloadCondition(t *testing.T) {
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err != nil {
 		t.Fatalf("the operator must not delete the workload itself: %v", err)
 	}
+}
+
+func TestRouterDeploymentStartsWithoutAnAdvertisedAddress(t *testing.T) {
+	e := setupDeployedRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.AdvertisedAddress = "" })
+	rt := e.reconcile(t)
+	if rt.Status.RouterID == "" {
+		t.Fatalf("status = %+v", rt.Status)
+	}
+
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err != nil {
+		t.Fatalf("deployment: %v", err)
+	}
+	// The tunneler needs an edge listener, and an edge listener needs an advertise value. A placeholder satisfies
+	// that, so a router nobody dials by name still starts and hosts.
+	var advertise string
+	for _, e := range dep.Spec.Template.Spec.Containers[0].Env {
+		if e.Name == "ZITI_ROUTER_ADVERTISED_ADDRESS" {
+			advertise = e.Value
+		}
+	}
+	if advertise != desired.AddressPlaceholder {
+		t.Errorf("advertise = %q, want the placeholder %q", advertise, desired.AddressPlaceholder)
+	}
+	if c := routerCond(rt, CondWorkload); c.Status != metav1.ConditionFalse || c.Reason != "DeploymentUnavailable" {
+		t.Errorf("workload = %+v", c)
+	}
+	if routerCond(rt, CondSynced).Status != metav1.ConditionTrue {
+		t.Errorf("an empty address must not fail the sync: %+v", routerCond(rt, CondSynced))
+	}
+}
+
+func TestRouterDeploymentReportsAStorageClassItCannotChange(t *testing.T) {
+	e := setupDeployedRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.StorageClassName = "wanted" })
+	e.reconcile(t)
+
+	// A bound claim keeps the class it was created with, so the operator must say so instead of waiting.
+	rt := e.reconcile(t)
+	rt.Spec.StorageClassName = "other"
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	rt = e.reconcile(t)
+	c := routerCond(rt, CondWorkload)
+	if c.Status != metav1.ConditionFalse || c.Reason != "StorageClassLocked" || !strings.Contains(c.Message, "wanted") {
+		t.Errorf("workload = %+v", c)
+	}
+	// The storage class must not become the reason the router is not ready: that reason is the enrollment state.
+	if r := routerCond(rt, CondReady).Reason; r == "StorageClassLocked" {
+		t.Errorf("a storage class problem must not drive Ready: %+v", routerCond(rt, CondReady))
+	}
+}
+
+func TestRouterDeploymentSecretKeepsNoManifestsForTheOperatorsOwn(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.reconcile(t)
+	s, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The manifests are for a hand-installed router. With no enrollmentSecretRef the pod only needs the JWT.
+	if len(s.Data[SecretKeyCompose]) != 0 || len(s.Data[SecretKeyDeployment]) != 0 {
+		t.Errorf("secret keys = %v", keysOf(s.Data))
+	}
+	if string(s.Data[SecretKeyJWT]) == "" {
+		t.Error("the pod still needs the JWT before it enrolls")
+	}
+
+	// A named Secret keeps them, because that is how a user installs a router by hand.
+	e = setupRouter(t, func(r *zitiv1.ZitiRouter) {
+		r.Spec.AdvertisedAddress = "edge.example.com"
+		r.Spec.EnrollmentSecretRef = &zitiv1.SecretRef{Namespace: "routers", Name: "edge-1-enrollment"}
+	})
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = "v2.0.4"
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	s, err = e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Data[SecretKeyCompose]) == 0 || len(s.Data[SecretKeyDeployment]) == 0 {
+		t.Errorf("named secret keys = %v", keysOf(s.Data))
+	}
+}
+
+func keysOf(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return out
 }
 
 func TestRouterManifestsFollowTheAddressAndLeaveWithTheJWT(t *testing.T) {

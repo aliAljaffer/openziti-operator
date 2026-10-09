@@ -67,8 +67,6 @@ spec:
     namespace: routers
 ```
 
-Set `advertisedAddress` before the first start. Ziti takes the router address from its certificate, and the image writes that certificate once and keeps it. A router that starts without an address enrolls and goes online under `CHANGE_ME.invalid`, and no client can reach it.
-
 The operator creates a `Deployment` and a volume claim in that namespace, and ties both to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter` shows `WORKLOAD` and `ENDPOINT`.
 
 The operator does **not** create the `Service`. Rewriting a Service anywhere in a cluster is a privilege escalation, so the operator does not ask for write access to them; you would not want the operator holding it either. The operator writes a ready-made `service.yaml` to the enrollment Secret instead:
@@ -78,6 +76,22 @@ kubectl -n routers get secret homelab-1-enrollment -o jsonpath='{.data.service\.
 ```
 
 Without a Service the router still starts and serves, but it has only a Pod address, which changes when the pod is rescheduled. Add the Service when you want a stable one.
+
+## Who needs a reachable address
+
+Ziti puts `advertisedAddress` in the router certificate on first start and never changes it. The image writes that certificate once and keeps it, so a later change to the field, or to `port`, has no effect.
+
+The address is only needed when something dials the router **by name**. It is not needed for the router to start, enroll, or host services.
+
+| Router | `advertisedAddress` |
+|---|---|
+| Clients connect to it directly, or other routers link to it | Required. Use the DNS name or IP clients use. |
+| It hosts services and clients arrive through other routers | Leave it empty. The operator uses the placeholder `CHANGE_ME.invalid`. |
+| `serviceType: NodePort` | Required, because a NodePort has no address of its own. Use a node IP or DNS name. |
+
+A router with an empty address still enrolls, goes online, and terminates services. Nothing can dial it by name, so it works only for clients whose path goes through another router. That is the normal shape for a hosting router behind an entry router.
+
+The tunneler needs an edge listener, and an edge listener needs an advertise value. A placeholder satisfies that, which is why an empty address starts at all.
 
 | Key | Meaning |
 |---|---|
@@ -91,6 +105,12 @@ Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollm
 The pod runs one replica as uid 2171 with all capabilities dropped. The Deployment is `Recreate`, never `RollingUpdate`: two router processes with the same identity fight each other.
 
 The enrollment token expires after about three hours. The operator removes it from the Secret once the router has enrolled, and the pod reads it as an optional key. A restarted pod starts from its volume with no token at all. If you delete the volume, the router needs a new enrollment: delete the resource and apply it again.
+
+A volume claim cannot change its storage class once it exists, so set `storageClassName` before the first reconcile. A later change leaves the `Workload` condition `False` with reason `StorageClassLocked`. Delete the claim to let the operator make a new one.
+
+Check the reclaim policy of the storage class. With `Retain`, deleting the resource leaves the volume behind, and a later `ZitiRouter` of the same name can pick it up with a certificate for a Ziti identity that no longer exists. That router never connects. Delete the volume as well when you delete the resource.
+
+The router needs one replica and a volume. It does not need CPU or memory requests, and the operator does not set them.
 
 The JWT works once and expires after about three hours. The operator writes new files when it issues a new JWT. It removes the JWT and both files when the router has enrolled. The files need the controller version, so the `ZitiConnection` must be connected.
 
@@ -142,6 +162,6 @@ A `ZitiApp` names routers in `hostedBy` and `entryRouters`, and the connection l
 
 ## Limits
 
-- Tested: the operator creates the router, delivers the JWT Ziti issued, keeps the pending enrollment across updates, and issues a new JWT with re-enroll. It has not enrolled a real router with that JWT, so the Enrolled and Online transitions are tested against a fake controller only.
+- Tested against a real cluster: the operator created the router, Deployment, Service, and volume claim, the router enrolled and went online on its own, and it came back after the pod was deleted with no token left in the Secret.
 - A live router that this operator created is deleted from Ziti when you delete its resource (or, with the orphan sweeper in `delete` mode, when the resource is gone). Use `deletionPolicy: Orphan` for routers that must survive.
-- `deployment` was not run against a cluster. It is tested against a real Ziti controller with the same objects the reconciler builds, but not against a live Kubernetes cluster yet.
+- `deployment` was tested on a real cluster: one `ZitiRouter` with `spec.deployment` produced an enrolled, online router from a single applied resource. Deleting the pod brought it back with no token.

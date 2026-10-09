@@ -241,7 +241,18 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 	if ref := rt.Spec.EnrollmentSecretRef; ref != nil {
 		name = ref.Name
 	}
-	// The volume claim spec is immutable, so an existing claim is left alone.
+	// The volume claim spec is immutable, so an existing claim is left alone. A claim on the wrong storage class
+	// can never bind to what the spec asks for, so say so rather than wait on a pod that never starts.
+	var pvc corev1.PersistentVolumeClaim
+	depName, _, claimName := w.Names()
+	if err := r.Get(ctx, types.NamespacedName{Namespace: w.Namespace, Name: claimName}, &pvc); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if got := pvc.Spec.StorageClassName; got != nil && w.StorageClass != "" && *got != w.StorageClass {
+		setCond(&rt.Status.Conditions, rt.Generation, CondWorkload, false, "", "StorageClassLocked",
+			fmt.Sprintf("the volume claim uses storage class %q and a bound claim cannot change; delete it or set storageClassName to %q", *got, w.StorageClass))
+		return nil
+	}
 	if err := r.createOwned(ctx, rt, w.PersistentVolumeClaim()); err != nil {
 		return err
 	}
@@ -260,9 +271,8 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 		return err
 	}
 
-	dep, _, _ := w.Names()
 	var cur appsv1.Deployment
-	if err := r.Get(ctx, types.NamespacedName{Namespace: w.Namespace, Name: dep}, &cur); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: w.Namespace, Name: depName}, &cur); err != nil {
 		return err
 	}
 	ready := cur.Status.ReadyReplicas
@@ -374,6 +384,21 @@ func objectKind(obj client.Object) string {
 	return "object"
 }
 
+// enrollmentStale reports whether the pending enrollment can no longer be used, so the operator must ask Ziti for a
+// new JWT. Ziti returns no JWT once the router has consumed it, and isVerified can still be false for a moment
+// after, so an empty JWT alone does not mean the enrollment is spent. Re-enrolling in that window throws away an
+// enrollment that is about to finish, and the router then never connects.
+func enrollmentStale(rt *zitiv1alpha1.ZitiRouter, jwt string, expires time.Time) bool {
+	if !expires.IsZero() {
+		// Ziti knows when its own pending enrollment runs out.
+		return expires.Before(time.Now())
+	}
+	if p := rt.Status.EnrollmentExpiresAt; p != nil {
+		return time.Until(p.Time) <= 0
+	}
+	return jwt == ""
+}
+
 // servingReport says which services the router terminates and which ones it was picked to terminate.
 // Ziti cannot filter terminators by router, so it reads the three kinds whole.
 func servingReport(ctx context.Context, zc ziti.Client, rt ziti.Entity) (check.RouterReport, error) {
@@ -402,7 +427,7 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 	if err != nil {
 		return err
 	}
-	if jwt == "" || (!expires.IsZero() && expires.Before(time.Now())) {
+	if enrollmentStale(rt, jwt, expires) {
 		if err := zc.ReEnroll(ctx, ziti.EdgeRouters, id); err != nil {
 			return err
 		}
@@ -417,12 +442,13 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 	if key.Name == "" || jwt == "" {
 		return nil
 	}
+	port := rt.Spec.Port
+	if port == 0 {
+		port = 3022
+	}
 	values := map[string][]byte{SecretKeyJWT: []byte(jwt)}
-	if conn.Status.ControllerVersion != "" {
-		port := rt.Spec.Port
-		if port == 0 {
-			port = 3022
-		}
+	// The manifests are for a router someone installs by hand. The operator's own Secret only feeds the pod.
+	if ref != nil && conn.Status.ControllerVersion != "" {
 		m := desired.RouterManifest{Name: desired.RouterName(rt, conn), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName}
 		values[SecretKeyCompose], values[SecretKeyDeployment] = []byte(m.Compose()), []byte(m.Deployment())
 	}

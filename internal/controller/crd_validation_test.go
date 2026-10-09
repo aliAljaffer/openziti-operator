@@ -512,11 +512,8 @@ var _ = Describe("ZitiRouter", func() {
 		Entry("negative cost", func(s *zitiv1.ZitiRouterSpec) { s.Cost = -1 }, "greater than or equal to 0"),
 		Entry("cost over the limit", func(s *zitiv1.ZitiRouterSpec) { s.Cost = 70000 }, "less than or equal to 65535"),
 		Entry("unknown deletionPolicy", func(s *zitiv1.ZitiRouterSpec) { s.DeletionPolicy = "Maybe" }, "Unsupported value"),
-		Entry("deployment without an address", func(s *zitiv1.ZitiRouterSpec) {
-			s.Deployment = &zitiv1.ZitiRouterDeployment{Namespace: "routers"}
-		}, "advertisedAddress is required with deployment"),
 		Entry("deployment without a namespace", func(s *zitiv1.ZitiRouterSpec) {
-			s.AdvertisedAddress, s.Deployment = "edge.example.com", &zitiv1.ZitiRouterDeployment{}
+			s.Deployment = &zitiv1.ZitiRouterDeployment{}
 		}, "spec.deployment.namespace"),
 		Entry("bad deployment namespace", func(s *zitiv1.ZitiRouterSpec) {
 			s.AdvertisedAddress = "edge.example.com"
@@ -528,14 +525,15 @@ var _ = Describe("ZitiRouter", func() {
 		}, "Unsupported value"),
 	)
 
-	It("applies the deployment defaults", func() {
+	It("applies the deployment defaults and allows an empty address", func() {
 		r := router(func(s *zitiv1.ZitiRouterSpec) {
-			s.AdvertisedAddress = "edge.example.com"
 			s.Deployment = &zitiv1.ZitiRouterDeployment{Namespace: "routers"}
 		})
 		Expect(k8sClient.Create(ctx, r)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, r) })
 		Expect(r.Spec.Deployment.ServiceType).To(Equal("LoadBalancer"))
 		Expect(r.Spec.Deployment.ImagePullPolicy).To(Equal("IfNotPresent"))
+		// A router that clients reach through other routers needs no address of its own.
+		Expect(r.Spec.AdvertisedAddress).To(BeEmpty())
 	})
 })
