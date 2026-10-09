@@ -33,6 +33,7 @@ import (
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -57,6 +58,7 @@ type ZitiJwtSignerReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitijwtsigners/finalizers,verbs=update
 
 func (r *ZitiJwtSignerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zitijwtsigner").Inc()
 	var sg zitiv1alpha1.ZitiJwtSigner
 	if err := r.Get(ctx, req.NamespacedName, &sg); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

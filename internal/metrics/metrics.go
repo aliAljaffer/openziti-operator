@@ -32,8 +32,14 @@ var (
 		Name: "ziti_operator_sweep_errors_total",
 		Help: "Orphan sweeps that failed.",
 	})
+
+	// Reconciliations counts reconcile loops per custom resource kind.
+	Reconciliations = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ziti_operator_reconcile_total",
+		Help: "Reconcile loops per custom resource kind.",
+	}, []string{"kind"})
 )
 
 func init() {
-	ctrlmetrics.Registry.MustRegister(APIRequests, ManagedEntities, Orphans, SweepErrors)
+	ctrlmetrics.Registry.MustRegister(APIRequests, ManagedEntities, Orphans, SweepErrors, Reconciliations)
 }

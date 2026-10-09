@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
 )
 
@@ -64,6 +65,7 @@ type ZitiConnectionReconciler struct {
 // Reconcile ensures a ZitiConnection exists when Create is set, then reports
 // whether the controller is reachable.
 func (r *ZitiConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("ziticonnection").Inc()
 	if r.CreateConnection {
 		if err := r.ensureDefaultConnection(ctx); err != nil {
 			return ctrl.Result{}, err

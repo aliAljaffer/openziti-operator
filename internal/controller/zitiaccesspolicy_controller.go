@@ -32,6 +32,7 @@ import (
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -49,6 +50,7 @@ type ZitiAccessPolicyReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiaccesspolicies/finalizers,verbs=update
 
 func (r *ZitiAccessPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zitiaccesspolicy").Inc()
 	var ap zitiv1alpha1.ZitiAccessPolicy
 	if err := r.Get(ctx, req.NamespacedName, &ap); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

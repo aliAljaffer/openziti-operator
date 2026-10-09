@@ -44,6 +44,7 @@ import (
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -83,6 +84,7 @@ type ZitiIdentityReconciler struct {
 // +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zitiidentity").Inc()
 	var id zitiv1alpha1.ZitiIdentity
 	if err := r.Get(ctx, req.NamespacedName, &id); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

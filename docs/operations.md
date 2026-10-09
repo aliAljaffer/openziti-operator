@@ -15,6 +15,7 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | `ziti_operator_managed_entities{kind}` | Ziti entities tagged for this cluster. Set by the sweeper. |
 | `ziti_operator_orphaned_entities{kind}` | Tagged entities whose owner is gone. |
 | `ziti_operator_sweep_errors_total` | Failed sweeps. |
+| `ziti_operator_reconcile_total{kind}` | Reconcile loops per custom resource kind. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
 
 ## Orphan sweeper

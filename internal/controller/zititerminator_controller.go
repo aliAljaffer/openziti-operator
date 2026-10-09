@@ -18,6 +18,7 @@ import (
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -36,6 +37,7 @@ type ZitiTerminatorReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zititerminators/finalizers,verbs=update
 
 func (r *ZitiTerminatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zititerminator").Inc()
 	var t zitiv1alpha1.ZitiTerminator
 	if err := r.Get(ctx, req.NamespacedName, &t); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

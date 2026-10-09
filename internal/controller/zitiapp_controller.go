@@ -43,6 +43,7 @@ import (
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -78,6 +79,7 @@ type specError struct{ reason, msg string }
 func (e *specError) Error() string { return e.msg }
 
 func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zitiapp").Inc()
 	var svc zitiv1alpha1.ZitiApp
 	if err := r.Get(ctx, req.NamespacedName, &svc); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
