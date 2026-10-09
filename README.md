@@ -1,4 +1,4 @@
-# ziti-operator
+# openziti-operator
 
 [![CI](https://github.com/aliAljaffer/openziti-operator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aliAljaffer/openziti-operator/actions/workflows/ci.yml)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot)](.github/dependabot.yml)
