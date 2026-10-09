@@ -67,6 +67,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `SecretConflict` | A Secret with the wanted name exists and this `ZitiIdentity` does not own it. | Set another `secretName`. |
 | `KeyAmbiguous` | `ZitiJwtSigner` with `keys.kubernetes`: the cluster publishes several keys and the operator cannot tell which one signs tokens (it has no token to compare, or none matches). | Run the operator in the cluster, or use `keys.jwksEndpoint`. |
 | `SecretNamespaceNotAllowed` | The operator runs with `--secret-namespaces` (chart value `rbac.secretNamespaces`) and this namespace is not in it. | Add the namespace to the list. |
+| `ServiceNamespaceNotAllowed` | On `Workload`. The chart narrows where the operator may write Services (`rbac.serviceNamespaces`) and `spec.deployment.namespace` is not in it. The Deployment and the claim are still made, and the router runs without a stable address. | Add the namespace to the list, or apply the `service.yaml` from the enrollment Secret yourself. |
 | `NameConflict` on a `Deployment`, `Service`, or `PersistentVolumeClaim` | An object of that name exists in `spec.deployment.namespace` and the operator did not create it. The operator never takes over a workload it does not own. | Rename the router, or delete the object. |
 
 ## Reasons on `Hosted`, `Dialable`, and `RoutePath`

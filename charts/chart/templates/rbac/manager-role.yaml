@@ -22,7 +22,6 @@ rules:
   - configmaps
 {{- end }}
   - namespaces
-  - services
   verbs:
   - get
   - list
@@ -40,6 +39,9 @@ rules:
   - persistentvolumeclaims
 {{- if not (include "ziti-operator.limitSecrets" .) }}
   - secrets
+{{- end }}
+{{- if not (include "ziti-operator.limitServices" .) }}
+  - services
 {{- end }}
   verbs:
   - create
@@ -148,3 +150,14 @@ rules:
   - get
   - patch
   - update
+
+{{- if (include "ziti-operator.limitServices" .) }}
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}

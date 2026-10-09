@@ -48,6 +48,14 @@ check "limited secrets: Roles in release namespace and both listed" '[ "$(yq "se
 check "limited secrets: ClusterRole has no secrets or configmaps" '! yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out" | grep -qxE "secrets|configmaps"'
 check "limited secrets: flag lists the release namespace first" 'grep -q -- "--secret-namespaces=ns,team-a,team-b" <<<"$out"'
 
+out=$(render)
+check "default: ClusterRole may write Services" 'yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[] | select(.resources[]? == \"services\") | .verbs[]" <<<"$out" | grep -qx create'
+out=$(render --set 'rbac.serviceNamespaces={team-a,team-b}')
+check "scoped services: ClusterRole may not write Services" '! yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[] | select(.resources[]? == \"services\") | .verbs[]" <<<"$out" | grep -qxE "create|update|patch|delete"'
+check "scoped services: ClusterRole can still watch Services" 'yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[] | select(.resources[]? == \"services\") | .verbs[]" <<<"$out" | grep -qx watch'
+check "scoped services: Roles in both listed namespaces" '[ "$(yq "select(.kind==\"Role\" and (.metadata.name|test(\"service-access\"))) | .metadata.namespace" <<<"$out" | grep -v "^---" | sort | tr "\n" " ")" = "team-a team-b " ]'
+check "default: no service-access Role" '[ -z "$(render | yq "select(.kind==\"Role\" and (.metadata.name|test(\"service-access\")))")" ]'
+
 for crd in config/crd/bases/*.yaml; do
   name=$(yq .metadata.name "$crd")
   want=$(yq -o=json -I=0 '.spec' "$crd" | sed 's/[[:space:]]//g')

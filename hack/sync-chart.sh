@@ -25,16 +25,37 @@ done
 
 # The manager role keeps the rules of config/rbac/role.yaml. With rbac.secretNamespaces set, or with
 # rbac.clusterWideSecrets turned off, secrets and configmaps move to per-namespace Roles
-# (templates/rbac/secret-roles.yaml). The ziti-operator.limitSecrets helper covers both.
+# (templates/rbac/secret-roles.yaml). The ziti-operator.limitSecrets helper covers both. With
+# rbac.serviceNamespaces set, services move to per-namespace Roles the same way
+# (templates/rbac/service-roles.yaml), and ziti-operator.limitServices covers that.
 #
-# controller-gen merges rules that share an apiGroup and a verb set, so secrets can land in the same rule as
-# services or persistentvolumeclaims. Guard the resource line, not the rule, or the ClusterRole would keep Secret
-# access in the mode that exists to remove it. A rule made only of guarded resources is dropped whole.
+# controller-gen merges rules that share an apiGroup and a verb set, so secrets and services land in the same rule as
+# persistentvolumeclaims. Guard the resource line, not the rule, or the ClusterRole would keep Secret access in the
+# mode that exists to remove it. A rule made only of guarded resources is dropped whole, unless they want different
+# guards, in which case it is guarded per line like a mixed one: one resource's guard around the whole rule would
+# drop another resource's access in a mode meant to keep it.
+#
+# services is the one resource that is read from every namespace no matter where the router runs, so narrowing it
+# drops the write verbs and adds a separate read rule back.
 python3 - <<'PY'
 import re
 
-GUARDED = ("secrets", "configmaps")
-GUARD = '{{- if not (include "ziti-operator.limitSecrets" .) }}'
+LIMIT_SECRETS = '{{- if not (include "ziti-operator.limitSecrets" .) }}'
+LIMIT_SERVICES = '{{- if not (include "ziti-operator.limitServices" .) }}'
+GUARDS = {"secrets": LIMIT_SECRETS, "configmaps": LIMIT_SECRETS, "services": LIMIT_SERVICES}
+
+READ_BACK = """
+{{- if (include "ziti-operator.limitServices" .) }}
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+{{- end }}
+"""
 
 src = open("config/rbac/role.yaml").read()
 rules = src.split("\nrules:\n", 1)[1].strip("\n").split("\n")
@@ -57,22 +78,31 @@ def resources(b):
     return start, end, [l[4:] for l in b[start + 1:end]]
 
 out = []
+read_back = ""
 for b in blocks:
     found = resources(b)
     names = found[2] if found else []
-    if not found or not any(n in GUARDED for n in names):
+    if not found or not any(n in GUARDS for n in names):
         out.append("\n".join(b))
-    elif all(n in GUARDED for n in names):
-        out.append(GUARD + "\n" + "\n".join(b) + "\n{{- end }}")
+    elif all(n in GUARDS for n in names) and len({GUARDS[n] for n in names}) == 1:
+        guard = GUARDS[names[0]]
+        if "services" in names:
+            read_back = READ_BACK
+        out.append(guard + "\n" + "\n".join(b) + "\n{{- end }}")
     else:
         start, end, _ = found
         lines = []
         for n in names:
-            if n in GUARDED:
-                lines += [GUARD, "  - " + n, "{{- end }}"]
+            if n in GUARDS:
+                lines += [GUARDS[n], "  - " + n, "{{- end }}"]
+                if n == "services":
+                    read_back = READ_BACK
             else:
                 lines.append("  - " + n)
         out.append("\n".join(b[:start + 1] + lines + b[end:]))
+
+if read_back:
+    out.append(read_back.rstrip("\n"))
 
 path = "charts/chart/templates/rbac/manager-role.yaml"
 tpl = open(path).read()

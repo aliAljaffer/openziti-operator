@@ -55,7 +55,7 @@ func NewRouterWorkload(rt *zitiv1.ZitiRouter, version string) RouterWorkload {
 		w.ImagePullPolicy = corev1.PullIfNotPresent
 	}
 	if w.ServiceType == "" {
-		w.ServiceType = corev1.ServiceTypeLoadBalancer
+		w.ServiceType = corev1.ServiceTypeClusterIP
 	}
 	return w
 }

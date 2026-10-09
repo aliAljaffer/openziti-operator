@@ -79,3 +79,17 @@ Renders "true" when Secret access is limited to namespaced Roles (the default).
 {{- define "ziti-operator.limitSecrets" -}}
 {{- if or (not .Values.rbac.clusterWideSecrets) .Values.rbac.secretNamespaces }}true{{ end }}
 {{- end }}
+
+{{/*
+Namespaces where the operator may write Services. Duplicates go, because a repeated Role breaks the install.
+*/}}
+{{- define "ziti-operator.serviceNamespaceList" -}}
+{{- .Values.rbac.serviceNamespaces | uniq | join "," }}
+{{- end }}
+
+{{/*
+Renders "true" when Service write access is limited to namespaced Roles.
+*/}}
+{{- define "ziti-operator.limitServices" -}}
+{{- if .Values.rbac.serviceNamespaces }}true{{ end }}
+{{- end }}
