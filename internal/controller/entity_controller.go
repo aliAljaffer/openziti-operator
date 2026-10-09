@@ -20,6 +20,7 @@ import (
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -102,6 +103,7 @@ func (r *entityReconciler[T]) audit(ctx context.Context, zc ziti.Client, obj T, 
 }
 
 func (r *entityReconciler[T]) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues(r.Name).Inc()
 	obj := r.New()
 	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

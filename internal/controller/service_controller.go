@@ -33,6 +33,7 @@ import (
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 )
 
 // ServiceReconciler turns an annotated Kubernetes Service into a ZitiApp that the Service owns.
@@ -46,6 +47,7 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitiapps,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("service").Inc()
 	var svc corev1.Service
 	if err := r.Get(ctx, req.NamespacedName, &svc); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

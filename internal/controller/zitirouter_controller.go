@@ -42,6 +42,7 @@ import (
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
+	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -73,6 +74,7 @@ type ZitiRouterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	metrics.Reconciliations.WithLabelValues("zitirouter").Inc()
 	var rt zitiv1alpha1.ZitiRouter
 	if err := r.Get(ctx, req.NamespacedName, &rt); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
