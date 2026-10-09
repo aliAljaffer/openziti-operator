@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,9 +12,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
+
+const CondInUse = "InUse"
 
 func buildConfig(res *resolver, o *zitiv1.ZitiConfig, conn *zitiv1.ZitiConnection) (ziti.Entity, error) {
 	typeID, ok := res.lookup(ziti.ConfigTypes, o.Spec.Type)
@@ -76,13 +80,27 @@ func buildServiceEdgeRouterPolicy(res *resolver, o *zitiv1.ZitiServiceEdgeRouter
 	return desired.ServiceEdgeRouterPolicyEntity(o, conn, services, routers), nil
 }
 
+// auditConfig reports a config that no service uses. Ziti has no filter for the services of a config,
+// so it reads the services whole.
+func auditConfig(ctx context.Context, zc ziti.Client, o *zitiv1.ZitiConfig, id string) ([]networkCond, error) {
+	services, err := zc.List(ctx, ziti.Services, "")
+	if err != nil {
+		return nil, err
+	}
+	users := check.ConfigUsers(services, id)
+	return []networkCond{{CondInUse, len(users) > 0, "InUse", check.UnusedConfig,
+		"no service uses this config"}}, nil
+}
+
 // SetupEntityControllers registers the reconcilers of the kinds that map one to one to a Ziti object.
 func SetupEntityControllers(mgr ctrl.Manager, clients ClientProvider) error {
 	c, scheme, rec := mgr.GetClient(), mgr.GetScheme(), mgr.GetEventRecorderFor("ziti-operator")
 	for _, setup := range []func() error{
 		func() error {
-			return newEntityReconciler(c, scheme, clients, rec, "ziticonfig", ziti.Configs,
-				func() *zitiv1.ZitiConfig { return &zitiv1.ZitiConfig{} }, buildConfig).SetupWithManager(mgr)
+			r := newEntityReconciler(c, scheme, clients, rec, "ziticonfig", ziti.Configs,
+				func() *zitiv1.ZitiConfig { return &zitiv1.ZitiConfig{} }, buildConfig)
+			r.Audit = auditConfig
+			return r.SetupWithManager(mgr)
 		},
 		func() error {
 			return newEntityReconciler(c, scheme, clients, rec, "zitiservice", ziti.Services,

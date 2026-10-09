@@ -112,6 +112,9 @@ type ZitiRouterStatus struct {
 	// enrollmentExpiresAt is when the pending JWT expires. Empty once the router has enrolled.
 	// +optional
 	EnrollmentExpiresAt *metav1.Time `json:"enrollmentExpiresAt,omitempty"`
+	// services are the names of the services that have a terminator on this router.
+	// +optional
+	Services []string `json:"services,omitempty"`
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -126,6 +129,7 @@ type ZitiRouterStatus struct {
 // +kubebuilder:resource:scope=Cluster,shortName=ztrouter,categories=ziti
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Online",type=boolean,JSONPath=".status.online"
+// +kubebuilder:printcolumn:name="Serving",type=string,JSONPath=".status.conditions[?(@.type=='Serving')].status"
 // +kubebuilder:printcolumn:name="Enrollment Expires",type=string,JSONPath=".status.enrollmentExpiresAt"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1

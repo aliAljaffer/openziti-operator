@@ -26,9 +26,11 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Ready` | Same as `Synced`. |
 | `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `Synced` | The Ziti object exists and matches the spec. |
 | | `Ready` | Same as `Synced`. |
+| | `InUse` | (`ZitiConfig` only) Some service uses the config. |
 | `ZitiRouter` | `Synced` | The router exists in Ziti and matches the spec. |
 | | `Enrolled` | The router has enrolled with its JWT. |
 | | `Online` | The router is connected to the controller. |
+| | `Serving` | Every service whose service edge router policy names this router has a terminator on it. |
 | | `Ready` | `Enrolled` and `Online`. |
 | `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
 | | `Verified` | Ziti accepted the proof that you control the CA. |
@@ -37,6 +39,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Ready` | The Dial policy selects at least one identity and one service. |
 
 `Dialable` and `RoutePath` can be false before the first client exists. That is not an error.
+
+`Serving` and `InUse` report on the network, not on the resource. They do not fail `Ready`. A router that no policy picked for serves nothing and `Serving` is true.
 
 ## Reasons when `Synced` is false
 

@@ -19,7 +19,7 @@ This is an independent community project. It is not an official OpenZiti or NetF
 |---|---|
 | Publish an app so authorized people can reach it | A `ZitiApp`. The operator creates the configs, the service, the bind and dial policies, and the router policies. |
 | Enroll or remove an identity | A `ZitiIdentity`. The operator enrolls it, writes the identity file to a Secret, and renews its certificate. |
-| Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret. |
+| Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret, and reports which services the router terminates. |
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
 | Let a workload log in with a certificate or a service account token | `ZitiCA` and `ZitiJwtSigner`, with cert-manager or your cluster issuer. |
 

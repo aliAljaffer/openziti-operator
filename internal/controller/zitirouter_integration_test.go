@@ -13,10 +13,12 @@ import (
 
 	"github.com/openziti/edge-api/rest_util"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -84,6 +86,32 @@ func TestRouterAgainstRealController(t *testing.T) {
 	e.reconcile(t)
 	if len(wc.writes) != 0 {
 		t.Fatalf("steady state wrote: %v", wc.writes)
+	}
+
+	// Ziti must report the router, service, and policy fields that the Serving condition reads.
+	rt = e.reconcile(t)
+	if c := routerCond(rt, CondServing); c.Status != metav1.ConditionTrue {
+		t.Fatalf("a router that no policy picked for serves nothing: %+v", c)
+	}
+	svcID, err := real.Create(t.Context(), ziti.Services, ziti.Entity{"name": "it-serving", "encryptionRequired": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	serpID, err := real.Create(t.Context(), ziti.ServiceEdgeRouterPolicies, ziti.Entity{
+		"name": "it-serp", "semantic": "AnyOf",
+		"edgeRouterRoles": []any{"@" + rt.Status.RouterID}, "serviceRoles": []any{"@" + svcID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		ctx := context.Background()
+		_ = real.Delete(ctx, ziti.ServiceEdgeRouterPolicies, serpID)
+		_ = real.Delete(ctx, ziti.Services, svcID)
+	}()
+	if c := routerCond(e.reconcile(t), CondServing); c.Status != metav1.ConditionFalse ||
+		c.Reason != check.NoTerminator || !strings.Contains(c.Message, "it-serving") {
+		t.Fatalf("picked but not terminating: %+v", c)
 	}
 }
 

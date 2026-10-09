@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -262,6 +263,49 @@ func TestEntityNameConflictDeleteAndOrphan(t *testing.T) {
 				t.Errorf("released config = %v", c)
 			}
 		}
+	}
+}
+
+func TestEntityConfigReportsThatNoServiceUsesIt(t *testing.T) {
+	newObj := func() *zitiv1.ZitiConfig { return &zitiv1.ZitiConfig{} }
+	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, &zitiv1.ZitiConfig{
+		ObjectMeta: entityMeta("web-intercept"),
+		Spec: zitiv1.ZitiConfigSpec{EntitySpec: common(), Type: "intercept.v1",
+			Data: apiextensionsv1.JSON{Raw: []byte(`{"protocols":["tcp"]}`)}},
+	})
+	r := newEntityReconciler(e.k, e.scheme, staticProvider{e.zc}, e.rec, "cfg", ziti.Configs, newObj, buildConfig)
+	r.Audit = auditConfig
+	key := types.NamespacedName{Namespace: "team-a", Name: "web-intercept"}
+	reconcile := func() *zitiv1.ZitiConfig {
+		if _, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: key}); err != nil {
+			t.Fatal(err)
+		}
+		obj := &zitiv1.ZitiConfig{}
+		if err := e.k.Get(t.Context(), key, obj); err != nil {
+			t.Fatal(err)
+		}
+		return obj
+	}
+	inUseOf := func(o *zitiv1.ZitiConfig) metav1.Condition {
+		for _, c := range o.Status.Conditions {
+			if c.Type == CondInUse {
+				return c
+			}
+		}
+		return metav1.Condition{}
+	}
+
+	obj := reconcile()
+	if c := inUseOf(obj); c.Status != metav1.ConditionFalse || c.Reason != check.UnusedConfig || c.Message != "no service uses this config" {
+		t.Errorf("unused: %+v", c)
+	}
+	if readyOf(obj).Status != metav1.ConditionTrue {
+		t.Error("an unused config is a warning, it must not fail Ready")
+	}
+
+	e.zc.Put(ziti.Services, ziti.Entity{"id": "s-2", "name": "billing", "configs": []any{obj.Status.ZitiID}})
+	if c := inUseOf(reconcile()); c.Status != metav1.ConditionTrue || c.Reason != "InUse" {
+		t.Errorf("in use: %+v", c)
 	}
 }
 

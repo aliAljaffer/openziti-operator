@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -219,6 +220,40 @@ func TestRouterSecretConflictNamespaceLimitAndDelete(t *testing.T) {
 		if n := len(e.zc.Objects[ziti.EdgeRouters]); n != want {
 			t.Errorf("%s: routers = %d, want %d", policy, n, want)
 		}
+	}
+}
+
+func TestRouterReportsWhatItTerminates(t *testing.T) {
+	e := setupRouter(t, nil)
+	e.reconcile(t)
+	if c := routerCond(e.reconcile(t), CondServing); c.Status != metav1.ConditionTrue {
+		t.Errorf("a router no policy picked for must serve: %+v", c)
+	}
+
+	rid := e.router().ID()
+	sid := e.zc.Put(ziti.Services, ziti.Entity{"name": "billing"})
+	e.zc.Put(ziti.ServiceEdgeRouterPolicies, ziti.Entity{
+		"name": "billing-serp", "semantic": "AnyOf",
+		"edgeRouterRoles": []any{"@" + rid}, "serviceRoles": []any{"@" + sid},
+	})
+	e.router()["isVerified"], e.router()["isOnline"] = true, true
+
+	rt := e.reconcile(t)
+	c := routerCond(rt, CondServing)
+	if c.Status != metav1.ConditionFalse || c.Reason != check.NoTerminator || !strings.Contains(c.Message, "billing") {
+		t.Errorf("picked but not terminating: %+v", c)
+	}
+	if routerCond(rt, CondReady).Status != metav1.ConditionTrue {
+		t.Error("Serving must not fail Ready, an online router that has no terminator is not a failure")
+	}
+
+	e.zc.Put(ziti.Terminators, ziti.Entity{"serviceId": sid, "routerId": rid})
+	rt = e.reconcile(t)
+	if c := routerCond(rt, CondServing); c.Status != metav1.ConditionTrue {
+		t.Errorf("terminating: %+v", c)
+	}
+	if len(rt.Status.Services) != 1 || rt.Status.Services[0] != "billing" {
+		t.Errorf("status.services = %v", rt.Status.Services)
 	}
 }
 

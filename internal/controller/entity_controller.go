@@ -74,6 +74,31 @@ type entityReconciler[T interface {
 	Kind ziti.Kind
 	// Build turns the resource into the body for Ziti.
 	Build func(res *resolver, obj T, conn *zitiv1.ZitiConnection) (ziti.Entity, error)
+	// Audit adds conditions that report how the entity sits in the network. It never feeds Ready,
+	// because a finding about the network is not a failure to build the entity. Nil means the kind
+	// needs nothing past Synced and Ready.
+	Audit func(ctx context.Context, zc ziti.Client, obj T, id string) ([]networkCond, error)
+}
+
+// networkCond is one condition that reports a network finding on a resource.
+type networkCond struct {
+	typ                              string
+	ok                               bool
+	reasonTrue, reasonFalse, message string
+}
+
+func (r *entityReconciler[T]) audit(ctx context.Context, zc ziti.Client, obj T, id string, st *zitiv1.EntityStatus) error {
+	if r.Audit == nil {
+		return nil
+	}
+	conds, err := r.Audit(ctx, zc, obj, id)
+	if err != nil {
+		return err
+	}
+	for _, c := range conds {
+		setCond(&st.Conditions, obj.GetGeneration(), c.typ, c.ok, c.reasonTrue, c.reasonFalse, c.message)
+	}
+	return nil
 }
 
 func (r *entityReconciler[T]) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -197,7 +222,7 @@ func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.Ziti
 	st.ZitiID = id
 	setCond(&st.Conditions, obj.GetGeneration(), CondSynced, true, "Synced", "", "")
 	setCond(&st.Conditions, obj.GetGeneration(), CondReady, true, "Ready", "", "")
-	return nil
+	return r.audit(ctx, zc, obj, id, st)
 }
 
 // observe reports on an object that was created outside this operator. It never writes to Ziti.

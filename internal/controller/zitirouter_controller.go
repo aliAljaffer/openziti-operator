@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
@@ -44,6 +45,7 @@ const (
 	SecretKeyDeployment = "deployment.yaml"
 	CondEnrolled        = "Enrolled"
 	CondOnline          = "Online"
+	CondServing         = "Serving"
 )
 
 var routerKinds = []ziti.Kind{ziti.EdgeRouters}
@@ -174,6 +176,15 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 	online, _ := list[0]["isOnline"].(bool)
 	rt.Status.RouterID, rt.Status.ZitiName, rt.Status.Enrolled, rt.Status.Online = id, name, enrolled, online
 
+	report, err := servingReport(ctx, zc, list[0])
+	if err != nil {
+		return err
+	}
+	missing := report.Missing()
+	rt.Status.Services = report.Services
+	setCond(&rt.Status.Conditions, rt.Generation, CondServing, len(missing) == 0, "Serving", check.NoTerminator,
+		"no terminator for: "+strings.Join(missing, ", "))
+
 	if err := r.deliverEnrollment(ctx, rt, conn, zc, id, enrolled); err != nil {
 		return err
 	}
@@ -186,6 +197,14 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 	}
 	setCond(&rt.Status.Conditions, rt.Generation, CondReady, enrolled && online, "Ready", "NotReady", notReady)
 	return nil
+}
+
+// servingReport says which services the router terminates and which ones it was picked to terminate.
+// Ziti cannot filter terminators by router, so it reads the three kinds whole.
+func servingReport(ctx context.Context, zc ziti.Client, rt ziti.Entity) (check.RouterReport, error) {
+	var g check.Graph
+	err := check.LoadInto(ctx, zc, &g, ziti.Services, ziti.ServiceEdgeRouterPolicies, ziti.Terminators)
+	return g.Router(rt), err
 }
 
 // deliverEnrollment keeps a valid enrollment JWT in the Secret until the router has enrolled, then removes it.

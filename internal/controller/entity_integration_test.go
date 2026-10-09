@@ -10,10 +10,12 @@ import (
 
 	"github.com/openziti/edge-api/rest_util"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -65,6 +67,7 @@ func TestOneToOneKindsAgainstRealController(t *testing.T) {
 		}
 	}
 	rc := newEntityReconciler(e.k, e.scheme, provider, e.rec, "cfg", ziti.Configs, func() *zitiv1.ZitiConfig { return &zitiv1.ZitiConfig{} }, buildConfig)
+	rc.Audit = auditConfig
 	rs := newEntityReconciler(e.k, e.scheme, provider, e.rec, "svc", ziti.Services, func() *zitiv1.ZitiService { return &zitiv1.ZitiService{} }, buildService)
 	rp := newEntityReconciler(e.k, e.scheme, provider, e.rec, "sp", ziti.ServicePolicies, func() *zitiv1.ZitiServicePolicy { return &zitiv1.ZitiServicePolicy{} }, buildServicePolicy)
 	rse := newEntityReconciler(e.k, e.scheme, provider, e.rec, "serp", ziti.ServiceEdgeRouterPolicies, func() *zitiv1.ZitiServiceEdgeRouterPolicy { return &zitiv1.ZitiServiceEdgeRouterPolicy{} }, buildServiceEdgeRouterPolicy)
@@ -93,6 +96,26 @@ func TestOneToOneKindsAgainstRealController(t *testing.T) {
 		}
 	})
 
+	inUseOf := func(name string) metav1.Condition {
+		t.Helper()
+		var got zitiv1.ZitiConfig
+		if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "team-a", Name: name}, &got); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range got.Status.Conditions {
+			if c.Type == CondInUse {
+				return c
+			}
+		}
+		return metav1.Condition{}
+	}
+
+	// Before the service exists Ziti has no service that uses the config.
+	reconcile(t, "it-intercept", func(r ctrl.Request) error { _, err := rc.Reconcile(t.Context(), r); return err })
+	if c := inUseOf("it-intercept"); c.Status != metav1.ConditionFalse || c.Reason != check.UnusedConfig {
+		t.Fatalf("unused config: %+v", c)
+	}
+
 	for _, step := range all {
 		reconcile(t, step.name, step.run)
 	}
@@ -102,6 +125,11 @@ func TestOneToOneKindsAgainstRealController(t *testing.T) {
 	}
 	if len(wc.writes) != 0 {
 		t.Fatalf("second pass wrote: %v", wc.writes)
+	}
+	for _, name := range []string{"it-intercept", "it-host"} {
+		if c := inUseOf(name); c.Status != metav1.ConditionTrue || c.Reason != "InUse" {
+			t.Errorf("%s: %+v", name, c)
+		}
 	}
 
 	for kind, want := range map[ziti.Kind]int{ziti.Configs: 2, ziti.Services: 1, ziti.ServicePolicies: 2, ziti.ServiceEdgeRouterPolicies: 1, ziti.EdgeRouterPolicies: 1} {
