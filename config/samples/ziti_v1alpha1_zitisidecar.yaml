@@ -1,0 +1,15 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiSidecar
+metadata:
+  labels:
+    app.kubernetes.io/name: ziti-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: zitisidecar-sample
+spec:
+  identityRef: zitiidentity-sample
+  # Host is tproxy: it rewrites iptables, so the patched workload needs NET_ADMIN, NET_RAW, and usually
+  # hostNetwork. Use Proxy when the workload cannot have those.
+  mode: Host
+  manifestSecretRef:
+    namespace: default
+    name: zitisidecar-sample-patch

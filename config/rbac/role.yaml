@@ -78,6 +78,7 @@ rules:
   - zitiserviceedgerouterpolicies
   - zitiservicepolicies
   - zitiservices
+  - zitisidecars
   - zititerminators
   verbs:
   - create
@@ -102,6 +103,7 @@ rules:
   - zitiserviceedgerouterpolicies/finalizers
   - zitiservicepolicies/finalizers
   - zitiservices/finalizers
+  - zitisidecars/finalizers
   - zititerminators/finalizers
   verbs:
   - update
@@ -120,6 +122,7 @@ rules:
   - zitiserviceedgerouterpolicies/status
   - zitiservicepolicies/status
   - zitiservices/status
+  - zitisidecars/status
   - zititerminators/status
   verbs:
   - get

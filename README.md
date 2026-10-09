@@ -21,6 +21,7 @@ This is an independent community project. It is not an official OpenZiti or NetF
 | Enroll or remove an identity | A `ZitiIdentity`. The operator enrolls it, writes the identity file to a Secret, and renews its certificate. |
 | Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret, and reports which services the router terminates. |
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
+| Log a workload in through a Ziti tunneler | A `ZitiSidecar`. It writes the patch that adds the tunneler, so you do not hand-write the container, identity mount, or resolver. |
 | Let a workload log in with a certificate or a service account token | `ZitiCA` and `ZitiJwtSigner`, with cert-manager or your cluster issuer. |
 
 Annotate a Kubernetes Service with `ziti.alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it.
@@ -94,6 +95,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 | `ZitiRouter` | `ztrouter` | cluster | Creates an edge router and puts its enrollment JWT and ready-made manifests in a Secret. See [Edge routers](docs/routers.md). |
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. |
+| `ZitiSidecar` | `ztc` | namespace | Writes the patch that adds a Ziti tunneler to a workload. See [Sidecar tunneler](docs/sidecar.md). |
 | `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `ztcfg`, `ztsvc`, `ztsp`, `zterp`, `ztserp`, `ztterm` | namespace | One resource per Ziti object. |
 
 ## Safe by default
@@ -109,7 +111,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 - [Install](docs/install.md), [First app](docs/first-app.md), [Uninstall](docs/uninstall.md)
 - [Role scope](docs/role-scope.md), [Existing Ziti resources](docs/existing-resources.md)
 - [Edge routers](docs/routers.md), [Full control](docs/full-control.md)
-- [Log in with a service account token](docs/service-account-tokens.md), [Use a cert-manager CA](docs/cert-manager.md)
+- [Sidecar tunneler](docs/sidecar.md), [Log in with a service account token](docs/service-account-tokens.md), [Use a cert-manager CA](docs/cert-manager.md)
 - [Conditions and reasons](docs/conditions.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md)
 - [Compatibility](docs/compatibility.md), [Interop with ziti-k8s-agent](docs/interop-ziti-k8s-agent.md)
 - Reference for every kind: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiRouter](docs/reference/ZitiRouter.md), [ZitiCA](docs/reference/ZitiCA.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiTerminator](docs/reference/ZitiTerminator.md)

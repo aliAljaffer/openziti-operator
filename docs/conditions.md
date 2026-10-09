@@ -36,6 +36,9 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
 | | `Verified` | Ziti accepted the proof that you control the CA. |
 | | `Ready` | Same as `Verified`. |
+| `ZitiSidecar` | `IdentityReady` | The `ZitiIdentity` has an `identity.json` for the tunneler to use. |
+| | `Synced` | The patch matches the spec. |
+| | `Ready` | `IdentityReady`, and the patch is written when `manifestSecretRef` is set. |
 | `ZitiAccessPolicy` | `Synced` | The Dial policy (and the edge router policy) exist and match. |
 | | `Ready` | The Dial policy selects at least one identity and one service. |
 
