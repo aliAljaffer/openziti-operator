@@ -40,6 +40,9 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | `ZitiSidecar` | `IdentityReady` | The `ZitiIdentity` has an `identity.json` for the tunneler to use. |
 | | `Synced` | The patch matches the spec. |
 | | `Ready` | `IdentityReady`, and the patch is written when `manifestSecretRef` is set. |
+| `ZitiPortForward` | `IdentityReady` | The referenced identity is enrolled and its identity file exists. |
+| | `Workload` | The proxy Deployment has a ready replica. |
+| | `Ready` | The identity is ready and the proxy listener is ready. |
 | `ZitiAccessPolicy` | `Synced` | The Dial policy (and the edge router policy) exist and match. |
 | | `Ready` | The Dial policy selects at least one identity and one service. |
 
@@ -104,6 +107,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `DeploymentUnavailable` | `ZitiRouter` `Workload` | The router pod has no ready replica. Look at the pod in `spec.deployment.namespace`. |
 | `ControllerVersionUnknown` | `ZitiRouter` `Workload` | The `ZitiConnection` has not reported a controller version, so the router image cannot be chosen. Set `spec.deployment.image`, or wait for the connection. |
 | `StorageClassLocked` | `ZitiRouter` `Workload` | The volume claim was created with another storage class and a bound claim cannot change. Delete the claim, or set `storageClassName` to the class it already has. |
+| `IdentityNotEnrolled` | `ZitiSidecar` or `ZitiPortForward` | The referenced `ZitiIdentity` has no enrolled `identity.json` yet. Wait for enrollment or use an identity with operator enrollment. |
 | `QueryFailed` | `ZitiIdentity` `SessionsObserved` | The operator could not read the controller's session list. Identity readiness is not affected; the session summary is cleared. |
 
 ## Events

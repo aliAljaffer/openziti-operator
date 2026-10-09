@@ -49,7 +49,7 @@ import (
 
 const (
 	SecretKeyJWT      = desired.EnrollTokenKey
-	SecretKeyIdentity = "identity.json"
+	SecretKeyIdentity = desired.IdentityFileKey
 	// ManagedByLabel marks the Secrets this operator creates. The manager cache holds only those.
 	ManagedByLabel       = "app.kubernetes.io/managed-by"
 	ManagedByLabelValue  = "ziti-operator"

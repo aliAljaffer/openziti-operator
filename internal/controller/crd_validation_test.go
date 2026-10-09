@@ -537,3 +537,29 @@ var _ = Describe("ZitiRouter", func() {
 		Expect(r.Spec.AdvertisedAddress).To(BeEmpty())
 	})
 })
+
+var _ = Describe("ZitiPortForward", func() {
+	portForward := func(name string) *zitiv1.ZitiPortForward {
+		return &zitiv1.ZitiPortForward{Name: name, Namespace: "default",
+			Spec: zitiv1.ZitiPortForwardSpec{IdentityRef: "dialer", Service: "billing", Port: 8080}}
+	}
+
+	It("defaults the connection and keeps the target fixed", func() {
+		pf := portForward("portforward-case")
+		Expect(k8sClient.Create(ctx, pf)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, pf) })
+		Expect(pf.Spec.ConnectionRef).To(Equal("default"))
+		pf.Spec.Service = "other"
+		Expect(k8sClient.Update(ctx, pf)).To(MatchError(ContainSubstring("service is immutable")))
+	})
+
+	DescribeTable("rejects invalid values",
+		func(mut func(*zitiv1.ZitiPortForwardSpec), message string) {
+			pf := portForward("bad-portforward")
+			mut(&pf.Spec)
+			Expect(k8sClient.Create(ctx, pf)).To(MatchError(ContainSubstring(message)))
+		},
+		Entry("port below range", func(s *zitiv1.ZitiPortForwardSpec) { s.Port = 0 }, "greater than or equal to 1"),
+		Entry("port above range", func(s *zitiv1.ZitiPortForwardSpec) { s.Port = 70000 }, "less than or equal to 65535"),
+	)
+})

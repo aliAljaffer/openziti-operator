@@ -92,6 +92,7 @@ rules:
   - zitiedgerouterpolicies
   - zitiidentities
   - zitijwtsigners
+  - zitiportforwards
   - zitirouters
   - zitiserviceedgerouterpolicies
   - zitiservicepolicies
@@ -136,6 +137,7 @@ rules:
   - zitiedgerouterpolicies/status
   - zitiidentities/status
   - zitijwtsigners/status
+  - zitiportforwards/status
   - zitirouters/status
   - zitiserviceedgerouterpolicies/status
   - zitiservicepolicies/status
