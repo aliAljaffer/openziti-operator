@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
@@ -99,11 +102,16 @@ func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	var se *specError
+	var missing *desired.MissingError
 	var next ctrl.Result
 	switch {
 	case err == nil:
 		applyResult(&svc, out)
 		next.RequeueAfter = jitter(serviceResync)
+	case errors.As(err, &missing):
+		markFailed(&svc.Status.Conditions, svc.Generation, "TargetNotFound", missing.Error())
+		next.RequeueAfter = dependencyRetry
+		err = nil
 	case errors.As(err, &se):
 		markFailed(&svc.Status.Conditions, svc.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
@@ -188,6 +196,11 @@ type syncResult struct {
 }
 
 func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) (*syncResult, error) {
+	resolved, err := r.resolveServiceSelector(ctx, svc)
+	if err != nil {
+		return nil, err
+	}
+	svc = resolved
 	b := &desired.Builder{Svc: svc, Conn: conn}
 	name := b.ZitiName()
 	if strings.ContainsAny(name, `"\`) {
@@ -296,6 +309,29 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		out.missing = missing
 	}
 	return out, err
+}
+
+func (r *ZitiAppReconciler) resolveServiceSelector(ctx context.Context, svc *zitiv1alpha1.ZitiApp) (*zitiv1alpha1.ZitiApp, error) {
+	selector := svc.Spec.Expose.Selector
+	if selector == nil {
+		return svc, nil
+	}
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil || labelSelector.Empty() {
+		return nil, &specError{"InvalidSpec", "expose.selector must match at least one Service label"}
+	}
+	var services corev1.ServiceList
+	if err := r.List(ctx, &services, client.InNamespace(svc.Namespace), client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+		return nil, err
+	}
+	if len(services.Items) == 0 {
+		return nil, &desired.MissingError{Msg: "expose.selector matches no Services in this namespace"}
+	}
+	resolved := svc.DeepCopy()
+	if err := desired.ResolveServiceSelector(&resolved.Spec, svc.Namespace, services.Items); err != nil {
+		return nil, &specError{"InvalidSpec", err.Error()}
+	}
+	return resolved, nil
 }
 
 // identityIDs maps the wanted identity names to Ziti ids. Names Ziti does not know are left out.
@@ -462,6 +498,18 @@ func (r *ZitiAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiApp{}).
 		Named("zitiapp")
+	b = b.Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		return listRequests(ctx, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiAppList{} },
+			func(app *zitiv1alpha1.ZitiApp) bool { return app.Spec.Expose.Selector != nil },
+			client.InNamespace(obj.GetNamespace()))
+	}))
+	b = b.Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		return listRequests(ctx, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiAppList{} },
+			func(app *zitiv1alpha1.ZitiApp) bool {
+				return app.Namespace == obj.GetNamespace() && app.Spec.Expose.Selector != nil
+			},
+			client.InNamespace(obj.GetNamespace()))
+	}))
 	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiAppList{} },
 		func(o *zitiv1alpha1.ZitiApp) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).

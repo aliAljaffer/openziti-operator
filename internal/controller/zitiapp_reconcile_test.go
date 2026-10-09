@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +42,9 @@ func setup(t *testing.T, mut func(*zitiv1.ZitiApp)) *env {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := zitiv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	conn := &zitiv1.ZitiConnection{
@@ -466,5 +470,55 @@ func TestAdoptTakesOverHandMadeServiceAndReleasesOnDelete(t *testing.T) {
 	}
 	if svc.Tags()["team"] != "x" || e.count(ziti.Services) != 1 {
 		t.Errorf("tags = %v", svc.Tags())
+	}
+}
+
+func TestAppSelectorDerivesTargetsFromMatchingServices(t *testing.T) {
+	e := setup(t, func(app *zitiv1.ZitiApp) {
+		app.Spec.Expose = zitiv1.Expose{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "billing"}}}
+		app.Spec.Targets = nil
+	})
+	for _, svc := range []*corev1.Service{
+		{Name: "billing-a", Namespace: "team-a", Labels: map[string]string{"app": "billing"}, Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}, {Port: 443}}}},
+		{Name: "billing-b", Namespace: "team-a", Labels: map[string]string{"app": "billing"}, Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 8080}}}},
+		{Name: "unrelated", Namespace: "team-a", Labels: map[string]string{"app": "other"}, Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 9000}}}},
+	} {
+		if err := e.k.Create(t.Context(), svc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.reconcile(t)
+
+	addresses, targetPorts := map[string]bool{}, map[string]bool{}
+	for _, cfg := range e.zc.Objects[ziti.Configs] {
+		data, _ := cfg["data"].(map[string]any)
+		terms, _ := data["terminators"].([]any)
+		for _, raw := range terms {
+			term, _ := raw.(map[string]any)
+			addresses[fmt.Sprint(term["address"])] = true
+			if p, ok := term["port"].(float64); ok {
+				targetPorts[fmt.Sprint(p)] = true
+			}
+		}
+	}
+	if !addresses["billing-a.team-a.svc"] || !addresses["billing-b.team-a.svc"] || addresses["unrelated.team-a.svc"] {
+		t.Errorf("host addresses = %v", addresses)
+	}
+	if !targetPorts["80"] || !targetPorts["443"] || !targetPorts["8080"] {
+		t.Errorf("target ports = %v", targetPorts)
+	}
+}
+
+func TestAppSelectorWithNoMatchesWaitsForServices(t *testing.T) {
+	e := setup(t, func(app *zitiv1.ZitiApp) {
+		app.Spec.Expose = zitiv1.Expose{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "missing"}}}
+		app.Spec.Targets = nil
+	})
+	res := e.reconcile(t)
+	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondSynced); c == nil || c.Reason != "TargetNotFound" {
+		t.Errorf("synced condition = %+v", c)
+	}
+	if res.RequeueAfter != dependencyRetry {
+		t.Errorf("requeueAfter = %v", res.RequeueAfter)
 	}
 }

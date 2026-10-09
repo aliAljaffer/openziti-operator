@@ -259,6 +259,11 @@ func (in *Expose) DeepCopyInto(out *Expose) {
 		*out = make([]intstr.IntOrString, len(*in))
 		copy(*out, *in)
 	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Protocols != nil {
 		in, out := &in.Protocols, &out.Protocols
 		*out = make([]string, len(*in))

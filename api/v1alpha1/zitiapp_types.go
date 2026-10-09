@@ -37,21 +37,30 @@ const (
 	DeletionPolicyOrphan DeletionPolicy = "Orphan"
 )
 
+// +kubebuilder:validation:XValidation:rule="has(self.selector) || (has(self.addresses) && size(self.addresses) > 0 && has(self.ports) && size(self.ports) > 0)",message="expose needs addresses and ports unless selector is set"
 // Expose is how clients reach the app.
 type Expose struct {
 	// addresses are the hostnames, IPs, or CIDRs clients dial.
-	// +kubebuilder:validation:MinItems=1
-	Addresses []string `json:"addresses"`
+	// When selector is set and addresses are empty, the operator uses the DNS names of selected Services.
+	// +kubebuilder:validation:MaxItems=16
+	// +optional
+	Addresses []string `json:"addresses,omitempty"`
 
 	// ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
-	// The operator checks range syntax and reports InvalidSpec.
-	// +kubebuilder:validation:MinItems=1
+	// The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
+	// the operator uses the selected Services' ports.
 	// +kubebuilder:validation:MaxItems=16
 	// +kubebuilder:validation:items:XValidation:rule="type(self) != int || (self >= 1 && self <= 65535)",message="a port is 1-65535"
-	Ports []intstr.IntOrString `json:"ports"`
+	// +optional
+	Ports []intstr.IntOrString `json:"ports,omitempty"`
+
+	// selector selects Kubernetes Services in this namespace. When set, the operator derives default
+	// addresses, ports, and targets from the matching Services. Do not set targets with selector.
+	// +kubebuilder:validation:XValidation:rule="(has(self.matchLabels) && size(self.matchLabels) > 0) || (has(self.matchExpressions) && size(self.matchExpressions) > 0)",message="selector must have at least one label or expression"
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// protocols the clients may use. The targets always accept the same protocols.
-	// +kubebuilder:default={tcp}
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:items:Enum=tcp;udp
 	// +optional
@@ -97,7 +106,8 @@ type Allow struct {
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
-// +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.expose) && has(self.targets) && size(self.targets) > 0)",message="expose and targets are required unless managementPolicy is Observe"
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy == 'Observe' || (has(self.expose) && (has(self.expose.selector) || (has(self.targets) && size(self.targets) > 0)))",message="expose and targets or expose.selector are required unless managementPolicy is Observe"
+// +kubebuilder:validation:XValidation:rule="!has(self.expose) || !has(self.expose.selector) || !has(self.targets) || size(self.targets) == 0",message="expose.selector derives targets; do not set targets"
 type ZitiAppSpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default

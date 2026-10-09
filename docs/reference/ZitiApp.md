@@ -34,9 +34,15 @@
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the Ziti entities when this resource is deleted. Orphan removes only the operator tags and keeps the entities. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.entryRouters` | list of string | no |  | entryRouters are the routers clients connect through. The hosting router is always allowed for the app. When set, an edge router policy gives the allowed identities access to them. |
 | `spec.expose` | object | no |  | expose is how clients reach the app. It is required unless managementPolicy is Observe. |
-| `spec.expose.addresses` | list of string | yes |  | addresses are the hostnames, IPs, or CIDRs clients dial. Minimum items 1. |
-| `spec.expose.ports` | list of integer or string | yes |  | ports are port numbers or "low-high" ranges, for example [443, "8000-8005"]. The operator checks range syntax and reports InvalidSpec. Minimum items 1. Maximum items 16. Each item: a port is 1-65535. |
-| `spec.expose.protocols` | list of string | no | `["tcp"]` | protocols the clients may use. The targets always accept the same protocols. Each item is one of: `tcp`, `udp`. Minimum items 1. |
+| `spec.expose.addresses` | list of string | no |  | addresses are the hostnames, IPs, or CIDRs clients dial. When selector is set and addresses are empty, the operator uses the DNS names of selected Services. Maximum items 16. |
+| `spec.expose.ports` | list of integer or string | no |  | ports are port numbers or "low-high" ranges, for example [443, "8000-8005"]. The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty, the operator uses the selected Services' ports. Maximum items 16. Each item: a port is 1-65535. |
+| `spec.expose.protocols` | list of string | no |  | protocols the clients may use. The targets always accept the same protocols. Each item is one of: `tcp`, `udp`. Minimum items 1. |
+| `spec.expose.selector` | object | no |  | selector selects Kubernetes Services in this namespace. When set, the operator derives default addresses, ports, and targets from the matching Services. Do not set targets with selector. |
+| `spec.expose.selector.matchExpressions` | list of object | no |  | matchExpressions is a list of label selector requirements. The requirements are ANDed. |
+| `spec.expose.selector.matchExpressions[].key` | string | yes |  | key is the label key that the selector applies to. |
+| `spec.expose.selector.matchExpressions[].operator` | string | yes |  | operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist. |
+| `spec.expose.selector.matchExpressions[].values` | list of string | no |  | values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch. |
+| `spec.expose.selector.matchLabels` | map of string | no |  | matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed. |
 | `spec.hostedBy` | string | no |  | hostedBy is the router that runs the targets. It must be in the connection hostingRouters. It defaults to the first entry. |
 | `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates and updates the Ziti entities. Adopt does the same, and also takes over existing entities that have the names this app would create. It updates them with a PATCH, so fields the spec cannot set (such as posture check roles) stay. Config data is replaced as a whole. Adopted entities are released on delete, never deleted. Observe only reads the existing service named zitiName and reports its status. It never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.memberOf` | list of string | no |  | memberOf are groups the app belongs to. Existing policies that grant access to a group apply to it. Groups follow the connection roleScope. |
@@ -53,8 +59,11 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
-- `spec`: expose and targets are required unless managementPolicy is Observe
+- `spec`: expose and targets or expose.selector are required unless managementPolicy is Observe
+- `spec`: expose.selector derives targets; do not set targets
+- `expose`: expose needs addresses and ports unless selector is set
 - `expose.ports[]`: a port is 1-65535
+- `expose.selector`: selector must have at least one label or expression
 - `targets[]`: set exactly one of address and kubernetesService
 - `targets[]`: port is required with kubernetesService
 

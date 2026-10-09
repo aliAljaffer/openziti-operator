@@ -17,7 +17,7 @@ This is an independent community project. It is not an official OpenZiti or NetF
 
 | You want to | You apply |
 |---|---|
-| Publish an app so authorized people can reach it | A `ZitiApp`. The operator creates the configs, the service, the bind and dial policies, and the router policies. |
+| Publish an app so authorized people can reach it | A `ZitiApp`. The operator creates the configs, service policies, and router policies. Use `expose.selector` to derive targets and ports from labeled Kubernetes Services. |
 | Enroll or remove an identity | A `ZitiIdentity`. The operator enrolls it, writes the identity file to a Secret, renews its certificate, and reports its active sessions. |
 | Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret, and reports which services the router terminates. |
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
