@@ -2,31 +2,19 @@
 
 ## v0.2.0
 
-Breaking release. It adds in-cluster router deployment, a sidecar tunneler, Ingress support, session visibility, port forwarding, and Service selectors, and it removes the operator's cluster-wide Service write permission.
+Adds in-cluster router deployment, a sidecar tunneler, Ingress support, session visibility, port forwarding, and Service selectors. Nothing in `v0.1.2` changes shape: `spec.deployment` and `deployment.serviceType` are new fields, so there is nothing to migrate.
 
-### Breaking changes
+### Notes
 
-**The operator no longer creates a Kubernetes Service for an in-cluster router.** `ZitiRouter.spec.deployment` used to create a `Service` alongside the `Deployment` and `PersistentVolumeClaim`. It no longer does. This keeps the RBAC role free of cluster-wide Service write access, which the security scan requires.
+**Go and image base moved to 1.27.2.** The build image, `go.mod`, and the linter pin Go 1.27.2 and `golang.org/x/net` 0.60.0 to clear the govulncheck findings in the earlier toolchain. Rebuild custom images from the new tag if you pinned the old digest.
 
-Migrate in three steps:
+**`ZitiApp.spec.expose.targets` is optional.** It is required only when you do not set `spec.expose.selector`. A `ZitiApp` that sets both `selector` and `targets` is rejected, because the selector already derives the targets.
 
-1. Upgrade the operator.
-2. Apply the Service manifest that the operator writes to the router enrollment Secret.
-3. Remove the Service from your own manifests, because the operator no longer manages it.
-
-```bash
-kubectl apply -f <router-enrollment-secret-mount>/service.yaml
-```
-
-Set `ZitiRouter.spec.deployment.serviceType` to the Service type you need (`ClusterIP`, `NodePort`, or `LoadBalancer`). The generated manifest carries the same ports the router listens on.
-
-**Go and image base moved to 1.27.2.** The build image, `go.mod`, and the linter now pin Go 1.27.2 and `golang.org/x/net` 0.60.0 to clear the govulncheck findings in the earlier toolchain. Rebuild custom images from the new tag if you pinned the old digest.
-
-**`ZitiApp.spec.expose.targets` is now optional.** It is required only when you do not set `spec.expose.selector`. A `ZitiApp` that sets both `selector` and `targets` is rejected, because the selector already derives the targets.
+**`deployment.serviceType` defaults to `ClusterIP`.** A `ClusterIP` is reachable only from inside the cluster. Set `NodePort` with an `advertisedAddress`, or `LoadBalancer`, for clients elsewhere.
 
 ### Added
 
-- `ZitiRouter.spec.deployment` runs a router in the cluster on amd64 or arm64 with a `PersistentVolumeClaim`, a generated Service manifest, an optional JWT from a Secret, and `Workload` and `StorageClassLocked` conditions. The JWT re-enrollment race between an issued JWT and `isVerified` is fixed.
+- `ZitiRouter.spec.deployment` runs a router in the cluster on amd64 or arm64 with a `Deployment`, a `PersistentVolumeClaim`, and a `Service`, all owned by the resource, plus an optional JWT from a Secret. It reports `Workload` and `StorageClassLocked`. The JWT re-enrollment race between an issued JWT and `isVerified` is fixed.
 - `ZitiRouter.spec.advertisedAddress` is optional. An empty value uses `CHANGE_ME.invalid`.
 - `ZitiSidecar` writes the tunneler sidecar patch for a workload into a Secret. It does not mutate workloads and does not run a webhook.
 - A `ZitiApp` is created from an Ingress annotated with `ziti.alialjaffer.com/expose: "true"`. One HTTP Service backend is supported; TLS and mixed backends are rejected.
@@ -37,7 +25,9 @@ Set `ZitiRouter.spec.deployment.serviceType` to the Service type you need (`Clus
 
 ### Security
 
-- The operator role no longer requests cluster-wide `Service` write access. Generated resource-level RBAC still honours `rbac.secretNamespaces` and `clusterWideSecrets`.
+- The operator role can write Services cluster-wide, because it creates the Service for an in-cluster router. That is wider than `v0.1.2`, which only read them, so an admission policy may flag the upgrade. Set `rbac.serviceNamespaces` to move the write access into per-namespace Roles. A router outside the list still gets its Deployment and claim and runs, reports `ServiceNamespaceNotAllowed`, and gets the Service manifest written to its enrollment Secret for you to apply. The operator does not take over a Service you applied yourself, so `Workload` then reads `NameConflict` and stays false until you delete it. Reading Services stays cluster-wide.
+- `Deployment` and `PersistentVolumeClaim` write access stays cluster-wide. Scoping Services alone limits the blast radius only partly: creating a Deployment in any namespace already lets the operator run a pod there.
+- The trivy scan flags `AVD-KSV-0056` on the Service rule. It is listed in `.trivyignore` on purpose, for the reason above.
 - Govulncheck is clean for the released code.
 - The sidecar, Ingress, and port-forward docs now publish to the wiki.
 
