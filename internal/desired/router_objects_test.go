@@ -29,7 +29,7 @@ func TestRouterWorkloadDefaults(t *testing.T) {
 	if dep != "edge-1" || svc != "edge-1" || claim != "edge-1-data" || w.SecretName() != "edge-1-enrollment" {
 		t.Errorf("names = %q %q %q %q", dep, svc, claim, w.SecretName())
 	}
-	if w.Port != 3022 || w.ImagePullPolicy != corev1.PullIfNotPresent || w.ServiceType != corev1.ServiceTypeLoadBalancer {
+	if w.Port != 3022 || w.ImagePullPolicy != corev1.PullIfNotPresent || w.ServiceType != corev1.ServiceTypeClusterIP {
 		t.Errorf("defaults = %+v", w)
 	}
 	if w.image() != "openziti/ziti-router:2.0.4@sha256:95d29bef1fb488345eccaa8db8c7bedd22cc31a6f265645dbc222512857d964f" {

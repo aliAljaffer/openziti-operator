@@ -34,6 +34,7 @@ PAGES = {
     "docs/interop-ziti-k8s-agent.md": "Interop-with-ziti-k8s-agent",
     "docs/adr/0001-build-or-contribute.md": "ADR-0001-Build-or-contribute",
     "docs/adr/0002-service-account-tokens.md": "ADR-0002-Service-account-tokens",
+    "docs/adr/0003-service-write-access.md": "ADR-0003-Service-write-access",
     "CONTRIBUTING.md": "Contributing",
     "SECURITY.md": "Security",
 }
@@ -84,6 +85,7 @@ SIDEBAR = """**[Home](Home)**
 **More**
 - [Interop with ziti-k8s-agent](Interop-with-ziti-k8s-agent)
 - [Design decisions](ADR-0001-Build-or-contribute)
+- [Service write access](ADR-0003-Service-write-access)
 - [Contributing](Contributing)
 - [Security](Security)
 """

@@ -188,6 +188,13 @@ rbac:
   ##
   clusterWideSecrets: false
 
+  ## Namespaces where the operator may create the Service for an in-cluster router.
+  ## empty (default): the ClusterRole may write Services in every namespace.
+  ## Set it to move Service write access into per-namespace Roles. Reading Services stays cluster-wide,
+  ## because the operator watches them everywhere. Deployment and volume claim write access is not scoped.
+  ##
+  serviceNamespaces: []
+
   ## Extra namespaces for Secret and ConfigMap access (the release namespace is always included).
   ## Ignored when clusterWideSecrets is true. Every namespace that holds a ZitiIdentity must be listed,
   ## because the operator writes identity Secrets there.

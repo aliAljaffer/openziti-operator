@@ -542,7 +542,7 @@ var _ = Describe("ZitiRouter", func() {
 		})
 		Expect(k8sClient.Create(ctx, r)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, r) })
-		Expect(r.Spec.Deployment.ServiceType).To(Equal("LoadBalancer"))
+		Expect(r.Spec.Deployment.ServiceType).To(Equal("ClusterIP"))
 		Expect(r.Spec.Deployment.ImagePullPolicy).To(Equal("IfNotPresent"))
 		// A router that clients reach through other routers needs no address of its own.
 		Expect(r.Spec.AdvertisedAddress).To(BeEmpty())

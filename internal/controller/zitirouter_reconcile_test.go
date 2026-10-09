@@ -3,20 +3,27 @@
 package controller
 
 import (
+	"context"
+	"errors"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/yaml"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
@@ -28,9 +35,15 @@ import (
 type routerEnv struct {
 	r   *ZitiRouterReconciler
 	zc  *ziti.Fake
-	k   client.Client
+	k   client.WithWatch
 	key types.NamespacedName
+	// denyServiceWrite makes the client refuse to write Services, the way a namespace outside
+	// rbac.serviceNamespaces does.
+	denyServiceWrite *atomic.Bool
 }
+
+// denyServices makes every Service write fail with Forbidden.
+func (e *routerEnv) denyServices() { e.denyServiceWrite.Store(true) }
 
 func setupRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Object) *routerEnv {
 	t.Helper()
@@ -55,12 +68,37 @@ func setupRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Obje
 	if mut != nil {
 		mut(rt)
 	}
+	deny := &atomic.Bool{}
+	denyWrite := func(obj client.Object) error {
+		if _, ok := obj.(*corev1.Service); !ok {
+			return nil
+		}
+		return apierrors.NewForbidden(schema.GroupResource{Resource: "services"}, obj.GetName(), errors.New("no write access in this namespace"))
+	}
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(objs, conn, rt)...).
-		WithStatusSubresource(&zitiv1.ZitiRouter{}, &appsv1.Deployment{}).Build()
+		WithStatusSubresource(&zitiv1.ZitiRouter{}, &appsv1.Deployment{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				if deny.Load() {
+					if err := denyWrite(obj); err != nil {
+						return err
+					}
+				}
+				return c.Create(ctx, obj, opts...)
+			},
+			Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				if deny.Load() {
+					if err := denyWrite(obj); err != nil {
+						return err
+					}
+				}
+				return c.Update(ctx, obj, opts...)
+			},
+		}).Build()
 	zc := ziti.NewFake()
 	return &routerEnv{
 		r:  &ZitiRouterReconciler{Client: k, Scheme: scheme, Clients: staticProvider{zc}, Recorder: record.NewFakeRecorder(50)},
-		zc: zc, k: k, key: types.NamespacedName{Name: "edge-1"},
+		zc: zc, k: k, key: types.NamespacedName{Name: "edge-1"}, denyServiceWrite: deny,
 	}
 }
 
@@ -327,10 +365,15 @@ func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
 		t.Fatalf("claim: %v", err)
 	}
-	// The operator must not write Services, so the Service is a manifest in the Secret instead.
 	var svc corev1.Service
-	if err := e.k.Get(t.Context(), key, &svc); err == nil {
-		t.Error("the operator must not create a Service, it has no cluster-wide write access to one")
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	if svc.Spec.Type != corev1.ServiceTypeClusterIP || len(svc.Spec.Ports) != 1 || svc.Spec.Ports[0].Port != 3022 {
+		t.Errorf("service = %+v", svc.Spec)
+	}
+	if !equality.Semantic.DeepEqual(svc.Spec.Selector, map[string]string{"app": "edge-1"}) {
+		t.Errorf("service selector = %+v", svc.Spec.Selector)
 	}
 	secret, err := e.secret(t)
 	if err != nil {
@@ -345,7 +388,7 @@ func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
 	}
 	// The operator owns all three, so deleting the router removes them. A cluster-scoped owner of a namespaced
 	// object is allowed by Kubernetes garbage collection.
-	for _, o := range []client.Object{&dep, &pvc} {
+	for _, o := range []client.Object{&dep, &pvc, &svc} {
 		if !metav1.IsControlledBy(o, rt) {
 			t.Errorf("%s is not owned by the router", o.GetName())
 		}
@@ -375,6 +418,35 @@ func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
 	}
 }
 
+// The API server defaults parts of a Service spec that the operator never sets, so a naive spec compare would
+// report drift forever. The fake client does no defaulting, so seed what a real cluster would have filled in.
+func checkServiceIsSteady(t *testing.T, e *routerEnv, key types.NamespacedName) {
+	t.Helper()
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatal(err)
+	}
+	svc.Spec.ClusterIP = "10.0.0.10"
+	svc.Spec.ClusterIPs = []string{"10.0.0.10"}
+	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+	policy := corev1.IPFamilyPolicySingleStack
+	svc.Spec.IPFamilyPolicy = &policy
+	svc.Spec.SessionAffinity = corev1.ServiceAffinityNone
+	internal := corev1.ServiceInternalTrafficPolicyCluster
+	svc.Spec.InternalTrafficPolicy = &internal
+	if err := e.k.Update(t.Context(), &svc); err != nil {
+		t.Fatal(err)
+	}
+	before := svc.ResourceVersion
+	e.reconcile(t)
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatal(err)
+	}
+	if svc.ResourceVersion != before {
+		t.Errorf("a steady reconcile rewrote the Service: %v -> %v", before, svc.ResourceVersion)
+	}
+}
+
 func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	e := setupDeployedRouter(t, nil)
 	e.reconcile(t)
@@ -400,6 +472,7 @@ func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	if dep.ResourceVersion != before {
 		t.Errorf("a steady reconcile rewrote the Deployment: %v -> %v", before, dep.ResourceVersion)
 	}
+	checkServiceIsSteady(t, e, key)
 
 	rt := e.reconcile(t)
 	rt.Spec.Deployment.ServiceType = "NodePort"
@@ -425,6 +498,34 @@ func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	if manifest.Spec.Type != corev1.ServiceTypeNodePort || manifest.Spec.Ports[0].Port != 4100 {
 		t.Errorf("service manifest not applied: %+v", manifest.Spec)
 	}
+	// The live Service follows too, and keeps the cluster IP the API server allocated.
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatal(err)
+	}
+	if svc.Spec.Type != corev1.ServiceTypeNodePort || svc.Spec.Ports[0].Port != 4100 {
+		t.Errorf("service not applied: %+v", svc.Spec)
+	}
+	if svc.Spec.ClusterIP != "10.0.0.10" || len(svc.Spec.Ports) != 1 || svc.Spec.Ports[0].NodePort != 0 {
+		t.Errorf("allocated service fields were dropped: %+v", svc.Spec)
+	}
+
+	// Back to ClusterIP, which rejects an update that still carries a node port.
+	back := &zitiv1.ZitiRouter{}
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "edge-1"}, back); err != nil {
+		t.Fatal(err)
+	}
+	back.Spec.Deployment.ServiceType = "ClusterIP"
+	if err := e.k.Update(t.Context(), back); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatal(err)
+	}
+	if svc.Spec.Type != corev1.ServiceTypeClusterIP || svc.Spec.Ports[0].NodePort != 0 || svc.Spec.ClusterIP != "10.0.0.10" {
+		t.Errorf("service type change = %+v", svc.Spec)
+	}
 	// The claim spec is immutable, so a port change must not touch it.
 	var pvc corev1.PersistentVolumeClaim
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
@@ -435,15 +536,103 @@ func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
 	}
 }
 
+// A Service the operator no longer owns must keep its owner reference across a spec change, or the next reconcile
+// reads it as foreign and the router goes to NameConflict.
+func TestRouterDeploymentKeepsTheServiceOwnedAcrossUpdates(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.reconcile(t)
+
+	rt := &zitiv1.ZitiRouter{}
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "edge-1"}, rt); err != nil {
+		t.Fatal(err)
+	}
+	rt.Spec.Deployment.ServiceType = "NodePort"
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	if c := routerCond(e.reconcile(t), CondSynced); c.Reason == "NameConflict" {
+		t.Fatalf("synced = %+v", c)
+	}
+	key := types.NamespacedName{Namespace: "routers", Name: "edge-1"}
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err != nil {
+		t.Fatal(err)
+	}
+	if !metav1.IsControlledBy(&svc, rt) {
+		t.Fatalf("the Service lost its owner: %+v", svc.OwnerReferences)
+	}
+	if svc.Spec.Type != corev1.ServiceTypeNodePort {
+		t.Errorf("service type = %q", svc.Spec.Type)
+	}
+}
+
+// A namespace the operator may not write Services in still gets a router. The Service is the only thing missing,
+// so the condition says so, and the manifest reaches the Secret for the user to apply.
+func TestRouterDeploymentReportsAServiceItMayNotWrite(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.denyServices()
+	rt := e.reconcile(t)
+
+	if c := routerCond(rt, CondWorkload); c.Reason != "ServiceNamespaceNotAllowed" || c.Status != metav1.ConditionFalse {
+		t.Errorf("workload = %+v", c)
+	}
+	key := types.NamespacedName{Namespace: "routers", Name: "edge-1"}
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err == nil {
+		t.Error("no Service may be created where the operator may not write")
+	}
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), key, &dep); err != nil {
+		t.Errorf("the Deployment must still be built: %v", err)
+	}
+	var pvc corev1.PersistentVolumeClaim
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
+		t.Errorf("the claim must still be built: %v", err)
+	}
+	secret, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := secret.Data[SecretKeyService]; !ok {
+		t.Error("the manifest must reach the Secret, it is how the user adds the Service")
+	}
+}
+
+// A Service the operator may not update reports the same reason as one it may not create, not a bare Forbidden.
+func TestRouterDeploymentReportsAServiceItMayNotUpdate(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.reconcile(t)
+	e.denyServices()
+
+	rt := &zitiv1.ZitiRouter{}
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "edge-1"}, rt); err != nil {
+		t.Fatal(err)
+	}
+	rt.Spec.Deployment.ServiceType = "NodePort"
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+
+	if c := routerCond(e.reconcile(t), CondWorkload); c.Reason != "ServiceNamespaceNotAllowed" {
+		t.Errorf("workload = %+v", c)
+	}
+}
+
 func TestRouterDeploymentRefusesForeignObjects(t *testing.T) {
-	for _, foreign := range []client.Object{
-		&appsv1.Deployment{Name: "edge-1", Namespace: "routers"},
-		&corev1.PersistentVolumeClaim{Name: "edge-1-data", Namespace: "routers"},
+	// A foreign Service is reported on Workload and does not stop the router, unlike the other two.
+	for _, c := range []struct {
+		foreign  client.Object
+		condType string
+	}{
+		{&appsv1.Deployment{Name: "edge-1", Namespace: "routers"}, CondSynced},
+		{&corev1.PersistentVolumeClaim{Name: "edge-1-data", Namespace: "routers"}, CondSynced},
+		{&corev1.Service{Name: "edge-1", Namespace: "routers"}, CondWorkload},
 	} {
+		foreign := c.foreign
 		e := setupDeployedRouter(t, nil, foreign.DeepCopyObject().(client.Object))
 		rt := e.reconcile(t)
-		if c := routerCond(rt, CondSynced); c.Reason != "NameConflict" {
-			t.Errorf("%s: synced = %+v", foreign.GetName(), c)
+		if got := routerCond(rt, c.condType); got.Reason != "NameConflict" {
+			t.Errorf("%s: %s = %+v", foreign.GetName(), c.condType, got)
 		}
 		// The operator must leave it exactly as it found it.
 		if err := e.k.Get(t.Context(), client.ObjectKeyFromObject(foreign), foreign); err != nil {

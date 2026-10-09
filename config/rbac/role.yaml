@@ -14,7 +14,6 @@ rules:
   resources:
   - configmaps
   - namespaces
-  - services
   verbs:
   - get
   - list
@@ -31,6 +30,7 @@ rules:
   resources:
   - persistentvolumeclaims
   - secrets
+  - services
   verbs:
   - create
   - delete

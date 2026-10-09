@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -72,6 +73,7 @@ type ZitiRouterReconciler struct {
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=zitirouters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	metrics.Reconciliations.WithLabelValues("zitirouter").Inc()
@@ -255,14 +257,20 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 			fmt.Sprintf("the volume claim uses storage class %q and a bound claim cannot change; delete it or set storageClassName to %q", *got, w.StorageClass))
 		return nil
 	}
+	// A Service the operator may not create, or may not take over, leaves the router without a stable address but
+	// does not stop it. The rest of the workload is built anyway and the manifest reaches the Secret, so the user can
+	// apply it. The reason goes in the Workload condition.
+	svcErr := r.applyService(ctx, rt, w)
+	var se *specError
+	if svcErr != nil && !errors.As(svcErr, &se) {
+		return svcErr
+	}
 	if err := r.createOwned(ctx, rt, w.PersistentVolumeClaim()); err != nil {
 		return err
 	}
 	if err := r.applyOwned(ctx, rt, w.Deployment(name), nil); err != nil {
 		return err
 	}
-	// The operator does not get write access to Services cluster-wide, because rewriting one anywhere in the
-	// cluster is a privilege escalation. It writes the Service to the Secret instead.
 	manifest, err := yaml.Marshal(w.Service())
 	if err != nil {
 		return err
@@ -282,8 +290,20 @@ func (r *ZitiRouterReconciler) syncWorkload(ctx context.Context, rt *zitiv1alpha
 	if ready == 0 {
 		msg = "the router pod is not ready yet"
 	}
-	setCond(&rt.Status.Conditions, rt.Generation, CondWorkload, ready > 0, "Running", "DeploymentUnavailable", msg)
+	if se != nil {
+		// A Service the operator could not create or take over, and a pod that is ready, are two facts. Report both.
+		msg += "; " + se.msg
+	}
+	setCond(&rt.Status.Conditions, rt.Generation, CondWorkload, ready > 0 && se == nil, "Running", reasonOf(se, "DeploymentUnavailable"), msg)
 	return nil
+}
+
+// reasonOf names the Service problem when there is one, and the Deployment problem otherwise.
+func reasonOf(se *specError, fallback string) string {
+	if se == nil {
+		return fallback
+	}
+	return se.reason
 }
 
 // createOwned creates obj when it is missing. An object that exists but belongs to someone else is a conflict.
@@ -326,6 +346,99 @@ func (r *ZitiRouterReconciler) applyOwned(ctx context.Context, rt *zitiv1alpha1.
 		return nil
 	}
 	return r.Update(ctx, want)
+}
+
+// applyService makes the live Service hold what the operator wants. A Service the operator may not write in that
+// namespace is reported as a spec error, so the condition names rbac.serviceNamespaces instead of showing a bare
+// Forbidden. A Service that exists but belongs to someone else is a conflict, never an adoption.
+func (r *ZitiRouterReconciler) applyService(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, w desired.RouterWorkload) error {
+	cur := &corev1.Service{}
+	key := types.NamespacedName{Namespace: w.Namespace, Name: w.Service().Name}
+	err := r.Get(ctx, key, cur)
+	if apierrors.IsNotFound(err) {
+		err = r.create(ctx, rt, w.Service())
+		if apierrors.IsForbidden(err) {
+			return serviceNamespaceError(w.Namespace)
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if !metav1.IsControlledBy(cur, rt) {
+		return conflict(cur)
+	}
+	next := adoptService(cur, w.Service())
+	if err := r.stamp(rt, next); err != nil {
+		return err
+	}
+	if serviceSettled(cur, next) {
+		return nil
+	}
+	next.SetResourceVersion(cur.GetResourceVersion())
+	if err := r.Update(ctx, next); apierrors.IsForbidden(err) {
+		return serviceNamespaceError(w.Namespace)
+	} else {
+		return err
+	}
+}
+
+func serviceNamespaceError(namespace string) *specError {
+	return &specError{"ServiceNamespaceNotAllowed", fmt.Sprintf("the operator may not write a Service in namespace %q, add it to rbac.serviceNamespaces", namespace)}
+}
+
+// serviceSettled reports whether the live Service already holds what the operator asks for. Only the fields the
+// operator sets are compared, because the API server defaults the rest (cluster IPs, IP families, traffic policy,
+// session affinity) and a fresh desired object carries none of them.
+func serviceSettled(cur, want *corev1.Service) bool {
+	if cur.Spec.Type != want.Spec.Type || !equality.Semantic.DeepEqual(cur.Spec.Selector, want.Spec.Selector) {
+		return false
+	}
+	if len(cur.Spec.Ports) != len(want.Spec.Ports) {
+		return false
+	}
+	for i := range want.Spec.Ports {
+		c, p := cur.Spec.Ports[i], want.Spec.Ports[i]
+		if c.Name != p.Name || c.Port != p.Port || c.Protocol != p.Protocol ||
+			c.TargetPort != p.TargetPort || c.AppProtocol != p.AppProtocol {
+			return false
+		}
+	}
+	return true
+}
+
+// adoptService moves the live Service onto the desired one while keeping what the cluster and other components own.
+// An allocated nodePort carries across a NodePort or LoadBalancer change, and is cleared for ClusterIP, which rejects
+// an update that still sets one. Annotations and finalizers stay: a load balancer provider and the cloud controller
+// both put things there that no field of the CRD can set.
+func adoptService(cur, want *corev1.Service) *corev1.Service {
+	out := want.DeepCopy()
+	out.Spec.ClusterIP = cur.Spec.ClusterIP
+	out.Spec.ClusterIPs = cur.Spec.ClusterIPs
+	out.Spec.IPFamilies = cur.Spec.IPFamilies
+	out.Spec.IPFamilyPolicy = cur.Spec.IPFamilyPolicy
+	if cur.Spec.LoadBalancerClass != nil {
+		out.Spec.LoadBalancerClass = cur.Spec.LoadBalancerClass
+	}
+	out.Annotations = cur.Annotations
+	out.Finalizers = cur.Finalizers
+	out.Labels = mergeLabels(cur.Labels, want.Labels)
+	if want.Spec.Type == corev1.ServiceTypeClusterIP {
+		return out
+	}
+	for i := range out.Spec.Ports {
+		if i < len(cur.Spec.Ports) {
+			out.Spec.Ports[i].NodePort = cur.Spec.Ports[i].NodePort
+		}
+	}
+	return out
+}
+
+func mergeLabels(cur, want map[string]string) map[string]string {
+	out := make(map[string]string, len(cur)+len(want))
+	maps.Copy(out, cur)
+	maps.Copy(out, want)
+	return out
 }
 
 // objectSettled reports whether the live object already holds everything the operator wants. The API server owns

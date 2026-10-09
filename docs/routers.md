@@ -67,15 +67,23 @@ spec:
     namespace: routers
 ```
 
-The operator creates a `Deployment` and a volume claim in that namespace, and ties both to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter` shows `WORKLOAD` and `ENDPOINT`.
+The operator creates a `Deployment` and a volume claim in that namespace, and ties both to the `ZitiRouter`, so deleting the resource removes them. `kubectl get ztrouter -o wide` shows the endpoint and whether the workload is ready.
 
-The operator does **not** create the `Service`. Rewriting a Service anywhere in a cluster is a privilege escalation, so the operator does not ask for write access to them; you would not want the operator holding it either. The operator writes a ready-made `service.yaml` to the enrollment Secret instead:
+The operator creates the `Service` as well, and ties it to the `ZitiRouter` too. It sets the Service type from `deployment.serviceType`, keeps the cluster IP and node port the cluster allocated when you change the type, and leaves a Service of the same name that it does not own alone.
+
+The `Workload` condition covers all three objects.
+
+The operator also writes a ready-made `service.yaml` to the enrollment Secret, for a cluster where you would rather it had no Service write access at all:
 
 ```sh
 kubectl -n routers get secret homelab-1-enrollment -o jsonpath='{.data.service\.yaml}' | base64 -d | kubectl apply -f -
 ```
 
-Without a Service the router still starts and serves, but it has only a Pod address, which changes when the pod is rescheduled. Add the Service when you want a stable one.
+Writing a Service anywhere in a cluster is a privilege escalation, so the chart grants that access by default and lets you narrow it. Set `rbac.serviceNamespaces` to move Service write access into per-namespace Roles. Reading Services stays cluster-wide, because the operator watches them everywhere.
+
+A router outside the list still gets its Deployment and its claim, and it runs. Only the Service is missing, and `Workload` says `ServiceNamespaceNotAllowed`. Apply the manifest above to add it yourself.
+
+The operator never takes over a Service it did not create, so a Service you applied yourself reads `NameConflict` on `Workload` and stays `False`. The router keeps running and the Service keeps serving; the condition never turns `True` until you delete the Service. Delete it to hand the Service back to the operator.
 
 ## Who needs a reachable address
 
@@ -95,10 +103,10 @@ The tunneler needs an edge listener, and an edge listener needs an advertise val
 
 | Key | Meaning |
 |---|---|
-| `deployment.namespace` | Where the three objects go. The operator needs RBAC for `deployments`, `services`, and `persistentvolumeclaims` there. |
+| `deployment.namespace` | Where the three objects go. The operator may only use Secrets in `rbac.secretNamespaces` and the release namespace, and may only write Services in `rbac.serviceNamespaces` when that list is set. |
 | `deployment.image` | The router image. Defaults to the tested `openziti/ziti-router` image for the controller version. Set it for a private registry. |
 | `deployment.imagePullPolicy` | Default `IfNotPresent`. |
-| `deployment.serviceType` | `LoadBalancer` (default) or `NodePort` in the `service.yaml` the operator writes. Use `NodePort` where the cluster has no load balancer, then set `advertisedAddress` to a node address. |
+| `deployment.serviceType` | The Service the operator creates. Default `ClusterIP`, which only clients inside the cluster reach. Use `LoadBalancer` where the cluster has one, or `NodePort`, then set `advertisedAddress` to a node address. |
 
 Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollment`, in the same namespace, because the router pod reads the token from it. With `enrollmentSecretRef` the pod reads that Secret instead.
 
@@ -164,4 +172,4 @@ A `ZitiApp` names routers in `hostedBy` and `entryRouters`, and the connection l
 
 - Tested against a real cluster: the operator created the router, Deployment, Service, and volume claim, the router enrolled and went online on its own, and it came back after the pod was deleted with no token left in the Secret.
 - A live router that this operator created is deleted from Ziti when you delete its resource (or, with the orphan sweeper in `delete` mode, when the resource is gone). Use `deletionPolicy: Orphan` for routers that must survive.
-- `deployment` was tested on a real cluster: one `ZitiRouter` with `spec.deployment` produced an enrolled, online router from a single applied resource. Deleting the pod brought it back with no token.
+- `deployment` was tested on a real cluster: one `ZitiRouter` with `spec.deployment` produced an enrolled, online router from a single applied resource, and the Service settled and kept its cluster IP across `ClusterIP` to `NodePort` to `LoadBalancer` changes. Deleting the resource removed all three objects.
