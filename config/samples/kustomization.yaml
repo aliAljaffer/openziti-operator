@@ -1,5 +1,6 @@
 ## Append samples of your project ##
 resources:
+- networking_v1_ingress_exposed.yaml
 - ziti_v1alpha1_ziticonnection.yaml
 - ziti_v1alpha1_zitiapp.yaml
 - ziti_v1alpha1_zitiidentity.yaml

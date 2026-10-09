@@ -273,6 +273,14 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "service")
 		os.Exit(1)
 	}
+	if err := (&controller.IngressReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "ingress")
+		os.Exit(1)
+	}
 	if err := mgr.Add(&controller.OrphanSweeper{
 		Reader:   mgr.GetAPIReader(),
 		Clients:  clients,

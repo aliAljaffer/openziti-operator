@@ -22,9 +22,10 @@ This is an independent community project. It is not an official OpenZiti or NetF
 | Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret, and reports which services the router terminates. |
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
 | Log a workload in through a Ziti tunneler | A `ZitiSidecar`. It writes the patch that adds the tunneler, so you do not hand-write the container, identity mount, or resolver. |
+| Expose an HTTP Ingress | Annotate it with `ziti.alialjaffer.com/expose: "true"`; the operator creates a `ZitiApp` for its host and backend Service. |
 | Let a workload log in with a certificate or a service account token | `ZitiCA` and `ZitiJwtSigner`, with cert-manager or your cluster issuer. |
 
-Annotate a Kubernetes Service with `ziti.alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it.
+Annotate a Kubernetes Service or supported HTTP Ingress with `ziti.alialjaffer.com/expose: "true"` and the operator creates the `ZitiApp` for it. See [Expose an Ingress](docs/ingress.md) for supported Ingress routes.
 
 For full control, there is one resource for every Ziti object too. See [Full control](docs/full-control.md).
 
