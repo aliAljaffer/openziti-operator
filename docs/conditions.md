@@ -31,6 +31,7 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Enrolled` | The router has enrolled with its JWT. |
 | | `Online` | The router is connected to the controller. |
 | | `Serving` | Every service whose service edge router policy names this router has a terminator on it. |
+| | `Workload` | The in-cluster router has a ready replica. Present only when `spec.deployment` is set. |
 | | `Ready` | `Enrolled` and `Online`. |
 | `ZitiCA` | `Synced` | The CA is registered in Ziti and matches the spec. |
 | | `Verified` | Ziti accepted the proof that you control the CA. |
@@ -59,6 +60,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `SecretConflict` | A Secret with the wanted name exists and this `ZitiIdentity` does not own it. | Set another `secretName`. |
 | `KeyAmbiguous` | `ZitiJwtSigner` with `keys.kubernetes`: the cluster publishes several keys and the operator cannot tell which one signs tokens (it has no token to compare, or none matches). | Run the operator in the cluster, or use `keys.jwksEndpoint`. |
 | `SecretNamespaceNotAllowed` | The operator runs with `--secret-namespaces` (chart value `rbac.secretNamespaces`) and this namespace is not in it. | Add the namespace to the list. |
+| `NameConflict` on a `Deployment`, `Service`, or `PersistentVolumeClaim` | An object of that name exists in `spec.deployment.namespace` and the operator did not create it. The operator never takes over a workload it does not own. | Rename the router, or delete the object. |
 
 ## Reasons on `Hosted`, `Dialable`, and `RoutePath`
 
@@ -95,6 +97,8 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `ConnectionFailed` | `ZitiConnection` `Connected` | Login failed. Check the Secret, the CA ConfigMap, and the URL. |
 | `NoMatch` | `ZitiAccessPolicy` `Ready` | The Dial policy selects no identity or no service yet. |
 | `IdentityNotFound` | `ZitiApp` `AccessResolved` | A name in `allow.identities` is not in Ziti. The policy still uses the identities that exist. |
+| `DeploymentUnavailable` | `ZitiRouter` `Workload` | The router pod has no ready replica. Look at the pod in `spec.deployment.namespace`. |
+| `ControllerVersionUnknown` | `ZitiRouter` `Workload` | The `ZitiConnection` has not reported a controller version, so the router image cannot be chosen. Set `spec.deployment.image`, or wait for the connection. |
 
 ## Events
 

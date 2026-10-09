@@ -18,9 +18,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  {{- if not (include "ziti-operator.limitSecrets" .) }}
+{{- if not (include "ziti-operator.limitSecrets" .) }}
   - configmaps
-  {{- end }}
+{{- end }}
   - namespaces
   - services
   verbs:
@@ -34,11 +34,13 @@ rules:
   verbs:
   - create
   - patch
-{{- if not (include "ziti-operator.limitSecrets" .) }}
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+{{- if not (include "ziti-operator.limitSecrets" .) }}
   - secrets
+{{- end }}
   verbs:
   - create
   - delete
@@ -47,7 +49,18 @@ rules:
   - patch
   - update
   - watch
-{{- end }}
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - cert-manager.io
   resources:

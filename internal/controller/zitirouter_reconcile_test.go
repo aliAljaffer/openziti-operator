@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,6 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/check"
@@ -37,6 +39,9 @@ func setupRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Obje
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 	conn := &zitiv1.ZitiConnection{Name: "default"}
 	rt := &zitiv1.ZitiRouter{
 		Name: "edge-1", UID: "uid-rt", Generation: 1,
@@ -48,7 +53,8 @@ func setupRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Obje
 	if mut != nil {
 		mut(rt)
 	}
-	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(objs, conn, rt)...).WithStatusSubresource(&zitiv1.ZitiRouter{}).Build()
+	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(objs, conn, rt)...).
+		WithStatusSubresource(&zitiv1.ZitiRouter{}, &appsv1.Deployment{}).Build()
 	zc := ziti.NewFake()
 	return &routerEnv{
 		r:  &ZitiRouterReconciler{Client: k, Scheme: scheme, Clients: staticProvider{zc}, Recorder: record.NewFakeRecorder(50)},
@@ -254,6 +260,219 @@ func TestRouterReportsWhatItTerminates(t *testing.T) {
 	}
 	if len(rt.Status.Services) != 1 || rt.Status.Services[0] != "billing" {
 		t.Errorf("status.services = %v", rt.Status.Services)
+	}
+}
+
+// setupDeployedRouter turns on spec.deployment and drops the named enrollment Secret, so the operator keeps its own.
+func setupDeployedRouter(t *testing.T, mut func(*zitiv1.ZitiRouter), objs ...client.Object) *routerEnv {
+	e := setupRouter(t, func(r *zitiv1.ZitiRouter) {
+		r.Spec.EnrollmentSecretRef = nil
+		r.Spec.AdvertisedAddress = "edge.example.com"
+		r.Spec.Deployment = &zitiv1.ZitiRouterDeployment{Namespace: "routers"}
+		if mut != nil {
+			mut(r)
+		}
+	}, objs...)
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = "v2.0.4"
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestRouterDeploymentRunsTheRouterInTheCluster(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	rt := e.reconcile(t)
+
+	key := types.NamespacedName{Namespace: "routers", Name: "edge-1"}
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), key, &dep); err != nil {
+		t.Fatalf("deployment: %v", err)
+	}
+	var pvc corev1.PersistentVolumeClaim
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	// The operator must not write Services, so the Service is a manifest in the Secret instead.
+	var svc corev1.Service
+	if err := e.k.Get(t.Context(), key, &svc); err == nil {
+		t.Error("the operator must not create a Service, it has no cluster-wide write access to one")
+	}
+	secret, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want corev1.Service
+	if err := yaml.Unmarshal(secret.Data[SecretKeyService], &want); err != nil {
+		t.Fatalf("service.yaml: %v\n%s", err, secret.Data[SecretKeyService])
+	}
+	if want.Name != "edge-1" || want.Namespace != "routers" || len(want.Spec.Ports) != 1 {
+		t.Errorf("service manifest = %+v", want)
+	}
+	// The operator owns all three, so deleting the router removes them. A cluster-scoped owner of a namespaced
+	// object is allowed by Kubernetes garbage collection.
+	for _, o := range []client.Object{&dep, &pvc} {
+		if !metav1.IsControlledBy(o, rt) {
+			t.Errorf("%s is not owned by the router", o.GetName())
+		}
+	}
+	// The operator keeps its own Secret when the spec does not name one, and the pod reads the token by reference.
+	s, err := e.secret(t)
+	if err != nil {
+		t.Fatalf("secret: %v", err)
+	}
+	if string(s.Data[SecretKeyJWT]) == "" {
+		t.Errorf("secret has no JWT: %v", s.Data)
+	}
+	env := dep.Spec.Template.Spec.Containers[0].Env[0]
+	if env.Name != "ZITI_ENROLL_TOKEN" || env.ValueFrom == nil || env.ValueFrom.SecretKeyRef.Name != "edge-1-enrollment" {
+		t.Errorf("env = %+v", env)
+	}
+	if c := routerCond(rt, CondWorkload); c.Status != metav1.ConditionFalse || c.Reason != "DeploymentUnavailable" {
+		t.Errorf("workload before a ready pod: %+v", c)
+	}
+
+	dep.Status.ReadyReplicas = 1
+	if err := e.k.Status().Update(t.Context(), &dep); err != nil {
+		t.Fatal(err)
+	}
+	if c := routerCond(e.reconcile(t), CondWorkload); c.Status != metav1.ConditionTrue || c.Reason != "Running" {
+		t.Errorf("workload = %+v", c)
+	}
+}
+
+func TestRouterDeploymentIsSteadyAndFollowsTheSpec(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.reconcile(t)
+
+	e.zc.Calls = nil
+	e.reconcile(t)
+	for _, c := range e.zc.Calls {
+		if strings.HasPrefix(c, "create") || strings.HasPrefix(c, "update") || strings.HasPrefix(c, "delete") || strings.HasPrefix(c, "re-enroll") {
+			t.Errorf("second reconcile wrote: %s", c)
+		}
+	}
+
+	var dep appsv1.Deployment
+	key := types.NamespacedName{Namespace: "routers", Name: "edge-1"}
+	if err := e.k.Get(t.Context(), key, &dep); err != nil {
+		t.Fatal(err)
+	}
+	before := dep.ResourceVersion
+	e.reconcile(t)
+	if err := e.k.Get(t.Context(), key, &dep); err != nil {
+		t.Fatal(err)
+	}
+	if dep.ResourceVersion != before {
+		t.Errorf("a steady reconcile rewrote the Deployment: %v -> %v", before, dep.ResourceVersion)
+	}
+
+	rt := e.reconcile(t)
+	rt.Spec.Deployment.ServiceType = "NodePort"
+	rt.Spec.Port = 4100
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if err := e.k.Get(t.Context(), key, &dep); err != nil {
+		t.Fatal(err)
+	}
+	if dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != 4100 {
+		t.Errorf("port not applied: %d", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+	}
+	secret, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest corev1.Service
+	if err := yaml.Unmarshal(secret.Data[SecretKeyService], &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Spec.Type != corev1.ServiceTypeNodePort || manifest.Spec.Ports[0].Port != 4100 {
+		t.Errorf("service manifest not applied: %+v", manifest.Spec)
+	}
+	// The claim spec is immutable, so a port change must not touch it.
+	var pvc corev1.PersistentVolumeClaim
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-data"}, &pvc); err != nil {
+		t.Fatal(err)
+	}
+	if pvc.Spec.AccessModes[0] != corev1.ReadWriteOnce {
+		t.Errorf("claim was rewritten: %+v", pvc.Spec)
+	}
+}
+
+func TestRouterDeploymentRefusesForeignObjects(t *testing.T) {
+	for _, foreign := range []client.Object{
+		&appsv1.Deployment{Name: "edge-1", Namespace: "routers"},
+		&corev1.PersistentVolumeClaim{Name: "edge-1-data", Namespace: "routers"},
+	} {
+		e := setupDeployedRouter(t, nil, foreign.DeepCopyObject().(client.Object))
+		rt := e.reconcile(t)
+		if c := routerCond(rt, CondSynced); c.Reason != "NameConflict" {
+			t.Errorf("%s: synced = %+v", foreign.GetName(), c)
+		}
+		// The operator must leave it exactly as it found it.
+		if err := e.k.Get(t.Context(), client.ObjectKeyFromObject(foreign), foreign); err != nil {
+			t.Fatal(err)
+		}
+		if len(foreign.GetOwnerReferences()) != 0 {
+			t.Errorf("%s: the operator took over a foreign object: %+v", foreign.GetName(), foreign.GetOwnerReferences())
+		}
+	}
+}
+
+func TestRouterDeploymentNeedsTheControllerVersion(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = ""
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	rt := e.reconcile(t)
+	if c := routerCond(rt, CondWorkload); c.Reason != "ControllerVersionUnknown" {
+		t.Errorf("workload = %+v", c)
+	}
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err == nil {
+		t.Error("no Deployment may be created without an image")
+	}
+	// An explicit image needs no controller version.
+	e = setupDeployedRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.Deployment.Image = "registry.example.com/router:1" })
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = ""
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	if c := routerCond(e.reconcile(t), CondWorkload); c.Reason != "DeploymentUnavailable" {
+		t.Errorf("workload = %+v", c)
+	}
+}
+
+func TestRouterWithoutADeploymentHasNoWorkloadCondition(t *testing.T) {
+	e := setupDeployedRouter(t, nil)
+	e.reconcile(t)
+	rt := e.reconcile(t)
+	rt.Spec.Deployment = nil
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	rt = e.reconcile(t)
+	if c := routerCond(rt, CondWorkload); c.Type != "" {
+		t.Errorf("workload condition must go away with the spec: %+v", c)
+	}
+	// The workload is left for garbage collection through its owner reference.
+	var dep appsv1.Deployment
+	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1"}, &dep); err != nil {
+		t.Fatalf("the operator must not delete the workload itself: %v", err)
 	}
 }
 

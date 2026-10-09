@@ -48,7 +48,7 @@ import (
 )
 
 const (
-	SecretKeyJWT      = "enrollment.jwt"
+	SecretKeyJWT      = desired.EnrollTokenKey
 	SecretKeyIdentity = "identity.json"
 	// ManagedByLabel marks the Secrets this operator creates. The manager cache holds only those.
 	ManagedByLabel      = "app.kubernetes.io/managed-by"

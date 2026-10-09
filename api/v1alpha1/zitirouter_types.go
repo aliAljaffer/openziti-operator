@@ -23,6 +23,7 @@ import (
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || has(self.advertisedAddress)",message="advertisedAddress is required with deployment: the address goes into the router certificate on first start and cannot change later"
 type ZitiRouterSpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -95,6 +96,41 @@ type ZitiRouterSpec struct {
 	// +kubebuilder:validation:Enum=Delete;Orphan
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
+
+	// deployment runs the router as a workload in this cluster. The operator creates the Deployment,
+	// the Service, and the volume claim, and reports the ready replica in the Workload condition.
+	// Without it the router runs somewhere else and the operator only writes the manifests.
+	// +optional
+	Deployment *ZitiRouterDeployment `json:"deployment,omitempty"`
+}
+
+// ZitiRouterDeployment runs the router in the cluster instead of on a VM.
+type ZitiRouterDeployment struct {
+	// namespace is where the Deployment, Service, and volume claim go. Every namespace but the ones in
+	// rbac.secretNamespaces must allow the operator to manage these three kinds.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	Namespace string `json:"namespace"`
+
+	// image overrides the router image. It defaults to the tested openziti/ziti-router image for the
+	// controller version. Set it for a private registry, and set imagePullPolicy to match.
+	// +kubebuilder:validation:MaxLength=512
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// imagePullPolicy for the router image. Default IfNotPresent.
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	// +kubebuilder:default=IfNotPresent
+	// +optional
+	ImagePullPolicy string `json:"imagePullPolicy,omitempty"`
+
+	// serviceType for the Service that clients and other routers reach. Default LoadBalancer.
+	// Use NodePort where the cluster has no load balancer, then set advertisedAddress to a node address.
+	// +kubebuilder:validation:Enum=LoadBalancer;NodePort
+	// +kubebuilder:default=LoadBalancer
+	// +optional
+	ServiceType string `json:"serviceType,omitempty"`
 }
 
 type ZitiRouterStatus struct {
@@ -130,6 +166,7 @@ type ZitiRouterStatus struct {
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Online",type=boolean,JSONPath=".status.online"
 // +kubebuilder:printcolumn:name="Serving",type=string,JSONPath=".status.conditions[?(@.type=='Serving')].status"
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=".spec.advertisedAddress"
 // +kubebuilder:printcolumn:name="Enrollment Expires",type=string,JSONPath=".status.enrollmentExpiresAt"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Message",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].message",priority=1

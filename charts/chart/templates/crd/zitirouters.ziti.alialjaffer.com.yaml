@@ -31,6 +31,9 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Serving')].status
       name: Serving
       type: string
+    - jsonPath: .spec.advertisedAddress
+      name: Endpoint
+      type: string
     - jsonPath: .status.enrollmentExpiresAt
       name: Enrollment Expires
       type: string
@@ -98,6 +101,46 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              deployment:
+                description: |-
+                  deployment runs the router as a workload in this cluster. The operator creates the Deployment,
+                  the Service, and the volume claim, and reports the ready replica in the Workload condition.
+                  Without it the router runs somewhere else and the operator only writes the manifests.
+                properties:
+                  image:
+                    description: |-
+                      image overrides the router image. It defaults to the tested openziti/ziti-router image for the
+                      controller version. Set it for a private registry, and set imagePullPolicy to match.
+                    maxLength: 512
+                    type: string
+                  imagePullPolicy:
+                    default: IfNotPresent
+                    description: imagePullPolicy for the router image. Default IfNotPresent.
+                    enum:
+                    - Always
+                    - IfNotPresent
+                    - Never
+                    type: string
+                  namespace:
+                    description: |-
+                      namespace is where the Deployment, Service, and volume claim go. Every namespace but the ones in
+                      rbac.secretNamespaces must allow the operator to manage these three kinds.
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  serviceType:
+                    default: LoadBalancer
+                    description: |-
+                      serviceType for the Service that clients and other routers reach. Default LoadBalancer.
+                      Use NodePort where the cluster has no load balancer, then set advertisedAddress to a node address.
+                    enum:
+                    - LoadBalancer
+                    - NodePort
+                    type: string
+                required:
+                - namespace
+                type: object
               disabled:
                 description: disabled takes the router out of service without deleting
                   it.
@@ -164,6 +207,10 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: 'advertisedAddress is required with deployment: the address
+                goes into the router certificate on first start and cannot change
+                later'
+              rule: '!has(self.deployment) || has(self.advertisedAddress)'
           status:
             description: status defines the observed state of ZitiRouter
             properties:
