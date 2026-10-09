@@ -1193,6 +1193,16 @@ func (in *ZitiIdentityStatus) DeepCopyInto(out *ZitiIdentityStatus) {
 		in, out := &in.CertNotAfter, &out.CertNotAfter
 		*out = (*in).DeepCopy()
 	}
+	if in.ConnectedServices != nil {
+		in, out := &in.ConnectedServices, &out.ConnectedServices
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ConnectedRouters != nil {
+		in, out := &in.ConnectedRouters, &out.ConnectedRouters
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]v1.Condition, len(*in))

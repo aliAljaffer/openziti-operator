@@ -19,6 +19,7 @@
 | `Ready` | always | `.status.conditions[?(@.type=='Ready')].status` |
 | `Enrollment Expires` | always | `.status.enrollmentExpiresAt` |
 | `Cert Expires` | always | `.status.certNotAfter` |
+| `Sessions` | always | `.status.activeSessions` |
 | `Ziti ID` | with `-o wide` | `.status.zitiId` |
 | `Message` | with `-o wide` | `.status.conditions[?(@.type=='Ready')].message` |
 | `Age` | always | `.metadata.creationTimestamp` |
@@ -58,6 +59,7 @@ The API server rejects a resource that breaks one of these rules.
 
 | Field | Type | Description |
 |---|---|---|
+| `status.activeSessions` | integer | activeSessions is the number of current client sessions for this identity. |
 | `status.certNotAfter` | string | certNotAfter is the earliest expiry of the identity's client certificates. |
 | `status.conditions` | list of object |  |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
@@ -66,6 +68,8 @@ The API server rejects a resource that breaks one of these rules.
 | `status.conditions[].reason` | string | reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty. Minimum length 1. Maximum length 1024. Must match `^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`. |
 | `status.conditions[].status` | string | status of the condition, one of True, False, Unknown. One of: `True`, `False`, `Unknown`. |
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
+| `status.connectedRouters` | list of string | connectedRouters are the edge routers used by current sessions for this identity. |
+| `status.connectedServices` | list of string | connectedServices are the Ziti services with current sessions for this identity. |
 | `status.enrolled` | boolean |  |
 | `status.enrollmentExpiresAt` | string |  |
 | `status.observedGeneration` | integer |  |

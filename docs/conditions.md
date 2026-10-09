@@ -22,6 +22,7 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | `ZitiIdentity` | `Synced` | The identity exists and matches the spec. |
 | | `Ready` | The identity is enrolled and its certificate is valid. |
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
+| | `SessionsObserved` | The operator read the controller's active session list. `status.activeSessions`, `status.connectedServices`, and `status.connectedRouters` summarize it. |
 | `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
 | | `Ready` | Same as `Synced`. |
 | `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `Synced` | The Ziti object exists and matches the spec. |
@@ -103,6 +104,7 @@ The operator did not finish writing to Ziti. Nothing more is written until the c
 | `DeploymentUnavailable` | `ZitiRouter` `Workload` | The router pod has no ready replica. Look at the pod in `spec.deployment.namespace`. |
 | `ControllerVersionUnknown` | `ZitiRouter` `Workload` | The `ZitiConnection` has not reported a controller version, so the router image cannot be chosen. Set `spec.deployment.image`, or wait for the connection. |
 | `StorageClassLocked` | `ZitiRouter` `Workload` | The volume claim was created with another storage class and a bound claim cannot change. Delete the claim, or set `storageClassName` to the class it already has. |
+| `QueryFailed` | `ZitiIdentity` `SessionsObserved` | The operator could not read the controller's session list. Identity readiness is not affected; the session summary is cleared. |
 
 ## Events
 

@@ -34,6 +34,9 @@ spec:
     - jsonPath: .status.certNotAfter
       name: Cert Expires
       type: string
+    - jsonPath: .status.activeSessions
+      name: Sessions
+      type: integer
     - jsonPath: .status.zitiId
       name: Ziti ID
       priority: 1
@@ -191,6 +194,11 @@ spec:
           status:
             description: status defines the observed state of ZitiIdentity
             properties:
+              activeSessions:
+                description: activeSessions is the number of current client sessions
+                  for this identity.
+                format: int32
+                type: integer
               certNotAfter:
                 description: certNotAfter is the earliest expiry of the identity's
                   client certificates.
@@ -255,6 +263,18 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              connectedRouters:
+                description: connectedRouters are the edge routers used by current
+                  sessions for this identity.
+                items:
+                  type: string
+                type: array
+              connectedServices:
+                description: connectedServices are the Ziti services with current
+                  sessions for this identity.
+                items:
+                  type: string
+                type: array
               enrolled:
                 type: boolean
               enrollmentExpiresAt:
