@@ -3,6 +3,7 @@ resources:
 - networking_v1_ingress_exposed.yaml
 - ziti_v1alpha1_ziticonnection.yaml
 - ziti_v1alpha1_zitiapp.yaml
+- ziti_v1alpha1_ztiapp_tls.yaml
 - ziti_v1alpha1_zitiidentity.yaml
 - ziti_v1alpha1_zitiaccesspolicy.yaml
 - ziti_v1alpha1_zitijwtsigner.yaml
