@@ -116,7 +116,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 - [Role scope](docs/role-scope.md), [Existing Ziti resources](docs/existing-resources.md)
 - [Edge routers](docs/routers.md), [Full control](docs/full-control.md)
 - [Sidecar tunneler](docs/sidecar.md), [Log in with a service account token](docs/service-account-tokens.md), [Use a cert-manager CA](docs/cert-manager.md)
-- [Conditions and reasons](docs/conditions.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md)
+- [Conditions and reasons](docs/conditions.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md), [Serve plain and TLS ports](docs/tls.md)
 - [Compatibility](docs/compatibility.md), [Interop with ziti-k8s-agent](docs/interop-ziti-k8s-agent.md)
 - Reference for every kind: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiRouter](docs/reference/ZitiRouter.md), [ZitiCA](docs/reference/ZitiCA.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiTerminator](docs/reference/ZitiTerminator.md)
 

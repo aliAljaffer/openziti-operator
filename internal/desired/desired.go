@@ -32,13 +32,38 @@ type Builder struct {
 	Svc       *zitiv1.ZitiApp
 	Conn      *zitiv1.ZitiConnection
 	RouterIDs map[string]string
+	group     *Group
+}
+
+// WithGroup returns a builder that builds the entities of one group instead of the whole app.
+func (b *Builder) WithGroup(g Group) *Builder {
+	nb := *b
+	nb.group = &g
+	return &nb
 }
 
 func (b *Builder) ZitiName() string {
+	if b.group != nil {
+		return b.group.Name
+	}
 	if b.Svc.Spec.ZitiName != "" {
 		return b.Svc.Spec.ZitiName
 	}
 	return b.Svc.Namespace + "." + b.Svc.Name
+}
+
+func (b *Builder) exposePorts() []intstr.IntOrString {
+	if b.group != nil {
+		return b.group.Ports
+	}
+	return b.Svc.Spec.Expose.Ports
+}
+
+func (b *Builder) groupTargets() []zitiv1.Target {
+	if b.group != nil {
+		return b.group.Targets
+	}
+	return b.Svc.Spec.Targets
 }
 
 func (b *Builder) Tags() map[string]any {
@@ -137,7 +162,7 @@ func PortRanges(ports []intstr.IntOrString) ([]map[string]any, error) {
 
 func (b *Builder) InterceptConfig(typeID string) (ziti.Entity, error) {
 	x := b.Svc.Spec.Expose
-	ranges, err := PortRanges(x.Ports)
+	ranges, err := PortRanges(b.exposePorts())
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +186,11 @@ func (b *Builder) protocols() []string {
 // HostConfig builds a host.v2 config with one terminator per target. Targets always accept every exposed
 // protocol. A target without a port receives the port the client dialed.
 func (b *Builder) HostConfig(typeID string) (ziti.Entity, error) {
-	targets := b.Svc.Spec.Targets
+	targets := b.groupTargets()
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("targets needs at least one entry")
 	}
-	ranges, err := PortRanges(b.Svc.Spec.Expose.Ports)
+	ranges, err := PortRanges(b.exposePorts())
 	if err != nil {
 		return nil, err
 	}

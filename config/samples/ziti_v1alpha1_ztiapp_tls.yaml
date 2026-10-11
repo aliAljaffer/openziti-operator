@@ -1,0 +1,27 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiApp
+metadata:
+  name: web
+  namespace: default
+spec:
+  zitiName: web.example.com
+  expose:
+    addresses:
+      - web.example.com
+    ports:
+      - 80
+      - 443
+    protocols:
+      - tcp
+  targets:
+    - address: 10.0.0.5
+      port: 8080
+      exposeOn:
+        - 80
+    - address: 10.0.0.5
+      port: 8443
+      exposeOn:
+        - 443
+  allow:
+    groups:
+      - team-a

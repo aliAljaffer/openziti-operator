@@ -189,12 +189,16 @@ func (r *ZitiAppReconciler) finalize(ctx context.Context, svc *zitiv1alpha1.Ziti
 	return r.Update(ctx, svc)
 }
 
-type syncResult struct {
+type serviceResult struct {
 	name        string
 	ids         zitiv1alpha1.EntityIDs
 	terminators []zitiv1alpha1.Terminator
 	report      check.ServiceReport
-	missing     []string
+}
+
+type syncResult struct {
+	services []serviceResult
+	missing  []string
 }
 
 func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) (*syncResult, error) {
@@ -234,6 +238,11 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		}
 	}
 
+	groups, err := b.Groups()
+	if err != nil {
+		return nil, &specError{"InvalidSpec", err.Error()}
+	}
+
 	identityIDs, err := r.identityIDs(ctx, zc, svc.Spec.Allow.Identities)
 	if err != nil {
 		return nil, err
@@ -242,24 +251,7 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	if err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
-
-	icBody, err := b.InterceptConfig(typeIDs["intercept.v1"])
-	if err != nil {
-		return nil, &specError{"InvalidSpec", err.Error()}
-	}
-	hcBody, err := b.HostConfig(typeIDs["host.v2"])
-	if err != nil {
-		return nil, &specError{"InvalidSpec", err.Error()}
-	}
-	if _, err := b.Service("", ""); err != nil {
-		return nil, &specError{"InvalidSpec", err.Error()}
-	}
-	for _, f := range []func(string) (ziti.Entity, error){b.Bind, b.SERP} {
-		if _, err := f(""); err != nil {
-			return nil, &specError{"InvalidSpec", err.Error()}
-		}
-	}
-	if _, err := b.ERP(allowed); err != nil {
+	if err := validateGroups(b, groups, typeIDs, allowed); err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
 
@@ -268,49 +260,102 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		return nil, err
 	}
 	set.adopt = svc.Spec.ManagementPolicy == zitiv1alpha1.ManagementAdopt
-	ensure := set.ensure
 
-	var ids zitiv1alpha1.EntityIDs
-	if ids.Intercept, err = ensure(ctx, ziti.Configs, icBody); err != nil {
-		return nil, err
-	}
-	if ids.Host, err = ensure(ctx, ziti.Configs, hcBody); err != nil {
-		return nil, err
-	}
-	svcBody, _ := b.Service(ids.Intercept, ids.Host)
-	if ids.Service, err = ensure(ctx, ziti.Services, svcBody); err != nil {
-		return nil, err
-	}
-	bind, _ := b.Bind(ids.Service)
-	if ids.Bind, err = ensure(ctx, ziti.ServicePolicies, bind); err != nil {
-		return nil, err
-	}
-	serp, _ := b.SERP(ids.Service)
-	if ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
-		return nil, err
-	}
-	if dial := b.Dial(ids.Service, allowed); dial != nil {
-		if ids.Dial, err = ensure(ctx, ziti.ServicePolicies, dial); err != nil {
+	results := make([]groupResult, 0, len(groups))
+	for _, g := range groups {
+		res, err := ensureGroup(ctx, b.WithGroup(g), g, typeIDs, allowed, set.ensure)
+		if err != nil {
 			return nil, err
 		}
+		results = append(results, res)
 	}
 	if erp, _ := b.ERP(allowed); erp != nil {
-		if ids.ERP, err = ensure(ctx, ziti.EdgeRouterPolicies, erp); err != nil {
+		erpID, err := set.ensure(ctx, ziti.EdgeRouterPolicies, erp)
+		if err != nil {
 			return nil, err
 		}
+		results[0].ids.ERP = erpID
 	}
 
 	if err := set.prune(ctx); err != nil {
 		return nil, err
 	}
 
-	out, err := r.observe(ctx, zc, name, ids, routers, configTypes, []ziti.Entity{
-		withID(icBody, ids.Intercept), withID(hcBody, ids.Host),
-	}, withID(svcBody, ids.Service))
-	if out != nil {
-		out.missing = missing
+	out := &syncResult{missing: missing}
+	for _, res := range results {
+		sr, err := r.observe(ctx, zc, res.group.Name, res.ids, routers, configTypes, []ziti.Entity{
+			withID(res.ic, res.ids.Intercept), withID(res.hc, res.ids.Host),
+		}, withID(res.svc, res.ids.Service))
+		if err != nil {
+			return nil, err
+		}
+		out.services = append(out.services, *sr)
 	}
-	return out, err
+	return out, nil
+}
+
+type groupResult struct {
+	group desired.Group
+	ids   zitiv1alpha1.EntityIDs
+	ic    ziti.Entity
+	hc    ziti.Entity
+	svc   ziti.Entity
+}
+
+// validateGroups builds every entity of every group without writing, so a broken spec is reported before any change.
+func validateGroups(b *desired.Builder, groups []desired.Group, typeIDs map[string]string, allowed []string) error {
+	for _, g := range groups {
+		gb := b.WithGroup(g)
+		if _, err := gb.InterceptConfig(typeIDs["intercept.v1"]); err != nil {
+			return err
+		}
+		if _, err := gb.HostConfig(typeIDs["host.v2"]); err != nil {
+			return err
+		}
+		if _, err := gb.Service("", ""); err != nil {
+			return err
+		}
+		for _, f := range []func(string) (ziti.Entity, error){gb.Bind, gb.SERP} {
+			if _, err := f(""); err != nil {
+				return err
+			}
+		}
+	}
+	_, err := b.ERP(allowed)
+	return err
+}
+
+// ensureGroup writes the configs, service, and policies of one group and returns their ids.
+func ensureGroup(ctx context.Context, gb *desired.Builder, g desired.Group, typeIDs map[string]string,
+	allowed []string, ensure func(context.Context, ziti.Kind, ziti.Entity) (string, error)) (groupResult, error) {
+	icBody, _ := gb.InterceptConfig(typeIDs["intercept.v1"])
+	hcBody, _ := gb.HostConfig(typeIDs["host.v2"])
+	res := groupResult{group: g, ic: icBody, hc: hcBody}
+	var err error
+	if res.ids.Intercept, err = ensure(ctx, ziti.Configs, icBody); err != nil {
+		return res, err
+	}
+	if res.ids.Host, err = ensure(ctx, ziti.Configs, hcBody); err != nil {
+		return res, err
+	}
+	res.svc, _ = gb.Service(res.ids.Intercept, res.ids.Host)
+	if res.ids.Service, err = ensure(ctx, ziti.Services, res.svc); err != nil {
+		return res, err
+	}
+	bind, _ := gb.Bind(res.ids.Service)
+	if res.ids.Bind, err = ensure(ctx, ziti.ServicePolicies, bind); err != nil {
+		return res, err
+	}
+	serp, _ := gb.SERP(res.ids.Service)
+	if res.ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
+		return res, err
+	}
+	if dial := gb.Dial(res.ids.Service, allowed); dial != nil {
+		if res.ids.Dial, err = ensure(ctx, ziti.ServicePolicies, dial); err != nil {
+			return res, err
+		}
+	}
+	return res, nil
 }
 
 func (r *ZitiAppReconciler) resolveServiceSelector(ctx context.Context, svc *zitiv1alpha1.ZitiApp) (*zitiv1alpha1.ZitiApp, error) {
@@ -390,7 +435,11 @@ func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client,
 			ids.Host = c.ID()
 		}
 	}
-	return r.observe(ctx, zc, name, ids, routers, configTypes, configs, svc)
+	sr, err := r.observe(ctx, zc, name, ids, routers, configTypes, configs, svc)
+	if err != nil {
+		return nil, err
+	}
+	return &syncResult{services: []serviceResult{*sr}}, nil
 }
 
 func anyStrings(v any) []string {
@@ -413,14 +462,14 @@ func withID(e ziti.Entity, id string) ziti.Entity {
 }
 
 func (r *ZitiAppReconciler) observe(ctx context.Context, zc ziti.Client, name string, ids zitiv1alpha1.EntityIDs,
-	routers, configTypes, configs []ziti.Entity, svc ziti.Entity) (*syncResult, error) {
+	routers, configTypes, configs []ziti.Entity, svc ziti.Entity) (*serviceResult, error) {
 	g := &check.Graph{Services: []ziti.Entity{svc}, Configs: configs, ConfigTypes: configTypes, Routers: routers}
 	err := check.LoadInto(ctx, zc, g,
 		ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Identities, ziti.Terminators)
 	if err != nil {
 		return nil, err
 	}
-	out := &syncResult{name: name, ids: ids, report: g.Service(svc)}
+	out := &serviceResult{name: name, ids: ids, report: g.Service(svc)}
 	routerNames := map[string]string{}
 	for _, rt := range routers {
 		routerNames[rt.ID()] = rt.Name()
@@ -460,16 +509,29 @@ func findingsFor(fs []check.Finding, codes ...string) (string, string) {
 }
 
 func applyResult(svc *zitiv1alpha1.ZitiApp, o *syncResult) {
-	svc.Status.ZitiName, svc.Status.IDs, svc.Status.Terminators = o.name, o.ids, o.terminators
-	fs := o.report.Findings
+	services := make([]zitiv1alpha1.ServiceStatus, 0, len(o.services))
+	var fs []check.Finding
+	hosted, dialable, routePath := len(o.services) > 0, len(o.services) > 0, len(o.services) > 0
+	for _, s := range o.services {
+		services = append(services, zitiv1alpha1.ServiceStatus{Name: s.name, IDs: s.ids, Terminators: s.terminators})
+		hosted = hosted && s.report.Hosted
+		dialable = dialable && s.report.Dialable
+		routePath = routePath && s.report.RoutePath
+		fs = append(fs, s.report.Findings...)
+	}
+	svc.Status.Services = services
+	if len(o.services) > 0 {
+		p := o.services[0]
+		svc.Status.ZitiName, svc.Status.IDs, svc.Status.Terminators = p.name, p.ids, p.terminators
+	}
 	setCond(&svc.Status.Conditions, svc.Generation, CondSynced, true, "Synced", "", "")
 	reason, msg := findingsFor(fs, check.NoTerminator, check.NoBind, check.InertBind, check.MissingConfig, check.ProtocolMismatch)
-	setCond(&svc.Status.Conditions, svc.Generation, CondHosted, o.report.Hosted, "Hosted", reasonOr(reason, "NotHosted"), msg)
+	setCond(&svc.Status.Conditions, svc.Generation, CondHosted, hosted, "Hosted", reasonOr(reason, "NotHosted"), msg)
 	reason, msg = findingsFor(fs, check.NoDialer)
-	setCond(&svc.Status.Conditions, svc.Generation, CondDialable, o.report.Dialable, "Dialable", reasonOr(reason, "NotDialable"), msg)
+	setCond(&svc.Status.Conditions, svc.Generation, CondDialable, dialable, "Dialable", reasonOr(reason, "NotDialable"), msg)
 	reason, msg = findingsFor(fs, check.OfflinePath, check.NoCommonRouter)
-	setCond(&svc.Status.Conditions, svc.Generation, CondRoutePath, o.report.RoutePath, "RoutePath", reasonOr(reason, "NoRoutePath"), msg)
-	ready := o.report.Hosted && o.report.Dialable && o.report.RoutePath
+	setCond(&svc.Status.Conditions, svc.Generation, CondRoutePath, routePath, "RoutePath", reasonOr(reason, "NoRoutePath"), msg)
+	ready := hosted && dialable && routePath
 	all := make([]string, 0, len(fs))
 	for _, f := range fs {
 		all = append(all, f.Message)

@@ -522,3 +522,55 @@ func TestAppSelectorWithNoMatchesWaitsForServices(t *testing.T) {
 		t.Errorf("requeueAfter = %v", res.RequeueAfter)
 	}
 }
+
+func TestPortGroupsCreateSeveralServices(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
+		s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}
+		s.Spec.Targets = []zitiv1.Target{
+			{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
+			{Address: "10.0.0.5", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+		}
+	})
+	e.reconcile(t)
+
+	if e.count(ziti.Configs) != 4 || e.count(ziti.Services) != 2 || e.count(ziti.ServiceEdgeRouterPolicies) != 2 {
+		t.Fatalf("objects: %v", e.zc.Calls)
+	}
+	s := e.get(t)
+	if len(s.Status.Services) != 2 {
+		t.Fatalf("services = %+v", s.Status.Services)
+	}
+	names := []string{s.Status.Services[0].Name, s.Status.Services[1].Name}
+	if !slices.Contains(names, "app.example.com-80") || !slices.Contains(names, "app.example.com-443") {
+		t.Errorf("names = %v", names)
+	}
+	if s.Status.ZitiName != s.Status.Services[0].Name || s.Status.IDs.Service != s.Status.Services[0].IDs.Service {
+		t.Errorf("primary status = %+v", s.Status)
+	}
+
+	e.zc.Calls = nil
+	e.reconcile(t)
+	if w := e.writes(); len(w) != 0 {
+		t.Errorf("second reconcile wrote: %v", w)
+	}
+}
+
+func TestPortGroupsPruneRemovedService(t *testing.T) {
+	e := setup(t, func(s *zitiv1.ZitiApp) {
+		s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}
+		s.Spec.Targets = []zitiv1.Target{
+			{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
+			{Address: "10.0.0.5", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+		}
+	})
+	e.reconcile(t)
+	s := e.get(t)
+	s.Spec.Targets = []zitiv1.Target{{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}}}
+	if err := e.k.Update(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	if e.count(ziti.Services) != 1 || e.count(ziti.Configs) != 2 {
+		t.Errorf("objects after collapse: %v", e.zc.Calls)
+	}
+}

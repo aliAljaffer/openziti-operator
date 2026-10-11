@@ -124,9 +124,9 @@ spec:
                     type: array
                   ports:
                     description: |-
-                      ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
-                      The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
-                      the operator uses the selected Services' ports.
+                      ports are port numbers or "low-high" ranges, for example [443, "8000-8005"]. These are the ports clients
+                      dial. The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
+                      the operator uses the selected Services' ports. See targets[].exposeOn to route a subset to another backend.
                     items:
                       anyOf:
                       - type: integer
@@ -231,8 +231,10 @@ spec:
                   type: string
                 type: array
               targets:
-                description: targets are the places the app runs. Each one becomes
-                  a terminator in Ziti.
+                description: |-
+                  targets are the places the app runs. Each one becomes a terminator in Ziti. Set targets[].port to choose
+                  the backend port and targets[].exposeOn to choose which client ports the target serves. Targets with the
+                  same targets[].exposeOn become one Ziti service; different sets become several.
                 items:
                   description: Target is one place the app runs. Set exactly one of
                     address and kubernetesService.
@@ -248,12 +250,27 @@ spec:
                       maximum: 65535
                       minimum: 0
                       type: integer
+                    exposeOn:
+                      description: |-
+                        exposeOn are the client-dialed ports this target is exposed on. A client dials one of these and reaches
+                        port. It is a subset of expose.ports and sorts targets into groups: targets with the same set become one
+                        Ziti service. When empty the target is exposed on every exposed port. Set it to send some exposed ports to
+                        another backend port or address, for example the TLS port. Every exposed port must be served by exactly
+                        one group. The operator checks this and reports InvalidSpec.
+                      items:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        x-kubernetes-int-or-string: true
+                      maxItems: 16
+                      type: array
                     kubernetesService:
                       description: kubernetesService is a Service name in this namespace.
                       type: string
                     port:
-                      description: port on the target. Without it, the port the client
-                        dialed is used.
+                      description: |-
+                        port is where the app is actually served, the backend port the router dials. It is one number per target.
+                        Without it the router uses the port the client dialed. Think of "exposeOn:port" like "docker run -p".
                       format: int32
                       maximum: 65535
                       minimum: 1
@@ -368,6 +385,47 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
+              services:
+                description: |-
+                  services are the Ziti services this app owns, one per distinct target port set.
+                  For a single service this repeats zitiName, ids, and terminators.
+                items:
+                  description: ServiceStatus reports one Ziti service that an app
+                    owns.
+                  properties:
+                    ids:
+                      description: ids are the Ziti ids of the entities of this service.
+                      properties:
+                        bind:
+                          type: string
+                        dial:
+                          type: string
+                        erp:
+                          type: string
+                        host:
+                          type: string
+                        intercept:
+                          type: string
+                        serp:
+                          type: string
+                        service:
+                          type: string
+                      type: object
+                    name:
+                      description: name is the service name in Ziti.
+                      type: string
+                    terminators:
+                      description: terminators are the routers that host this service.
+                      items:
+                        properties:
+                          router:
+                            type: string
+                        required:
+                        - router
+                        type: object
+                      type: array
+                  type: object
+                type: array
               terminators:
                 items:
                   properties:

@@ -46,9 +46,9 @@ type Expose struct {
 	// +optional
 	Addresses []string `json:"addresses,omitempty"`
 
-	// ports are port numbers or "low-high" ranges, for example [443, "8000-8005"].
-	// The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
-	// the operator uses the selected Services' ports.
+	// ports are port numbers or "low-high" ranges, for example [443, "8000-8005"]. These are the ports clients
+	// dial. The operator checks range syntax and reports InvalidSpec. When selector is set and ports are empty,
+	// the operator uses the selected Services' ports. See targets[].exposeOn to route a subset to another backend.
 	// +kubebuilder:validation:MaxItems=16
 	// +kubebuilder:validation:items:XValidation:rule="type(self) != int || (self >= 1 && self <= 65535)",message="a port is 1-65535"
 	// +optional
@@ -79,11 +79,21 @@ type Target struct {
 	// +optional
 	KubernetesService string `json:"kubernetesService,omitempty"`
 
-	// port on the target. Without it, the port the client dialed is used.
+	// port is where the app is actually served, the backend port the router dials. It is one number per target.
+	// Without it the router uses the port the client dialed. Think of "exposeOn:port" like "docker run -p".
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port int32 `json:"port,omitempty"`
+
+	// exposeOn are the client-dialed ports this target is exposed on. A client dials one of these and reaches
+	// port. It is a subset of expose.ports and sorts targets into groups: targets with the same set become one
+	// Ziti service. When empty the target is exposed on every exposed port. Set it to send some exposed ports to
+	// another backend port or address, for example the TLS port. Every exposed port must be served by exactly
+	// one group. The operator checks this and reports InvalidSpec.
+	// +kubebuilder:validation:MaxItems=16
+	// +optional
+	ExposeOn []intstr.IntOrString `json:"exposeOn,omitempty"`
 
 	// cost ranks targets. Ziti prefers the lowest cost. Targets with equal cost share the load.
 	// +kubebuilder:validation:Minimum=0
@@ -141,7 +151,9 @@ type ZitiAppSpec struct {
 	// +optional
 	Expose Expose `json:"expose,omitzero"`
 
-	// targets are the places the app runs. Each one becomes a terminator in Ziti.
+	// targets are the places the app runs. Each one becomes a terminator in Ziti. Set targets[].port to choose
+	// the backend port and targets[].exposeOn to choose which client ports the target serves. Targets with the
+	// same targets[].exposeOn become one Ziti service; different sets become several.
 	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	Targets []Target `json:"targets,omitempty"`
@@ -180,6 +192,21 @@ type Terminator struct {
 	Router string `json:"router"`
 }
 
+// ServiceStatus reports one Ziti service that an app owns.
+type ServiceStatus struct {
+	// name is the service name in Ziti.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// ids are the Ziti ids of the entities of this service.
+	// +optional
+	IDs EntityIDs `json:"ids,omitzero"`
+
+	// terminators are the routers that host this service.
+	// +optional
+	Terminators []Terminator `json:"terminators,omitempty"`
+}
+
 type ZitiAppStatus struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
@@ -189,6 +216,11 @@ type ZitiAppStatus struct {
 	Terminators []Terminator `json:"terminators,omitempty"`
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// services are the Ziti services this app owns, one per distinct target port set.
+	// For a single service this repeats zitiName, ids, and terminators.
+	// +optional
+	Services []ServiceStatus `json:"services,omitempty"`
 
 	// +listType=map
 	// +listMapKey=type
