@@ -33,15 +33,20 @@ metadata:
 spec:
   zitiName: web.example.com
   expose:
-    addresses: [web.example.com]
-    ports: [80, 443]
-    protocols: [tcp]
+    addresses:
+      - web.example.com
+    ports:
+      - 80
+      - 443
+    protocols:
+      - tcp
   hostedBy: my-router
   targets:
     - address: 10.0.0.10
       port: 8080
   allow:
-    groups: [admins]
+    groups:
+      - admins
 ```
 
 | Client dials | Backend | Ziti service |
@@ -62,19 +67,26 @@ metadata:
 spec:
   zitiName: web.example.com
   expose:
-    addresses: [web.example.com]
-    ports: [80, 443]
-    protocols: [tcp]
+    addresses:
+      - web.example.com
+    ports:
+      - 80
+      - 443
+    protocols:
+      - tcp
   hostedBy: my-router
   targets:
     - address: 10.0.0.10
       port: 8080
-      exposeOn: [80]
+      exposeOn:
+      - 80
     - address: 10.0.0.10
       port: 8443
-      exposeOn: [443]
+      exposeOn:
+      - 443
   allow:
-    groups: [admins]
+    groups:
+      - admins
 ```
 
 | Client dials | Backend | Ziti service |
