@@ -24,6 +24,7 @@ PAGES = {
     "docs/sidecar.md": "Sidecar-Tunneler",
     "docs/ingress.md": "Ingress",
     "docs/port-forward.md": "Port-Forward",
+    "docs/tls.md": "Serve-Plain-and-TLS-Ports",
     "docs/role-scope.md": "Role-Scope",
     "docs/existing-resources.md": "Existing-Resources",
     "docs/audit.md": "Audit",
@@ -59,6 +60,7 @@ SIDEBAR = """**[Home](Home)**
 - [Sidecar tunneler](Sidecar-Tunneler)
 - [Expose an Ingress](Ingress)
 - [Port forward](Port-Forward)
+- [Serve plain and TLS ports](Serve-Plain-and-TLS-Ports)
 
 **Resource reference**
 - [ZitiConnection](ZitiConnection)
