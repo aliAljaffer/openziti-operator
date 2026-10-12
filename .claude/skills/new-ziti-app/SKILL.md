@@ -27,7 +27,7 @@ Read these for the service to copy:
 |---|---|---|
 | service | `roleAttributes` | `memberOf` |
 | `intercept.v1` config | `addresses`, `portRanges`, `protocols` | `expose.addresses`, `expose.ports`, `expose.protocols` |
-| `host.v1` or `host.v2` config | `address`, `port` | `targets[].address`, `targets[].port` |
+| `host.v1` or `host.v2` config | `address`, `port` | `targets[].address`, `targets[].port` (or `targets[].kubernetesService` for an in-cluster Service) |
 | Dial policy | `identityRoles` (`#group`) | `allow.groups` |
 | Dial policy | `identityRoles` (`@id`) | `allow.identities` (use identity names) |
 | Bind policy | `@<router id>` | `hostedBy` (router name) |
@@ -64,6 +64,10 @@ spec:
       - <group>
       - <zitiName>
 ```
+
+One app can publish several ports. List them in `expose.ports`. Send a subset to another backend with `targets[].exposedPorts`. Targets with the same set become one Ziti service, and `exposedPorts` must be a subset of `expose.ports`. With `expose.selector` and no `ports`, the operator uses the selected Services' ports.
+
+A `ZitiApp` can also come from an annotated `Ingress` or `Service`. See `docs/ingress.md`.
 
 The target must be reachable from the hosting router pod, not from the operator.
 
