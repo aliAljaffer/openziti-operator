@@ -81,7 +81,7 @@ func (b *Builder) Groups() ([]Group, error) {
 }
 
 func targetPorts(t zitiv1.Target, all []intstr.IntOrString) ([]intstr.IntOrString, string, error) {
-	ports := t.ExposeOn
+	ports := t.ExposedPorts
 	if len(ports) == 0 {
 		ports = all
 	}
