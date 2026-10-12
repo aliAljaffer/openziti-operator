@@ -77,10 +77,11 @@ var _ = Describe("CRD validation", func() {
 		Entry("target ports", func(s *zitiv1.ZitiAppSpec) {
 			s.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}
 			s.Targets = []zitiv1.Target{
-				{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
-				{Address: "10.0.0.5", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+				{Address: "10.0.0.5", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80)}},
+				{Address: "10.0.0.5", Port: 8443, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 			}
 		}, ""),
+
 		Entry("observe needs no expose or targets", func(s *zitiv1.ZitiAppSpec) {
 			s.ManagementPolicy = zitiv1.ManagementObserve
 			s.Expose, s.Targets = zitiv1.Expose{}, nil

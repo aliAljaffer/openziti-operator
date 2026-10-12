@@ -527,8 +527,8 @@ func TestPortGroupsCreateSeveralServices(t *testing.T) {
 	e := setup(t, func(s *zitiv1.ZitiApp) {
 		s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}
 		s.Spec.Targets = []zitiv1.Target{
-			{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
-			{Address: "10.0.0.5", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+			{Address: "10.0.0.5", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80)}},
+			{Address: "10.0.0.5", Port: 8443, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 		}
 	})
 	e.reconcile(t)
@@ -559,13 +559,13 @@ func TestPortGroupsPruneRemovedService(t *testing.T) {
 	e := setup(t, func(s *zitiv1.ZitiApp) {
 		s.Spec.Expose.Ports = []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}
 		s.Spec.Targets = []zitiv1.Target{
-			{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
-			{Address: "10.0.0.5", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+			{Address: "10.0.0.5", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80)}},
+			{Address: "10.0.0.5", Port: 8443, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 		}
 	})
 	e.reconcile(t)
 	s := e.get(t)
-	s.Spec.Targets = []zitiv1.Target{{Address: "10.0.0.5", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}}}
+	s.Spec.Targets = []zitiv1.Target{{Address: "10.0.0.5", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}}}
 	if err := e.k.Update(t.Context(), s); err != nil {
 		t.Fatal(err)
 	}

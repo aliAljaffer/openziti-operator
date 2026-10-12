@@ -13,6 +13,7 @@ description: Use when you prepare a release or a public push of this operator. L
 4. `hack/check-hygiene.sh <private-patterns-file>` finds nothing. Never put the patterns file in the repo.
 5. Run the kind e2e in the `run-e2e` skill, including the client-pod dial. Run `make test-e2e` too.
 6. `docs/compatibility.md` names the controller and Kubernetes versions you tested.
+6a. `make yaml-style` and `make docs-check` pass. `git status` shows no uncommitted API changes.
 7. `make build-installer IMG=<registry>/ziti-operator:<tag>` builds. Do not commit `dist/` until the release.
 
 ## Needs the repository owner
@@ -20,7 +21,7 @@ description: Use when you prepare a release or a public push of this operator. L
 - Repository secret `HYGIENE_PATTERNS` (internal names, one regex per line).
 - GitHub private vulnerability reporting (`SECURITY.md` points to it).
 - The wiki enabled and one page created by hand, so the wiki repository exists. Then `hack/publish-wiki.sh --push` or the `wiki.yml` workflow updates it.
-- A registry, image build and push, and the `v0.1.0` tag.
+- A registry, image build and push, and the release tag. Existing tags: `v0.1.0`, `v0.1.1`, `v0.1.2`, `v0.2.0`. Chart `version` and `appVersion` (`charts/chart/Chart.yaml`) and `CHANGELOG` must match the new tag.
 - Confirm the module path `github.com/aliAljaffer/openziti-operator` and the API group `ziti.alialjaffer.com`.
 
 ## Never

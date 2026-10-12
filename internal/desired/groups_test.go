@@ -36,8 +36,8 @@ func TestGroupsSingleWhenNoTargetPorts(t *testing.T) {
 
 func TestGroupsSplitByPortSet(t *testing.T) {
 	b := app(
-		zitiv1.Target{Address: "10.0.0.1", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}},
-		zitiv1.Target{Address: "10.0.0.1", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+		zitiv1.Target{Address: "10.0.0.1", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80)}},
+		zitiv1.Target{Address: "10.0.0.1", Port: 8443, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 	)
 	groups, err := b.Groups()
 	if err != nil {
@@ -73,8 +73,8 @@ func TestGroupsSplitByPortSet(t *testing.T) {
 
 func TestGroupsSamePortSetSharesService(t *testing.T) {
 	groups, err := app(
-		zitiv1.Target{Address: "10.0.0.1", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}},
-		zitiv1.Target{Address: "10.0.0.2", Port: 8080, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443), intstr.FromInt32(80)}},
+		zitiv1.Target{Address: "10.0.0.1", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}},
+		zitiv1.Target{Address: "10.0.0.2", Port: 8080, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443), intstr.FromInt32(80)}},
 	).Groups()
 	if err != nil {
 		t.Fatal(err)
@@ -89,12 +89,12 @@ func TestGroupsErrors(t *testing.T) {
 		targets []zitiv1.Target
 		want    string
 	}{
-		"port not exposed": {[]zitiv1.Target{{Address: "a", Port: 1, ExposeOn: []intstr.IntOrString{intstr.FromInt32(22)}}}, "not in expose.ports"},
-		"port unserved":    {[]zitiv1.Target{{Address: "a", Port: 1, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80)}}}, "is not served by any target"},
+		"port not exposed": {[]zitiv1.Target{{Address: "a", Port: 1, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(22)}}}, "not in expose.ports"},
+		"port unserved":    {[]zitiv1.Target{{Address: "a", Port: 1, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80)}}}, "is not served by any target"},
 		"port overlap": {
 			[]zitiv1.Target{
-				{Address: "a", Port: 1, ExposeOn: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}},
-				{Address: "b", Port: 2, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+				{Address: "a", Port: 1, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(80), intstr.FromInt32(443)}},
+				{Address: "b", Port: 2, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 			}, "more than one target group"},
 	}
 	for name, tc := range tests {
@@ -107,7 +107,7 @@ func TestGroupsErrors(t *testing.T) {
 func TestGroupsFullPortSetOverlapsSubset(t *testing.T) {
 	_, err := app(
 		zitiv1.Target{Address: "10.0.0.1", Port: 8080},
-		zitiv1.Target{Address: "10.0.0.1", Port: 8443, ExposeOn: []intstr.IntOrString{intstr.FromInt32(443)}},
+		zitiv1.Target{Address: "10.0.0.1", Port: 8443, ExposedPorts: []intstr.IntOrString{intstr.FromInt32(443)}},
 	).Groups()
 	if err == nil || !strings.Contains(err.Error(), "more than one target group") {
 		t.Fatalf("err = %v", err)

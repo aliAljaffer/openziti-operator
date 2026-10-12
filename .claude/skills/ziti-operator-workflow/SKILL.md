@@ -5,7 +5,14 @@ description: Use when you work on any code, chart, or docs in this OpenZiti Kube
 
 # Working in this repo
 
-The operator drives the OpenZiti Edge Management API from Kubernetes resources. Kinds: `ZitiConnection` (cluster), `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy` (namespaced). API group `ziti.alialjaffer.com`, version `v1alpha1`.
+The operator drives the OpenZiti Edge Management API from Kubernetes resources. Kinds:
+
+- Cluster scope: `ZitiConnection`, `ZitiRouter`, `ZitiCA`, `ZitiJwtSigner`.
+- Namespaced, everyday: `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy`.
+- Namespaced, workload helpers (own no Ziti entity): `ZitiSidecar`, `ZitiPortForward`.
+- Namespaced, full control (one Ziti object each): `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator`.
+
+The operator also turns an annotated `Ingress` or `Service` into a `ZitiApp` (`ingress_controller.go`, `service_controller.go`). API group `ziti.alialjaffer.com`, version `v1alpha1`.
 
 ## Layout
 
@@ -15,11 +22,12 @@ The operator drives the OpenZiti Edge Management API from Kubernetes resources. 
 | `internal/controller/` | Reconcilers, `entityset.go`, sweeper, metrics collector |
 | `internal/desired/` | Pure builders: spec to Ziti entity bodies. `Matches` compares desired and actual |
 | `internal/check/` | Pure graph checks. The same code feeds status conditions and `cmd/audit` |
+| `internal/metrics/` | Prometheus metrics, including the reconcile counter per kind |
 | `internal/ziti/` | REST client, fake client, enrollment, certificate extend |
 | `cmd/main.go`, `cmd/audit/` | Manager and the read-only audit command |
 | `charts/chart/` | Helm chart. CRD copies come from `make chart-sync` |
 | `docs/` | Guides. `docs/reference/` is generated |
-| `hack/` | Chart tests, docs and wiki generators, hygiene check |
+| `hack/` | Chart tests, docs and wiki generators (`gen-wiki.py`, `publish-wiki.sh`), `yaml-style.py`, hygiene check |
 
 ## Commands
 
@@ -27,7 +35,8 @@ The operator drives the OpenZiti Edge Management API from Kubernetes resources. 
 |---|---|
 | Regenerate CRDs, RBAC, deepcopy | `make manifests generate` |
 | Copy CRDs into the chart | `make chart-sync` |
-| Regenerate the reference docs | `make docs` |
+| Regenerate the reference docs | `make docs` (`make docs-check` fails when stale) |
+| YAML block style in docs and samples | `make yaml-style` (`yaml-style-fix` to repair) |
 | Unit and envtest tests | `make test` (about 40 seconds, run it in the background) |
 | Chart checks | `hack/test-chart.sh` |
 | Integration tests (real Ziti controller) | see the `run-e2e` skill |
