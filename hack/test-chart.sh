@@ -57,7 +57,7 @@ out=$(render --set webhook.enabled=true)
 check "webhook: ValidatingWebhookConfiguration rendered" '[ "$(yq "select(.kind==\"ValidatingWebhookConfiguration\") | .webhooks | length" <<<"$out")" = 4 ]'
 check "webhook: caBundle is set" '[ -n "$(yq "select(.kind==\"ValidatingWebhookConfiguration\") | .webhooks[0].clientConfig.caBundle" <<<"$out")" ]'
 check "webhook: serving Secret rendered" '[ "$(yq "select(.kind==\"Secret\" and .metadata.name==\"t-ziti-operator-webhook-server-cert\") | .type" <<<"$out")" = kubernetes.io/tls ]'
-check "webhook: service rendered" '[ -n "$(yq "select(.kind==\"Service\" and (.metadata.name|test(\"webhook-service\")))")" <<<"$out" ]'
+check "webhook: service rendered" '[ -n "$(yq "select(.kind==\"Service\" and (.metadata.name|test(\"webhook-service\")))" <<<"$out")" ]'
 check "webhook: manager enables it" 'grep -q -- "--enable-webhook" <<<"$out" && grep -q -- "--webhook-cert-path=/etc/webhook/certs" <<<"$out"'
 check "default: no webhook objects" '[ -z "$(render | yq "select(.kind==\"ValidatingWebhookConfiguration\")")" ]'
 
