@@ -291,7 +291,7 @@ func main() {
 		setupLog.Error(err, "Failed to add orphan sweeper")
 		os.Exit(1)
 	}
-	ctrlmetrics.Registry.MustRegister(&controller.ConditionCollector{Reader: mgr.GetClient()})
+	ctrlmetrics.Registry.MustRegister(&controller.StatusCollector{Reader: mgr.GetClient()})
 	clusterKeys, err := controller.NewClusterKeys(mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "Failed to create the cluster key reader")
