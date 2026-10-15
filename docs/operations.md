@@ -20,6 +20,12 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | `ziti_operator_reconcile_total{kind}` | Reconcile loops per custom resource kind. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
 
+The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics. Set
+`prometheus.enabled=true` for the ServiceMonitor and the alert rules (set `prometheus.rules.enabled=false`
+to keep only the ServiceMonitor), and `grafanaDashboard.enabled=true` to install the dashboard as a
+ConfigMap for the kube-prometheus-stack sidecar. Both need prometheus-operator, or kube-prometheus-stack
+with its dashboard sidecar.
+
 ## Orphan sweeper
 
 A crash or a removed finalizer can leave Ziti entities without an owner. Every `--orphan-sweep-interval` the leader looks for entities that carry this cluster's tag and an owner UID that no longer exists.
