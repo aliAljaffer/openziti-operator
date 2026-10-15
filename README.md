@@ -108,6 +108,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 - `Adopt` updates only the fields your resource sets. `Observe` never writes.
 - Deleting a resource deletes its Ziti entities. Use `deletionPolicy: Orphan` to keep them.
 - `--orphan-policy=report` (the default) only reports entities whose owner is gone. See [Operations](docs/operations.md).
+- An optional validating webhook rejects a bad spec at `kubectl apply` time, before anything reaches Ziti. See [Validation](docs/validation.md).
 - Two replicas run with leader election.
 
 ## Documentation
@@ -116,7 +117,7 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 - [Role scope](docs/role-scope.md), [Existing Ziti resources](docs/existing-resources.md)
 - [Edge routers](docs/routers.md), [Full control](docs/full-control.md)
 - [Sidecar tunneler](docs/sidecar.md), [Log in with a service account token](docs/service-account-tokens.md), [Use a cert-manager CA](docs/cert-manager.md)
-- [Conditions and reasons](docs/conditions.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md), [Serve plain and TLS ports](docs/tls.md)
+- [Conditions and reasons](docs/conditions.md), [Validation](docs/validation.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md), [Serve plain and TLS ports](docs/tls.md)
 - [Compatibility](docs/compatibility.md), [Interop with ziti-k8s-agent](docs/interop-ziti-k8s-agent.md)
 - Reference for every kind: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiRouter](docs/reference/ZitiRouter.md), [ZitiCA](docs/reference/ZitiCA.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiTerminator](docs/reference/ZitiTerminator.md)
 
