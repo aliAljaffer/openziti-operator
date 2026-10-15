@@ -16,11 +16,11 @@ spec:
   targets:
     - address: 10.0.0.5
       port: 8080
-      exposeOn:
+      exposedPorts:
         - 80
     - address: 10.0.0.5
       port: 8443
-      exposeOn:
+      exposedPorts:
         - 443
   allow:
     groups:
