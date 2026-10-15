@@ -251,7 +251,7 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	if err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
-	if err := validateGroups(b, groups, typeIDs, allowed); err != nil {
+	if err := b.CheckShape(groups, allowed); err != nil {
 		return nil, &specError{"InvalidSpec", err.Error()}
 	}
 
@@ -300,29 +300,6 @@ type groupResult struct {
 	ic    ziti.Entity
 	hc    ziti.Entity
 	svc   ziti.Entity
-}
-
-// validateGroups builds every entity of every group without writing, so a broken spec is reported before any change.
-func validateGroups(b *desired.Builder, groups []desired.Group, typeIDs map[string]string, allowed []string) error {
-	for _, g := range groups {
-		gb := b.WithGroup(g)
-		if _, err := gb.InterceptConfig(typeIDs["intercept.v1"]); err != nil {
-			return err
-		}
-		if _, err := gb.HostConfig(typeIDs["host.v2"]); err != nil {
-			return err
-		}
-		if _, err := gb.Service("", ""); err != nil {
-			return err
-		}
-		for _, f := range []func(string) (ziti.Entity, error){gb.Bind, gb.SERP} {
-			if _, err := f(""); err != nil {
-				return err
-			}
-		}
-	}
-	_, err := b.ERP(allowed)
-	return err
 }
 
 // ensureGroup writes the configs, service, and policies of one group and returns their ids.

@@ -182,8 +182,8 @@ func pickKey(keys []ziti.JWK, currentKid string) (ziti.JWK, error) {
 
 func (r *ZitiJwtSignerReconciler) sync(ctx context.Context, sg *zitiv1alpha1.ZitiJwtSigner, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.SignerName(sg)
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 	issuer, kid, certPEM, err := r.keyMaterial(ctx, sg)
 	if err != nil {

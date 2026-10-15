@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/validate"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
@@ -119,10 +120,10 @@ func namespaceAllowed(ctx context.Context, k client.Reader, conn *zitiv1.ZitiCon
 	if sel == nil || (len(sel.MatchLabels) == 0 && len(sel.MatchExpressions) == 0) {
 		return nil
 	}
-	selector, err := metav1.LabelSelectorAsSelector(sel)
-	if err != nil {
-		return &specError{"InvalidConnection", "allowedNamespaces: " + err.Error()}
+	if err := validate.Connection(conn); err != nil {
+		return &specError{"InvalidConnection", err.Error()}
 	}
+	selector, _ := metav1.LabelSelectorAsSelector(sel)
 	var ns corev1.Namespace
 	if err := k.Get(ctx, types.NamespacedName{Name: namespace}, &ns); err != nil {
 		return err

@@ -173,8 +173,8 @@ func (r *ZitiRouterReconciler) finalize(ctx context.Context, rt *zitiv1alpha1.Zi
 
 func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.RouterName(rt, conn)
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 	set, err := newEntitySet(ctx, zc, r.Recorder, rt, rt.UID, routerKinds)
 	if err != nil {

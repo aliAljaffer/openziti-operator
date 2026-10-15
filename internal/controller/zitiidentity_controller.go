@@ -25,7 +25,6 @@ import (
 	"maps"
 	"net/http"
 	"slices"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -244,8 +243,8 @@ func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "tru
 //nolint:gocyclo // one branch per enrollment mode and management policy, split when it grows
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.IdentityName(id, conn)
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 
 	mode := id.Spec.ManagementPolicy

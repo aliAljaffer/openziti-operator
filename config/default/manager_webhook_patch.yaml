@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --enable-webhook
+            - --webhook-cert-path=/etc/webhook/certs
+          ports:
+            - containerPort: 9443
+              name: webhook
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/webhook/certs
+              name: webhook-server-cert
+              readOnly: true
+      volumes:
+        - name: webhook-server-cert
+          secret:
+            defaultMode: 420
+            secretName: webhook-server-cert

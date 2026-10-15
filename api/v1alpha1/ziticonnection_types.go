@@ -128,6 +128,7 @@ type ZitiConnectionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=ztconn,categories=ziti
+// +kubebuilder:webhook:path=/validate-ziti-alialjaffer-com-v1alpha1-ziticonnection,mutating=false,failurePolicy=Ignore,sideEffects=None,groups=ziti.alialjaffer.com,resources=ziticonnections,verbs=create;update,versions=v1alpha1,name=vziticonnection.kb.io,admissionReviewVersions=v1
 // +kubebuilder:printcolumn:name="URL",type=string,JSONPath=".spec.managementUrl"
 // +kubebuilder:printcolumn:name="Connected",type=string,JSONPath=".status.conditions[?(@.type=='Connected')].status"
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".status.controllerVersion"

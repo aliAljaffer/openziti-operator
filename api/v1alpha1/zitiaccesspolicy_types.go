@@ -84,6 +84,7 @@ type ZitiAccessPolicyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ztap,categories=ziti
+// +kubebuilder:webhook:path=/validate-ziti-alialjaffer-com-v1alpha1-zitiaccesspolicy,mutating=false,failurePolicy=Ignore,sideEffects=None,groups=ziti.alialjaffer.com,resources=zitiaccesspolicies,verbs=create;update,versions=v1alpha1,name=vzitiaccesspolicy.kb.io,admissionReviewVersions=v1
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Identities",type=integer,JSONPath=".status.identities"
 // +kubebuilder:printcolumn:name="Services",type=integer,JSONPath=".status.services"
