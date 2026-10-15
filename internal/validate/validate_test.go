@@ -13,7 +13,7 @@ import (
 )
 
 func conn(spec zitiv1.ZitiConnectionSpec) *zitiv1.ZitiConnection {
-	return &zitiv1.ZitiConnection{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Spec: spec}
+	return &zitiv1.ZitiConnection{Name: "default", Spec: spec}
 }
 
 func namespaceConn() *zitiv1.ZitiConnection {
@@ -22,7 +22,7 @@ func namespaceConn() *zitiv1.ZitiConnection {
 
 func app() *zitiv1.ZitiApp {
 	return &zitiv1.ZitiApp{
-		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "ns"},
+		Name: "app", Namespace: "ns",
 		Spec: zitiv1.ZitiAppSpec{
 			Expose:  zitiv1.Expose{Ports: []intstr.IntOrString{intstr.FromInt(80)}},
 			Targets: []zitiv1.Target{{Address: "web.ns.svc", Port: 8080}},
@@ -88,7 +88,7 @@ func TestApp(t *testing.T) {
 func TestAccessPolicy(t *testing.T) {
 	valid := func() *zitiv1.ZitiAccessPolicy {
 		return &zitiv1.ZitiAccessPolicy{
-			ObjectMeta: metav1.ObjectMeta{Name: "ap", Namespace: "ns"},
+			Name: "ap", Namespace: "ns",
 			Spec: zitiv1.ZitiAccessPolicySpec{
 				IdentityRoles: []string{"#developers"},
 				ServiceRoles:  []string{"#apps"},
@@ -115,8 +115,8 @@ func TestAccessPolicy(t *testing.T) {
 
 func TestIdentity(t *testing.T) {
 	valid := &zitiv1.ZitiIdentity{
-		ObjectMeta: metav1.ObjectMeta{Name: "id", Namespace: "ns"},
-		Spec:       zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
+		Name: "id", Namespace: "ns",
+		Spec: zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
 	}
 	if err := Identity(valid, namespaceConn()); err != nil {
 		t.Fatalf("valid identity: %v", err)

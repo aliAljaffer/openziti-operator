@@ -34,10 +34,10 @@ func call(t *testing.T, wh *admission.Webhook, op admissionv1.Operation, obj run
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+	req := admission.Request{
 		Operation: op,
 		Object:    runtime.RawExtension{Raw: raw},
-	}}
+	}
 	if op == admissionv1.Update {
 		req.OldObject = runtime.RawExtension{Raw: raw}
 	}
@@ -56,7 +56,7 @@ func deniedWith(t *testing.T, resp admission.Response, want string) {
 
 func conn(name string) *zitiv1.ZitiConnection {
 	return &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Name: name,
 		Spec: zitiv1.ZitiConnectionSpec{
 			ManagementURL:  "https://controller.example:443/edge/management/v1",
 			HostingRouters: []string{"router-a"},
@@ -67,7 +67,7 @@ func conn(name string) *zitiv1.ZitiConnection {
 
 func app(name string) *zitiv1.ZitiApp {
 	return &zitiv1.ZitiApp{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns"},
+		Name: name, Namespace: "ns",
 		Spec: zitiv1.ZitiAppSpec{
 			Expose:  zitiv1.Expose{Addresses: []string{"web.ns.svc"}, Ports: []intstr.IntOrString{intstr.FromInt(80)}},
 			Targets: []zitiv1.Target{{Address: "web.ns.svc", Port: 8080}},
@@ -136,7 +136,7 @@ func TestZitiAccessPolicyValidator(t *testing.T) {
 	wh := admission.WithValidator(scheme, &ZitiAccessPolicyValidator{Client: client})
 
 	valid := &zitiv1.ZitiAccessPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "ap", Namespace: "ns"},
+		Name: "ap", Namespace: "ns",
 		Spec: zitiv1.ZitiAccessPolicySpec{
 			IdentityRoles: []string{"#developers"},
 			ServiceRoles:  []string{"#apps"},
@@ -161,8 +161,8 @@ func TestZitiIdentityValidator(t *testing.T) {
 	wh := admission.WithValidator(scheme, &ZitiIdentityValidator{Client: client})
 
 	valid := &zitiv1.ZitiIdentity{
-		ObjectMeta: metav1.ObjectMeta{Name: "id", Namespace: "ns"},
-		Spec:       zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
+		Name: "id", Namespace: "ns",
+		Spec: zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
 	}
 	if resp := call(t, wh, admissionv1.Create, valid); !resp.Allowed {
 		t.Fatalf("valid identity denied: %+v", resp.Result)
