@@ -41,6 +41,9 @@ var (
 )
 
 func TestWebhookServer(t *testing.T) {
+	if envtestAssetsDir() == "" {
+		t.Skip("envtest binaries are not installed; run make test")
+	}
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Webhook server Suite")
 }
@@ -56,14 +59,12 @@ var _ = BeforeSuite(func() {
 
 	By("starting the test environment with the generated webhook configuration")
 	testEnv = &envtest.Environment{
+		BinaryAssetsDirectory: envtestAssetsDir(),
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			ValidatingWebhooks: []*admissionv1.ValidatingWebhookConfiguration{singleSlashWebhookConfig()},
 		},
-	}
-	if dir := firstEnvTestBinaryDir(); dir != "" {
-		testEnv.BinaryAssetsDirectory = dir
 	}
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -118,7 +119,7 @@ var _ = Describe("Validating webhook against the API server", func() {
 
 	It("allows a valid ZitiApp and denies one whose zitiName has a quote", func() {
 		good := &zitiv1.ZitiApp{
-			ObjectMeta: metav1.ObjectMeta{Name: "smoke-app-ok", Namespace: "default"},
+			Name: "smoke-app-ok", Namespace: "default",
 			Spec: zitiv1.ZitiAppSpec{
 				Expose:  zitiv1.Expose{Addresses: []string{"web.default.svc"}, Ports: []intstr.IntOrString{intstr.FromInt32(80)}},
 				Targets: []zitiv1.Target{{Address: "web.default.svc", Port: 8080}},
@@ -135,8 +136,8 @@ var _ = Describe("Validating webhook against the API server", func() {
 
 	It("allows a valid ZitiIdentity and denies an externalId under a namespaced connection", func() {
 		good := &zitiv1.ZitiIdentity{
-			ObjectMeta: metav1.ObjectMeta{Name: "smoke-identity-ok", Namespace: "default"},
-			Spec:       zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
+			Name: "smoke-identity-ok", Namespace: "default",
+			Spec: zitiv1.ZitiIdentitySpec{RoleAttributes: []string{"web"}},
 		}
 		Expect(create(good)).To(Succeed())
 		DeferCleanup(func() { remove(good) })
@@ -149,7 +150,7 @@ var _ = Describe("Validating webhook against the API server", func() {
 
 	It("allows a valid ZitiAccessPolicy and denies #all under a namespaced connection", func() {
 		good := &zitiv1.ZitiAccessPolicy{
-			ObjectMeta: metav1.ObjectMeta{Name: "smoke-policy-ok", Namespace: "default"},
+			Name: "smoke-policy-ok", Namespace: "default",
 			Spec: zitiv1.ZitiAccessPolicySpec{
 				IdentityRoles: []string{"#developers"},
 				ServiceRoles:  []string{"#apps"},
@@ -183,7 +184,7 @@ func singleSlashWebhookConfig() *admissionv1.ValidatingWebhookConfiguration {
 	GinkgoHelper()
 	f, err := os.Open(filepath.Join("..", "..", "..", "config", "webhook", "manifests.yaml"))
 	Expect(err).NotTo(HaveOccurred())
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var cfg admissionv1.ValidatingWebhookConfiguration
 	Expect(yaml.NewYAMLOrJSONDecoder(f, 4096).Decode(&cfg)).To(Succeed())
@@ -201,7 +202,7 @@ func singleSlashWebhookConfig() *admissionv1.ValidatingWebhookConfiguration {
 // fall back to when they set no connectionRef.
 func defaultConnection() *zitiv1.ZitiConnection {
 	conn := &zitiv1.ZitiConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
+		Name: "default",
 		Spec: zitiv1.ZitiConnectionSpec{
 			ManagementURL:  "https://controller.example:443/edge/management/v1",
 			HostingRouters: []string{"router-a"},
@@ -213,13 +214,22 @@ func defaultConnection() *zitiv1.ZitiConnection {
 	return conn
 }
 
+// envtestAssetsDir returns the directory holding the envtest binaries, or "" when they are not
+// installed. make test downloads them under bin/k8s and exports KUBEBUILDER_ASSETS; the integration
+// job runs the tests without them, so the suite skips there instead of starting a control plane.
+func envtestAssetsDir() string {
+	if dir := firstEnvTestBinaryDir(); dir != "" {
+		return dir
+	}
+	return os.Getenv("KUBEBUILDER_ASSETS")
+}
+
 // firstEnvTestBinaryDir locates the envtest binaries so the suite also runs from an IDE, where the
 // Makefile has not exported KUBEBUILDER_ASSETS.
 func firstEnvTestBinaryDir() string {
 	basePath := filepath.Join("..", "..", "..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		logf.Log.Error(err, "Failed to read directory", "path", basePath)
 		return ""
 	}
 	for _, entry := range entries {
