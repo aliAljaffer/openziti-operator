@@ -29,11 +29,11 @@ kubectl apply -k .
 kubectl -n routers get ztrouter edge-1 -o wide
 ```
 
-Next to the JWT, the operator writes a `docker-compose.yml` for a VM and a `deployment.yaml` for a cluster. Pick one.
+Next to the JWT, the operator writes a `docker-compose.yml` for a VM and a `router.yaml` bundle for a cluster, including another cluster. Pick one.
 
 ```sh
-# In a cluster
-kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.deployment\.yaml}' | base64 -d | kubectl apply -f -
+# In a cluster, including one that does not run this operator
+kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.router\.yaml}' | base64 -d | kubectl apply -f -
 
 # On a VM
 kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.docker-compose\.yml}' | base64 -d > docker-compose.yml
@@ -46,4 +46,4 @@ Pass the JWT to the installer. It works once and expires in about three hours, a
 kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.enrollment\.jwt}' | base64 -d
 ```
 
-The operator removes the JWT and both files once the router has enrolled. Open port 3022 to clients, and add `edge-1` to `hostingRouters` and `entryRouters` on the connection. See [Edge routers](../../docs/routers.md).
+The operator removes the JWT and both bundles once the router has enrolled. Open port 3022 to clients, and add `edge-1` to `hostingRouters` and `entryRouters` on the connection. See [Edge routers](../../docs/routers.md).

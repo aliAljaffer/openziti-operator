@@ -231,6 +231,7 @@ type ZitiAppStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ztapp,categories=ziti
+// +kubebuilder:webhook:path=/validate-ziti-alialjaffer-com-v1alpha1-zitiapp,mutating=false,failurePolicy=Ignore,sideEffects=None,groups=ziti.alialjaffer.com,resources=zitiapps,verbs=create;update,versions=v1alpha1,name=vzitiapp.kb.io,admissionReviewVersions=v1
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Ziti Name",type=string,JSONPath=".status.zitiName"
 // +kubebuilder:printcolumn:name="Hosted",type=string,JSONPath=".status.conditions[?(@.type=='Hosted')].status"

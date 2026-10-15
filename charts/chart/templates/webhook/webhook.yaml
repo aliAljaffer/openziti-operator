@@ -1,0 +1,127 @@
+{{- if .Values.webhook.enabled }}
+{{- $secretName := include "ziti-operator.resourceName" (dict "suffix" "webhook-server-cert" "context" $) }}
+{{- $serviceName := include "ziti-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}
+{{- $dns := printf "%s.%s.svc" $serviceName .Release.Namespace }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName }}
+{{- $ca := genCA "ziti-operator-webhook-ca" 3650 }}
+{{- if and $existing (hasKey $existing.data "ca.crt") (hasKey $existing.data "ca.key") }}
+{{- $ca = buildCustomCert (index $existing.data "ca.crt") (index $existing.data "ca.key") }}
+{{- end }}
+{{- $cert := genSignedCert $serviceName nil (list $dns) 3650 $ca }}
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    control-plane: controller-manager
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ $ca.Cert | b64enc }}
+  ca.key: {{ $ca.Key | b64enc }}
+  tls.crt: {{ $cert.Cert | b64enc }}
+  tls.key: {{ $cert.Key | b64enc }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ include "ziti-operator.fullname" . }}-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $ca.Cert | b64enc }}
+    service:
+      name: {{ $serviceName }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiapp
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: vzitiapp.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiapps
+  sideEffects: None
+  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $ca.Cert | b64enc }}
+    service:
+      name: {{ $serviceName }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiaccesspolicy
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: vzitiaccesspolicy.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiaccesspolicies
+  sideEffects: None
+  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $ca.Cert | b64enc }}
+    service:
+      name: {{ $serviceName }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiidentity
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: vzitiidentity.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiidentities
+  sideEffects: None
+  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ $ca.Cert | b64enc }}
+    service:
+      name: {{ $serviceName }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-ziti-alialjaffer-com-v1alpha1-ziticonnection
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: vziticonnection.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ziticonnections
+  sideEffects: None
+  timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
+{{- end }}

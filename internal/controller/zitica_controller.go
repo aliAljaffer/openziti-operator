@@ -150,8 +150,8 @@ func (r *ZitiCAReconciler) readSecret(ctx context.Context, ref zitiv1alpha1.Secr
 
 func (r *ZitiCAReconciler) sync(ctx context.Context, ca *zitiv1alpha1.ZitiCA, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.CAName(ca)
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 	ref := ca.Spec.Certificate.SecretRef
 	secret, err := r.readSecret(ctx, ref)

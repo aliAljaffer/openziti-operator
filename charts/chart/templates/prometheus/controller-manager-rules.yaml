@@ -1,0 +1,89 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.rules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "ziti-operator.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    control-plane: controller-manager
+    {{- with .Values.prometheus.rules.labels }}
+    {{- with omit . "app.kubernetes.io/managed-by" "app.kubernetes.io/name" "helm.sh/chart" "app.kubernetes.io/instance" "control-plane" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+  name: {{ include "ziti-operator.resourceName" (dict "suffix" "controller-manager-rules" "context" $) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  groups:
+    - name: ziti-operator.rules
+      rules:
+        - alert: ZitiIdentityCertificateExpiringSoon
+          expr: ziti_operator_identity_certificate_expires_seconds < 2592000 and ziti_operator_identity_certificate_expires_seconds >= 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: A ZitiIdentity client certificate expires soon
+            description: >-
+              The earliest client certificate of ZitiIdentity {{ "{{ $labels.namespace }}" }}/{{ "{{ $labels.name }}" }}
+              expires in less than 30 days. Enrolled identities renew automatically, but JwtOnly identities cannot,
+              because the workload holds the key.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/operations.md#certificates-of-identities
+        - alert: ZitiIdentityCertificateExpired
+          expr: ziti_operator_identity_certificate_expires_seconds < 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: A ZitiIdentity client certificate has expired
+            description: >-
+              The earliest client certificate of ZitiIdentity {{ "{{ $labels.namespace }}" }}/{{ "{{ $labels.name }}" }}
+              has expired. Clients that use it cannot authenticate until it is renewed.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/operations.md#certificates-of-identities
+        - alert: ZitiResourceNotReady
+          expr: ziti_operator_resource_conditions{type="Ready",status="False"} > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: A Ziti resource is not ready
+            description: >-
+              {{ "{{ $value }}" }} {{ "{{ $labels.kind }}" }} resources report Ready=False. Run kubectl describe on the
+              resource to read the condition reason.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/conditions.md
+        - alert: ZitiConnectionDown
+          expr: ziti_operator_resource_conditions{kind="ZitiConnection",type="Connected",status="False"} > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: The operator cannot reach the Ziti controller
+            description: >-
+              The ZitiConnection reports Connected=False, so no resource syncs. Check the controller address, the CA
+              bundle, and the credentials of the connection Secret.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/conditions.md
+        - alert: ZitiOperatorOrphanedEntities
+          expr: sum by (kind) (ziti_operator_orphaned_entities) > 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Ziti entities have no owning resource
+            description: >-
+              {{ "{{ $value }}" }} Ziti {{ "{{ $labels.kind }}" }} entities carry this cluster's tag but their owner is
+              gone. Run the audit command to compare, then choose an orphan policy.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/operations.md#orphan-sweeper
+        - alert: ZitiOperatorZitiAPIErrors
+          expr: sum(rate(ziti_operator_api_requests_total{code=~"5..|error"}[5m])) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: The Ziti API is failing requests
+            description: >-
+              The operator is seeing more than 0.1 Ziti API server errors per second. Check the controller logs and
+              health.
+            runbook_url: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/operations.md
+{{- end }}

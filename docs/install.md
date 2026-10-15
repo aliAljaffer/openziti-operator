@@ -22,7 +22,7 @@
 2. Install the chart. It creates the CRDs, the RBAC, a Deployment with two replicas, and the `ZitiConnection`. The chart is published for every release. The image is `ghcr.io/alialjaffer/openziti-operator`, tag from the chart `appVersion`. To install from a clone of the repository instead, use `charts/chart` in place of the `oci://` address. Use `--set manager.image.repository=<registry>/ziti-operator --set manager.image.tag=<tag>` for your own build.
 
    ```sh
-   helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.2.0 -n ziti-operator-system \
+   helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.3.0 -n ziti-operator-system \
      --set connection.create=true \
      --set connection.managementUrl=https://<controller>/edge/management/v1 \
      --set 'connection.hostingRouters={<router>}' \
@@ -54,7 +54,8 @@
 | `rbac.secretNamespaces` | empty | Namespaces for Secret access, in addition to the release namespace. List every namespace that holds a `ZitiIdentity`. |
 | `rbac.clusterWideSecrets` | `false` | Set `true` to grant Secret access in all namespaces with a ClusterRole. Upgrade note: before this default, access was cluster-wide. |
 | `rbac.serviceNamespaces` | empty | Namespaces where the operator may create the Service for an in-cluster router. Empty leaves the ClusterRole able to write Services everywhere. Deployment and volume claim access is not scoped by this. |
-| `metrics.enabled`, `metrics.secure`, `prometheus.enabled` | on, on, off | Metrics endpoint and an optional ServiceMonitor. |
+| `metrics.enabled`, `metrics.secure`, `prometheus.enabled` | on, on, off | Metrics endpoint and an optional ServiceMonitor. `prometheus.enabled` also ships alert rules, and `grafanaDashboard.enabled` installs a Grafana dashboard as a ConfigMap. |
+| `webhook.enabled` | off | Serve the validating admission webhooks with a chart-generated serving certificate. See [Validation](validation.md). |
 | `crd.keep` | `true` | Keep the CRDs when the release is uninstalled. |
 
 ## Install without Helm

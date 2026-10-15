@@ -45,6 +45,7 @@ import (
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
+	webhookv1alpha1 "github.com/aliAljaffer/openziti-operator/internal/webhook/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -67,6 +68,7 @@ func main() {
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
 	var webhookPort int
+	var enableWebhook bool
 	var enableLeaderElection bool
 	var probeAddr string
 	var secureMetrics bool
@@ -92,6 +94,8 @@ func main() {
 	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "Port the webhook server listens on. "+
 		"Defaults to 9443. Set -1 to disable the webhook server.")
+	flag.BoolVar(&enableWebhook, "enable-webhook", false,
+		"Serve the validating admission webhooks. Needs --webhook-cert-path with the mounted serving certificate.")
 	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
 		"The directory that contains the metrics server certificate.")
 	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
@@ -123,6 +127,11 @@ func main() {
 
 	if orphanInterval <= 0 {
 		setupLog.Error(nil, "Invalid --orphan-sweep-interval, use a duration above zero", "value", orphanInterval.String())
+		os.Exit(1)
+	}
+
+	if enableWebhook && webhookCertPath == "" {
+		setupLog.Error(nil, "Invalid flags: --enable-webhook needs --webhook-cert-path")
 		os.Exit(1)
 	}
 
@@ -291,7 +300,7 @@ func main() {
 		setupLog.Error(err, "Failed to add orphan sweeper")
 		os.Exit(1)
 	}
-	ctrlmetrics.Registry.MustRegister(&controller.ConditionCollector{Reader: mgr.GetClient()})
+	ctrlmetrics.Registry.MustRegister(&controller.StatusCollector{Reader: mgr.GetClient()})
 	clusterKeys, err := controller.NewClusterKeys(mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "Failed to create the cluster key reader")
@@ -359,6 +368,12 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "zititerminator")
 		os.Exit(1)
+	}
+	if enableWebhook {
+		if err := webhookv1alpha1.Setup(mgr); err != nil {
+			setupLog.Error(err, "Failed to set up webhooks")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

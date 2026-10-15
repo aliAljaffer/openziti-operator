@@ -80,3 +80,14 @@ func TestRouterImageWithoutKnownDigestKeepsTag(t *testing.T) {
 		t.Errorf("image = %q", got)
 	}
 }
+
+func TestRouterBundleServiceTypeDefaultsToLoadBalancerAndFollowsTheSpec(t *testing.T) {
+	m := RouterManifest{Name: "e", JWT: "x", Version: "2.0.4", Port: 3022}
+	if got := m.Deployment(); !strings.Contains(got, "type: LoadBalancer") {
+		t.Errorf("default Service type missing:\n%s", got)
+	}
+	m.ServiceType = "NodePort"
+	if got := m.Deployment(); !strings.Contains(got, "type: NodePort") || strings.Contains(got, "type: LoadBalancer") {
+		t.Errorf("NodePort Service type not honored:\n%s", got)
+	}
+}

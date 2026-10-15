@@ -43,6 +43,24 @@ b=$(yq 'select(.kind=="Bundle")' <<<"$out")
 check "trust-manager: Bundle targets the release namespace" '[ "$(yq .spec.target.namespaceSelector.matchLabels.\"kubernetes.io/metadata.name\" <<<"$b")" = ns ] && [ "$(yq .spec.target.configMap.key <<<"$b")" = ca.crt ]'
 check "fail: trust-manager without sources" 'render --set trustManager.enabled=true | grep -q "needs at least one source"'
 
+out=$(render --set prometheus.enabled=true)
+check "prometheus: PrometheusRule rendered" 'yq "select(.kind==\"PrometheusRule\")" <<<"$out" | grep -q "ZitiIdentityCertificateExpiringSoon"'
+check "default: no PrometheusRule" '[ -z "$(render | yq "select(.kind==\"PrometheusRule\")")" ]'
+out=$(render --set prometheus.enabled=true --set prometheus.rules.enabled=false)
+check "prometheus.rules disabled: no PrometheusRule" '[ -z "$(yq "select(.kind==\"PrometheusRule\")" <<<"$out")" ]'
+
+out=$(render --set grafanaDashboard.enabled=true)
+check "grafanaDashboard: dashboard ConfigMap rendered" '[ "$(yq "select(.kind==\"ConfigMap\" and .metadata.labels.grafana_dashboard==\"1\") | .metadata.name" <<<"$out")" = t-ziti-operator-grafana-dashboard ]'
+check "default: no grafana dashboard" '[ -z "$(render | yq "select(.kind==\"ConfigMap\" and .metadata.labels.grafana_dashboard==\"1\")")" ]'
+
+out=$(render --set webhook.enabled=true)
+check "webhook: ValidatingWebhookConfiguration rendered" '[ "$(yq "select(.kind==\"ValidatingWebhookConfiguration\") | .webhooks | length" <<<"$out")" = 4 ]'
+check "webhook: caBundle is set" '[ -n "$(yq "select(.kind==\"ValidatingWebhookConfiguration\") | .webhooks[0].clientConfig.caBundle" <<<"$out")" ]'
+check "webhook: serving Secret rendered" '[ "$(yq "select(.kind==\"Secret\" and .metadata.name==\"t-ziti-operator-webhook-server-cert\") | .type" <<<"$out")" = kubernetes.io/tls ]'
+check "webhook: service rendered" '[ -n "$(yq "select(.kind==\"Service\" and (.metadata.name|test(\"webhook-service\")))" <<<"$out")" ]'
+check "webhook: manager enables it" 'grep -q -- "--enable-webhook" <<<"$out" && grep -q -- "--webhook-cert-path=/etc/webhook/certs" <<<"$out"'
+check "default: no webhook objects" '[ -z "$(render | yq "select(.kind==\"ValidatingWebhookConfiguration\")")" ]'
+
 out=$(render --set 'rbac.secretNamespaces={team-a,team-b}')
 check "limited secrets: Roles in release namespace and both listed" '[ "$(yq "select(.kind==\"Role\" and (.metadata.name|test(\"secret-access\"))) | .metadata.namespace" <<<"$out" | sort | tr "\n" " ")" = "---- ns team-a team-b " ] || [ "$(yq "select(.kind==\"Role\" and (.metadata.name|test(\"secret-access\"))) | .metadata.namespace" <<<"$out" | grep -v "^---" | sort | tr "\n" " ")" = "ns team-a team-b " ]'
 check "limited secrets: ClusterRole has no secrets or configmaps" '! yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out" | grep -qxE "secrets|configmaps"'

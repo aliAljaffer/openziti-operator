@@ -1,0 +1,86 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiaccesspolicy
+  failurePolicy: Ignore
+  name: vzitiaccesspolicy.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiaccesspolicies
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiapp
+  failurePolicy: Ignore
+  name: vzitiapp.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiapps
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ziti-alialjaffer-com-v1alpha1-ziticonnection
+  failurePolicy: Ignore
+  name: vziticonnection.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ziticonnections
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-ziti-alialjaffer-com-v1alpha1-zitiidentity
+  failurePolicy: Ignore
+  name: vzitiidentity.kb.io
+  rules:
+  - apiGroups:
+    - ziti.alialjaffer.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - zitiidentities
+  sideEffects: None

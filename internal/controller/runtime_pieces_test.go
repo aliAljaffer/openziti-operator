@@ -61,7 +61,7 @@ func TestSweeperStartSweepsThenStopsOnCancel(t *testing.T) {
 	}
 }
 
-func TestConditionCollectorCountsByKindTypeAndStatus(t *testing.T) {
+func TestStatusCollectorReportsConditionsTerminatorsAndCertExpiry(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := zitiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
@@ -69,23 +69,56 @@ func TestConditionCollectorCountsByKindTypeAndStatus(t *testing.T) {
 	ready := func(s metav1.ConditionStatus) []metav1.Condition {
 		return []metav1.Condition{{Type: "Ready", Status: s}}
 	}
+	notAfter := metav1.NewTime(time.Now().Add(720 * time.Hour))
 	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
-		&zitiv1.ZitiApp{Name: "a", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
+		&zitiv1.ZitiApp{Name: "a", Namespace: "n", Status: zitiv1.ZitiAppStatus{
+			Conditions: ready(metav1.ConditionTrue),
+			Services:   []zitiv1.ServiceStatus{{Name: "svc", Terminators: []zitiv1.Terminator{{Router: "r1"}, {Router: "r2"}}}},
+		}},
 		&zitiv1.ZitiApp{Name: "b", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionTrue)}},
 		&zitiv1.ZitiApp{Name: "c", Namespace: "n", Status: zitiv1.ZitiAppStatus{Conditions: ready(metav1.ConditionFalse)}},
 		&zitiv1.ZitiConnection{Name: "default", Status: zitiv1.ZitiConnectionStatus{Conditions: ready(metav1.ConditionTrue)}},
+		&zitiv1.ZitiIdentity{Name: "id", Namespace: "n", Status: zitiv1.ZitiIdentityStatus{CertNotAfter: &notAfter}},
 	).Build()
 
 	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(&ConditionCollector{Reader: k})
-	want := `# HELP ziti_operator_resource_conditions Custom resources by kind, condition type, and condition status.
+	reg.MustRegister(&StatusCollector{Reader: k})
+	wantConditions := `# HELP ziti_operator_resource_conditions Custom resources by kind, condition type, and condition status.
 # TYPE ziti_operator_resource_conditions gauge
 ziti_operator_resource_conditions{kind="ZitiApp",status="False",type="Ready"} 1
 ziti_operator_resource_conditions{kind="ZitiApp",status="True",type="Ready"} 2
 ziti_operator_resource_conditions{kind="ZitiConnection",status="True",type="Ready"} 1
 `
-	if err := testutil.GatherAndCompare(reg, strings.NewReader(want)); err != nil {
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(wantConditions), "ziti_operator_resource_conditions"); err != nil {
 		t.Error(err)
+	}
+	wantTerminators := `# HELP ziti_operator_app_service_terminators Terminators hosting each Ziti service of a ZitiApp.
+# TYPE ziti_operator_app_service_terminators gauge
+ziti_operator_app_service_terminators{name="a",namespace="n",service="svc"} 2
+`
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(wantTerminators), "ziti_operator_app_service_terminators"); err != nil {
+		t.Error(err)
+	}
+
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var expiry *float64
+	for _, mf := range families {
+		if mf.GetName() != "ziti_operator_identity_certificate_expires_seconds" {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			v := m.GetGauge().GetValue()
+			expiry = &v
+		}
+	}
+	if expiry == nil {
+		t.Fatal("no certificate expiry metric was reported")
+	}
+	if *expiry < 719*3600 || *expiry > 721*3600 {
+		t.Errorf("certificate expiry = %v seconds, want about 720 hours", *expiry)
 	}
 }
 

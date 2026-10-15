@@ -126,8 +126,8 @@ func (r *ZitiAccessPolicyReconciler) finalize(ctx context.Context, ap *zitiv1alp
 
 func (r *ZitiAccessPolicyReconciler) sync(ctx context.Context, ap *zitiv1alpha1.ZitiAccessPolicy, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.AccessName(ap)
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 	routers, err := zc.List(ctx, ziti.EdgeRouters, "")
 	if err != nil {

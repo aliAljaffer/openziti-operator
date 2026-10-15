@@ -31,6 +31,7 @@ PAGES = {
     "docs/operations.md": "Operations",
     "docs/uninstall.md": "Uninstall",
     "docs/conditions.md": "Conditions-and-Reasons",
+    "docs/validation.md": "Validation",
     "docs/compatibility.md": "Compatibility",
     "docs/interop-ziti-k8s-agent.md": "Interop-with-ziti-k8s-agent",
     "docs/adr/0001-build-or-contribute.md": "ADR-0001-Build-or-contribute",
@@ -79,6 +80,7 @@ SIDEBAR = """**[Home](Home)**
 
 **Run it**
 - [Conditions and reasons](Conditions-and-Reasons)
+- [Validation](Validation)
 - [Operations](Operations)
 - [Audit a network](Audit)
 - [Uninstall](Uninstall)

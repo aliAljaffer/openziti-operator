@@ -258,6 +258,11 @@ webhook:
   enabled: false
   # Webhook server port
   port: 9443
+  # A webhook outage must not block edits, so a denied or timed out call falls through to the
+  # reconciler, which still reports InvalidSpec. Set to Fail only once the install is proven.
+  failurePolicy: Ignore
+  # Seconds the API server waits for a response.
+  timeoutSeconds: 10
 
 ## Prometheus ServiceMonitor for metrics scraping.
 ## Requires prometheus-operator to be installed in the cluster.
@@ -272,6 +277,22 @@ prometheus:
   ## Custom ServiceMonitor annotations
   ##
   # annotations: {}
+
+  ## PrometheusRule with alerts for resource conditions, identity certificates, orphans, and Ziti API
+  ## errors. Requires prometheus-operator, like the ServiceMonitor.
+  ##
+  rules:
+    enabled: true
+
+    ## Custom PrometheusRule labels
+    ##
+    # labels: {}
+
+## Grafana dashboard shipped as a ConfigMap for the kube-prometheus-stack sidecar.
+## Requires kube-prometheus-stack with its dashboard sidecar enabled.
+##
+grafanaDashboard:
+  enabled: false
 
 ## Network policies for controlling traffic flow.
 ## Enable to restrict ingress to the controller manager.
