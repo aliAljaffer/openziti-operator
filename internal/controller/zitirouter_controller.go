@@ -48,13 +48,13 @@ import (
 )
 
 const (
-	SecretKeyCompose    = "docker-compose.yml"
-	SecretKeyDeployment = "deployment.yaml"
-	SecretKeyService    = "service.yaml"
-	CondEnrolled        = "Enrolled"
-	CondOnline          = "Online"
-	CondServing         = "Serving"
-	CondWorkload        = "Workload"
+	SecretKeyCompose = "docker-compose.yml"
+	SecretKeyRouter  = "router.yaml"
+	SecretKeyService = "service.yaml"
+	CondEnrolled     = "Enrolled"
+	CondOnline       = "Online"
+	CondServing      = "Serving"
+	CondWorkload     = "Workload"
 )
 
 var routerKinds = []ziti.Kind{ziti.EdgeRouters}
@@ -535,7 +535,7 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 		if ref == nil {
 			return dropSecretKey(ctx, r.Client, rt, key, SecretKeyJWT)
 		}
-		return dropSecretKey(ctx, r.Client, rt, key, SecretKeyJWT, SecretKeyCompose, SecretKeyDeployment)
+		return dropSecretKey(ctx, r.Client, rt, key, SecretKeyJWT, SecretKeyCompose, SecretKeyRouter)
 	}
 
 	jwt, expires, err := zc.Enrollment(ctx, ziti.EdgeRouters, id)
@@ -564,8 +564,13 @@ func (r *ZitiRouterReconciler) deliverEnrollment(ctx context.Context, rt *zitiv1
 	values := map[string][]byte{SecretKeyJWT: []byte(jwt)}
 	// The manifests are for a router someone installs by hand. The operator's own Secret only feeds the pod.
 	if ref != nil && conn.Status.ControllerVersion != "" {
-		m := desired.RouterManifest{Name: desired.RouterName(rt, conn), JWT: jwt, Address: rt.Spec.AdvertisedAddress, Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName}
-		values[SecretKeyCompose], values[SecretKeyDeployment] = []byte(m.Compose()), []byte(m.Deployment())
+		serviceType := ""
+		if rt.Spec.Portable != nil {
+			serviceType = rt.Spec.Portable.ServiceType
+		}
+		m := desired.RouterManifest{Name: desired.RouterName(rt, conn), JWT: jwt, Address: rt.Spec.AdvertisedAddress,
+			Version: conn.Status.ControllerVersion, Port: port, StorageClass: rt.Spec.StorageClassName, ServiceType: serviceType}
+		values[SecretKeyCompose], values[SecretKeyRouter] = []byte(m.Compose()), []byte(m.Deployment())
 	}
 	return upsertOwnedSecretKeys(ctx, r.Client, r.Scheme, rt, key, values)
 }
