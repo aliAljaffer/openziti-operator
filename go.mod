@@ -3,7 +3,7 @@ module github.com/aliAljaffer/openziti-operator
 go 1.27.2
 
 require (
-	github.com/onsi/ginkgo/v2 v2.33.0
+	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
 	github.com/openziti/edge-api v0.36.1
 	github.com/openziti/sdk-golang v1.8.2
