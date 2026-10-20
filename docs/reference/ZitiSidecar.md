@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.identityRef` | string | yes |  | identityRef is the name of the ZitiIdentity in this namespace whose identity file the tunneler uses. It cannot change later. Minimum length 1. Maximum length 253. |
-| `spec.image` | string | no |  | image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler, a ziti-router image with file capabilities so tproxy runs as non-root. The default in Proxy mode is openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host mode the image must carry the same file capabilities on the ziti and iptables binaries. Maximum length 253. |
+| `spec.image` | string | no |  | image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler at the controller version, a ziti-router image with file capabilities so tproxy runs as non-root. The default in Proxy mode is openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host mode the image must carry the same file capabilities on the ziti and iptables binaries. Maximum length 253. |
 | `spec.manifestSecretRef` | object | no |  | manifestSecretRef names the Secret that receives the patch under the key "sidecar-patch.yaml". Without it the operator writes nothing and only reports. |
 | `spec.manifestSecretRef.name` | string | yes |  | name of the Secret. |
 | `spec.manifestSecretRef.namespace` | string | yes |  | namespace of the Secret. |

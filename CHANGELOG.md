@@ -9,7 +9,7 @@
 ### Added
 
 - `ZitiSidecar.spec.image` sets the tunneler image, for a mirror in an air-gapped cluster.
-- `ghcr.io/alialjaffer/ziti-tunneler` is `ziti-router` with file capabilities on `ziti` and `iptables`. It is the `Host` mode default, so `tproxy` runs as non-root. `Proxy` mode still uses `openziti/ziti-router` at the controller version. Build a mirror from `images/tunneler/Dockerfile`.
+- `ghcr.io/alialjaffer/ziti-tunneler` is `ziti-router` with file capabilities on `ziti` and `iptables`. It is the `Host` mode default at the controller version, so `tproxy` runs as non-root. `Proxy` mode still uses `openziti/ziti-router` at the controller version. Build a mirror from `images/tunneler/Dockerfile`.
 
 ### Changed
 

@@ -3,7 +3,6 @@
 package desired
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -52,7 +51,7 @@ func TestSidecarPatchIsValidYAMLAndAValidStrategicPatch(t *testing.T) {
 		t.Fatalf("patch must add exactly one container: %s", patch)
 	}
 	c := doc.Spec.Template.Spec.Containers[0]
-	if c.Name != "ziti-tunneler" || c.Image != TunnelerImage {
+	if c.Name != "ziti-tunneler" || c.Image != TunnelerRepository+":2.0.4" {
 		t.Errorf("container = %+v", c)
 	}
 	want := []string{"ziti", "tunnel", "tproxy", "-i", "/ziti/identity.json", "--svcPollRate", "15",
@@ -100,21 +99,11 @@ func TestSidecarImage(t *testing.T) {
 			t.Errorf("proxy image = %s", got)
 		}
 	}
-	if got := sidecarImage(zitiv1.ZitiSidecarSpec{Mode: "Host"}, "v9.9.9"); got != TunnelerImage {
+	if got := sidecarImage(zitiv1.ZitiSidecarSpec{Mode: "Host"}, "v2.0.4"); got != TunnelerRepository+":2.0.4" {
 		t.Errorf("host image = %s", got)
 	}
 	if got := sidecarImage(zitiv1.ZitiSidecarSpec{Mode: "Host", Image: "reg.local/t:1"}, "v2.0.4"); got != "reg.local/t:1" {
 		t.Errorf("override = %s", got)
-	}
-}
-
-func TestTunnelerImageTagMatchesTheDockerfile(t *testing.T) {
-	df, err := os.ReadFile("../../images/tunneler/Dockerfile")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "ARG ZITI_VERSION=" + TunnelerImage[strings.LastIndex(TunnelerImage, ":")+1:] + "\n"; !strings.Contains(string(df), want) {
-		t.Errorf("Dockerfile must contain %q", want)
 	}
 }
 

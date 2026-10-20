@@ -50,8 +50,8 @@ type ZitiSidecarSpec struct {
 	// +optional
 	Resolver string `json:"resolver,omitempty"`
 
-	// image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler, a ziti-router
-	// image with file capabilities so tproxy runs as non-root. The default in Proxy mode is
+	// image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler at the controller version, a
+	// ziti-router image with file capabilities so tproxy runs as non-root. The default in Proxy mode is
 	// openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host
 	// mode the image must carry the same file capabilities on the ziti and iptables binaries.
 	// +kubebuilder:validation:MaxLength=253

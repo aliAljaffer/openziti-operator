@@ -44,7 +44,7 @@ In `Host` mode the patch runs `ziti tunnel tproxy`. The tunneler listens on `127
 | `identityRef` | The `ZitiIdentity` in the same namespace whose `identity.json` the tunneler uses. Immutable. |
 | `mode` | `Host` or `Proxy`. Immutable. |
 | `resolver` | `--dnsUpstream` for `Host` mode. Set it to the cluster DNS IP, for example `udp://10.96.0.10:53`. Without it, cluster Service names do not resolve in the pod. |
-| `image` | Tunneler image. `Host` default is `ghcr.io/alialjaffer/ziti-tunneler`, `ziti-router` with file capabilities on `ziti` and `iptables`, so it runs as non-root. `Proxy` default is `openziti/ziti-router` at the controller version. Set it to use a mirror in an air-gapped cluster. A `Host` mirror must keep the file capabilities: build it from `images/tunneler/Dockerfile`. |
+| `image` | Tunneler image. `Host` default is `ghcr.io/alialjaffer/ziti-tunneler` at the controller version, `ziti-router` with file capabilities on `ziti` and `iptables`, so it runs as non-root. `Proxy` default is `openziti/ziti-router` at the controller version. Set it to use a mirror in an air-gapped cluster. A `Host` mirror must keep the file capabilities: build it from `images/tunneler/Dockerfile`. |
 | `servicePollRate` | Seconds between polls of Ziti for service changes. Default 15. |
 | `manifestSecretRef` | Secret that receives `sidecar-patch.yaml`. Without it the operator only reports. |
 

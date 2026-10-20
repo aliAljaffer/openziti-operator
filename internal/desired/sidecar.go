@@ -12,9 +12,9 @@ import (
 // IdentityMountPath is where the sidecar mounts the identity file of its ZitiIdentity.
 const IdentityMountPath = "/ziti"
 
-// TunnelerImage is the Host mode image: ziti-router with file capabilities on ziti and iptables, so tproxy runs
-// as non-root. Its tag must match ZITI_VERSION in images/tunneler/Dockerfile.
-const TunnelerImage = "ghcr.io/alialjaffer/ziti-tunneler:2.0.4"
+// TunnelerRepository is the Host mode image: ziti-router with file capabilities on ziti and iptables, so tproxy
+// runs as non-root. The tag is the controller version, built from images/tunneler/Dockerfile.
+const TunnelerRepository = "ghcr.io/alialjaffer/ziti-tunneler"
 
 // SidecarSecretKey is the Secret key the patch goes under.
 const SidecarSecretKey = "sidecar-patch.yaml"
@@ -95,7 +95,7 @@ func sidecarImage(s zitiv1.ZitiSidecarSpec, version string) string {
 	case s.Image != "":
 		return s.Image
 	case s.Mode == "Host":
-		return TunnelerImage
+		return TunnelerRepository + ":" + strings.TrimPrefix(version, "v")
 	}
 	return "openziti/ziti-router:" + strings.TrimPrefix(version, "v")
 }
