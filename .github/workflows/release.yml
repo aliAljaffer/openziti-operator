@@ -63,13 +63,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Work out the tunneler image name
+        id: tunneler
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/ziti-tunneler
+          tags: type=raw,value=2.0.4
+
       - name: Build and push the tunneler image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: images/tunneler
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ziti-tunneler:2.0.4
+          tags: ${{ steps.tunneler.outputs.tags }}
 
       - name: Publish the Helm chart
         env:
