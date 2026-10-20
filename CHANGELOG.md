@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.3.1
+
+Fixes `ZitiSidecar` `Host` mode, which did not intercept traffic. Existing `ZitiSidecar` resources keep working. Re-apply the patch to get the fix.
 
 ### Fixed
 

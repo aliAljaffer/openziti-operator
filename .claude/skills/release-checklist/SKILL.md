@@ -21,7 +21,7 @@ description: Use when you prepare a release or a public push of this operator. L
 - Repository secret `HYGIENE_PATTERNS` (internal names, one regex per line).
 - GitHub private vulnerability reporting (`SECURITY.md` points to it).
 - The wiki enabled and one page created by hand, so the wiki repository exists. Then `hack/publish-wiki.sh --push` or the `wiki.yml` workflow updates it.
-- A registry, image build and push, and the release tag. Existing tags: `v0.1.0`, `v0.1.1`, `v0.1.2`, `v0.2.0`, `v0.3.0`. Chart `version` and `appVersion` (`charts/chart/Chart.yaml`) and `CHANGELOG` must match the new tag.
+- A registry, image build and push, and the release tag. Existing tags: `v0.1.0`, `v0.1.1`, `v0.1.2`, `v0.2.0`, `v0.3.0`, `v0.3.1`. Chart `version` and `appVersion` (`charts/chart/Chart.yaml`) and `CHANGELOG` must match the new tag.
 - Confirm the module path `github.com/aliAljaffer/openziti-operator` and the API group `ziti.alialjaffer.com`.
 
 ## Never
