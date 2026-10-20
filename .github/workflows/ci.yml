@@ -3,6 +3,10 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    inputs:
+      e2e:
+        type: boolean
+        default: true
   workflow_dispatch:
   schedule:
     - cron: '0 5 * * 1'
@@ -86,7 +90,7 @@ jobs:
   e2e:
     name: E2E Tests
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && inputs.e2e != false
     permissions:
       contents: read
     uses: ./.github/workflows/test-e2e.yml
