@@ -4,7 +4,12 @@
 
 ### Fixed
 
-- `ZitiSidecar` in `Host` mode now runs `ziti tunnel tproxy`. It ran `ziti tunnel host`, which does not intercept, so the workload could not dial Ziti services by name. The patch also sets `runAsUser: 0`, `dnsPolicy: None`, and `dnsConfig` with the tunneler (`127.0.0.1`) as the pod resolver. It no longer suggests `hostNetwork`.
+- `ZitiSidecar` in `Host` mode now runs `ziti tunnel tproxy`. It ran `ziti tunnel host`, which does not intercept, so the workload could not dial Ziti services by name. The patch runs as non-root with `drop: [ALL]` plus `NET_ADMIN` and `NET_RAW`, sets `dnsPolicy: None` and `dnsConfig` with the tunneler (`127.0.0.1`) as the pod resolver, and sets the `net.ipv4.ip_unprivileged_port_start` sysctl. It no longer suggests `hostNetwork`.
+
+### Added
+
+- `ZitiSidecar.spec.image` sets the tunneler image, for a mirror in an air-gapped cluster.
+- `ghcr.io/alialjaffer/ziti-tunneler` is `ziti-router` with file capabilities on `ziti` and `iptables`. It is the `Host` mode default, so `tproxy` runs as non-root. `Proxy` mode still uses `openziti/ziti-router` at the controller version. Build a mirror from `images/tunneler/Dockerfile`.
 
 ### Changed
 

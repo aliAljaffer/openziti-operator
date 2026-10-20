@@ -75,6 +75,14 @@ spec:
                 maxLength: 253
                 minLength: 1
                 type: string
+              image:
+                description: |-
+                  image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler, a ziti-router
+                  image with file capabilities so tproxy runs as non-root. The default in Proxy mode is
+                  openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host
+                  mode the image must carry the same file capabilities on the ziti and iptables binaries.
+                maxLength: 253
+                type: string
               manifestSecretRef:
                 description: |-
                   manifestSecretRef names the Secret that receives the patch under the key "sidecar-patch.yaml".
@@ -93,7 +101,7 @@ spec:
               mode:
                 default: Host
                 description: |-
-                  mode is Host for tproxy interception, which needs root, NET_ADMIN, and NET_RAW, or Proxy for a
+                  mode is Host for tproxy interception, which needs NET_ADMIN and NET_RAW, or Proxy for a
                   transparent proxy that needs neither. It cannot change later.
                 enum:
                 - Host

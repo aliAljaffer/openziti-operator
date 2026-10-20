@@ -36,7 +36,7 @@ type ZitiSidecarSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	IdentityRef string `json:"identityRef"`
 
-	// mode is Host for tproxy interception, which needs root, NET_ADMIN, and NET_RAW, or Proxy for a
+	// mode is Host for tproxy interception, which needs NET_ADMIN and NET_RAW, or Proxy for a
 	// transparent proxy that needs neither. It cannot change later.
 	// +kubebuilder:validation:Enum=Host;Proxy
 	// +kubebuilder:default=Host
@@ -49,6 +49,14 @@ type ZitiSidecarSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	Resolver string `json:"resolver,omitempty"`
+
+	// image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler, a ziti-router
+	// image with file capabilities so tproxy runs as non-root. The default in Proxy mode is
+	// openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host
+	// mode the image must carry the same file capabilities on the ziti and iptables binaries.
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	Image string `json:"image,omitempty"`
 
 	// servicePollRate is how often the tunneler asks Ziti for service changes, in seconds.
 	// +kubebuilder:default=15

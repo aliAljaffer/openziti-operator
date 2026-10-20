@@ -27,10 +27,11 @@
 |---|---|---|---|---|
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.identityRef` | string | yes |  | identityRef is the name of the ZitiIdentity in this namespace whose identity file the tunneler uses. It cannot change later. Minimum length 1. Maximum length 253. |
+| `spec.image` | string | no |  | image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler, a ziti-router image with file capabilities so tproxy runs as non-root. The default in Proxy mode is openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host mode the image must carry the same file capabilities on the ziti and iptables binaries. Maximum length 253. |
 | `spec.manifestSecretRef` | object | no |  | manifestSecretRef names the Secret that receives the patch under the key "sidecar-patch.yaml". Without it the operator writes nothing and only reports. |
 | `spec.manifestSecretRef.name` | string | yes |  | name of the Secret. |
 | `spec.manifestSecretRef.namespace` | string | yes |  | namespace of the Secret. |
-| `spec.mode` | string | no | `"Host"` | mode is Host for tproxy interception, which needs root, NET_ADMIN, and NET_RAW, or Proxy for a transparent proxy that needs neither. It cannot change later. One of: `Host`, `Proxy`. |
+| `spec.mode` | string | no | `"Host"` | mode is Host for tproxy interception, which needs NET_ADMIN and NET_RAW, or Proxy for a transparent proxy that needs neither. It cannot change later. One of: `Host`, `Proxy`. |
 | `spec.resolver` | string | no |  | resolver is the DNS upstream (--dnsUpstream) for names that are not Ziti services. The tunneler itself listens on 127.0.0.1:53 and the patch points the pod resolver at it. Use the cluster DNS IP, for example udp://10.96.0.10:53. Without it, cluster Service names do not resolve in the pod. Maximum length 253. |
 | `spec.servicePollRate` | integer | no | `15` | servicePollRate is how often the tunneler asks Ziti for service changes, in seconds. Minimum 1. Maximum 3600. |
 
@@ -71,7 +72,7 @@ metadata:
   name: zitisidecar-sample
 spec:
   identityRef: zitiidentity-sample
-  # Host is tproxy: the patched workload needs root, NET_ADMIN, and NET_RAW. Use Proxy when it cannot have those.
+  # Host is tproxy: the patched workload needs NET_ADMIN and NET_RAW. Use Proxy when it cannot have those.
   mode: Host
   manifestSecretRef:
     namespace: default

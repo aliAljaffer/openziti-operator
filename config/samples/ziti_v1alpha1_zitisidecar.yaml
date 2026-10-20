@@ -7,7 +7,7 @@ metadata:
   name: zitisidecar-sample
 spec:
   identityRef: zitiidentity-sample
-  # Host is tproxy: the patched workload needs root, NET_ADMIN, and NET_RAW. Use Proxy when it cannot have those.
+  # Host is tproxy: the patched workload needs NET_ADMIN and NET_RAW. Use Proxy when it cannot have those.
   mode: Host
   manifestSecretRef:
     namespace: default

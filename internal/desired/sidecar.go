@@ -12,6 +12,10 @@ import (
 // IdentityMountPath is where the sidecar mounts the identity file of its ZitiIdentity.
 const IdentityMountPath = "/ziti"
 
+// TunnelerImage is the Host mode image: ziti-router with file capabilities on ziti and iptables, so tproxy runs
+// as non-root. Its tag must match ZITI_VERSION in images/tunneler/Dockerfile.
+const TunnelerImage = "ghcr.io/alialjaffer/ziti-tunneler:2.0.4"
+
 // SidecarSecretKey is the Secret key the patch goes under.
 const SidecarSecretKey = "sidecar-patch.yaml"
 
@@ -24,11 +28,12 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("# Add the Ziti tunneler to a workload with:\n")
 	fmt.Fprintf(&b, "#   kubectl patch deployment %q -n %s --patch-file sidecar-patch.yaml --type=strategic\n", "<name>", sc.Namespace)
 	if s.Mode == "Host" {
-		b.WriteString("# Host mode runs tproxy in the pod network namespace. It needs root, NET_ADMIN, and NET_RAW.\n")
+		b.WriteString("# Host mode runs tproxy in the pod network namespace as non-root with NET_ADMIN and NET_RAW.\n")
 		b.WriteString("# The pod resolver points at the tunneler. Do not set hostNetwork: it changes the node iptables.\n")
 	}
 	b.WriteString("spec:\n  template:\n    spec:\n")
 	if s.Mode == "Host" {
+		b.WriteString("      securityContext:\n        sysctls:\n          - name: net.ipv4.ip_unprivileged_port_start\n            value: \"0\"\n")
 		b.WriteString("      dnsPolicy: None\n")
 		b.WriteString("      dnsConfig:\n        nameservers:\n          - 127.0.0.1\n")
 	}
@@ -41,7 +46,7 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 
 	b.WriteString("      containers:\n")
 	fmt.Fprintf(&b, "        - name: %s\n", sidecarContainerName)
-	fmt.Fprintf(&b, "          image: %q\n", sidecarImage(version))
+	fmt.Fprintf(&b, "          image: %q\n", sidecarImage(s, version))
 	b.WriteString("          imagePullPolicy: IfNotPresent\n")
 	b.WriteString("          command:\n")
 	for _, arg := range sidecarCommand(s) {
@@ -51,8 +56,10 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("            allowPrivilegeEscalation: false\n")
 	b.WriteString("            readOnlyRootFilesystem: false\n")
 	if s.Mode == "Host" {
-		b.WriteString("            runAsUser: 0\n")
+		b.WriteString("            runAsNonRoot: true\n")
+		b.WriteString("            runAsUser: 2171\n")
 		b.WriteString("            capabilities:\n")
+		b.WriteString("              drop:\n                - ALL\n")
 		b.WriteString("              add:\n")
 		b.WriteString("                - NET_ADMIN\n")
 		b.WriteString("                - NET_RAW\n")
@@ -83,7 +90,13 @@ func sidecarCommand(s zitiv1.ZitiSidecarSpec) []string {
 	return cmd
 }
 
-func sidecarImage(version string) string {
+func sidecarImage(s zitiv1.ZitiSidecarSpec, version string) string {
+	switch {
+	case s.Image != "":
+		return s.Image
+	case s.Mode == "Host":
+		return TunnelerImage
+	}
 	return "openziti/ziti-router:" + strings.TrimPrefix(version, "v")
 }
 

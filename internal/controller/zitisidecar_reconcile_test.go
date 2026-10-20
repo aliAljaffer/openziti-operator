@@ -96,7 +96,7 @@ func TestSidecarWritesThePatchWhenTheIdentityIsEnrolled(t *testing.T) {
 		t.Fatalf("secret: %v", err)
 	}
 	patch := string(s.Data[desired.SidecarSecretKey])
-	for _, want := range []string{"ziti-tunneler", "openziti/ziti-router:2.0.4", "NET_ADMIN", "--patch-file"} {
+	for _, want := range []string{"ziti-tunneler", desired.TunnelerImage, "NET_ADMIN", "--patch-file"} {
 		if !strings.Contains(patch, want) {
 			t.Errorf("patch is missing %q: %s", want, patch)
 		}

@@ -3,6 +3,7 @@
 package desired
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -51,7 +52,7 @@ func TestSidecarPatchIsValidYAMLAndAValidStrategicPatch(t *testing.T) {
 		t.Fatalf("patch must add exactly one container: %s", patch)
 	}
 	c := doc.Spec.Template.Spec.Containers[0]
-	if c.Name != "ziti-tunneler" || c.Image != "openziti/ziti-router:2.0.4" {
+	if c.Name != "ziti-tunneler" || c.Image != TunnelerImage {
 		t.Errorf("container = %+v", c)
 	}
 	want := []string{"ziti", "tunnel", "tproxy", "-i", "/ziti/identity.json", "--svcPollRate", "15",
@@ -82,7 +83,7 @@ func TestSidecarProxyModeNeedsNoResolverOrCapabilities(t *testing.T) {
 
 func TestSidecarHostModeAsksForTheTproxyCapabilities(t *testing.T) {
 	patch := SidecarPatch(sidecar(nil), "v2.0.4")
-	for _, want := range []string{"NET_ADMIN", "NET_RAW", "runAsUser: 0", "dnsPolicy: None", "- 127.0.0.1", "allowPrivilegeEscalation: false", "readOnlyRootFilesystem: false"} {
+	for _, want := range []string{"NET_ADMIN", "NET_RAW", "dnsPolicy: None", "- 127.0.0.1", "allowPrivilegeEscalation: false", "readOnlyRootFilesystem: false"} {
 		if !strings.Contains(patch, want) {
 			t.Errorf("host mode patch is missing %q: %s", want, patch)
 		}
@@ -92,12 +93,40 @@ func TestSidecarHostModeAsksForTheTproxyCapabilities(t *testing.T) {
 	}
 }
 
-func TestSidecarImageStripsTheVPrefix(t *testing.T) {
-	if got := sidecarImage("v2.0.4"); got != "openziti/ziti-router:2.0.4" {
-		t.Errorf("image = %s", got)
+func TestSidecarImage(t *testing.T) {
+	proxy := zitiv1.ZitiSidecarSpec{Mode: "Proxy"}
+	for _, v := range []string{"v2.0.4", "2.0.4"} {
+		if got := sidecarImage(proxy, v); got != "openziti/ziti-router:2.0.4" {
+			t.Errorf("proxy image = %s", got)
+		}
 	}
-	if got := sidecarImage("2.0.4"); got != "openziti/ziti-router:2.0.4" {
-		t.Errorf("image = %s", got)
+	if got := sidecarImage(zitiv1.ZitiSidecarSpec{Mode: "Host"}, "v9.9.9"); got != TunnelerImage {
+		t.Errorf("host image = %s", got)
+	}
+	if got := sidecarImage(zitiv1.ZitiSidecarSpec{Mode: "Host", Image: "reg.local/t:1"}, "v2.0.4"); got != "reg.local/t:1" {
+		t.Errorf("override = %s", got)
+	}
+}
+
+func TestTunnelerImageTagMatchesTheDockerfile(t *testing.T) {
+	df, err := os.ReadFile("../../images/tunneler/Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "ARG ZITI_VERSION=" + TunnelerImage[strings.LastIndex(TunnelerImage, ":")+1:] + "\n"; !strings.Contains(string(df), want) {
+		t.Errorf("Dockerfile must contain %q", want)
+	}
+}
+
+func TestSidecarHostModeRunsAsNonRoot(t *testing.T) {
+	patch := SidecarPatch(sidecar(nil), "v2.0.4")
+	for _, want := range []string{"runAsNonRoot: true", "- ALL", "ip_unprivileged_port_start"} {
+		if !strings.Contains(patch, want) {
+			t.Errorf("host mode patch is missing %q: %s", want, patch)
+		}
+	}
+	if strings.Contains(patch, "runAsUser: 0") {
+		t.Errorf("the patch must not run as root: %s", patch)
 	}
 }
 
