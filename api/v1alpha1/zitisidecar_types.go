@@ -36,19 +36,27 @@ type ZitiSidecarSpec struct {
 	// +kubebuilder:validation:MaxLength=253
 	IdentityRef string `json:"identityRef"`
 
-	// mode is Host for tproxy interception, which needs NET_ADMIN and usually hostNetwork, or Proxy for a
+	// mode is Host for tproxy interception, which needs NET_ADMIN and NET_RAW, or Proxy for a
 	// transparent proxy that needs neither. It cannot change later.
 	// +kubebuilder:validation:Enum=Host;Proxy
 	// +kubebuilder:default=Host
 	// +optional
 	Mode string `json:"mode,omitempty"`
 
-	// resolver is the DNS upstream the tunneler uses. The default is the cluster DNS, which the image default
-	// of 127.0.0.1 cannot reach.
-	// +kubebuilder:default="udp://kube-dns.kube-system.svc.cluster.local:53"
+	// resolver is the DNS upstream (--dnsUpstream) for names that are not Ziti services. The tunneler
+	// itself listens on 127.0.0.1:53 and the patch points the pod resolver at it. Use the cluster DNS IP, for
+	// example udp://10.96.0.10:53. Without it, cluster Service names do not resolve in the pod.
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	Resolver string `json:"resolver,omitempty"`
+
+	// image is the tunneler image. The default in Host mode is ghcr.io/alialjaffer/ziti-tunneler at the controller version, a
+	// ziti-router image with file capabilities so tproxy runs as non-root. The default in Proxy mode is
+	// openziti/ziti-router at the controller version. Set it to use a mirror in an air-gapped cluster. In Host
+	// mode the image must carry the same file capabilities on the ziti and iptables binaries.
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	Image string `json:"image,omitempty"`
 
 	// servicePollRate is how often the tunneler asks Ziti for service changes, in seconds.
 	// +kubebuilder:default=15

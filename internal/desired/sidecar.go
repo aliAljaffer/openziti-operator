@@ -12,6 +12,10 @@ import (
 // IdentityMountPath is where the sidecar mounts the identity file of its ZitiIdentity.
 const IdentityMountPath = "/ziti"
 
+// TunnelerRepository is the Host mode image: ziti-router with file capabilities on ziti and iptables, so tproxy
+// runs as non-root. The tag is the controller version, built from images/tunneler/Dockerfile.
+const TunnelerRepository = "ghcr.io/alialjaffer/ziti-tunneler"
+
 // SidecarSecretKey is the Secret key the patch goes under.
 const SidecarSecretKey = "sidecar-patch.yaml"
 
@@ -24,10 +28,15 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("# Add the Ziti tunneler to a workload with:\n")
 	fmt.Fprintf(&b, "#   kubectl patch deployment %q -n %s --patch-file sidecar-patch.yaml --type=strategic\n", "<name>", sc.Namespace)
 	if s.Mode == "Host" {
-		b.WriteString("# Host mode rewrites iptables in the pod network namespace, so the pod needs NET_ADMIN and NET_RAW.\n")
-		b.WriteString("# It usually needs hostNetwork too, and that is the workload's own setting to make.\n")
+		b.WriteString("# Host mode runs tproxy in the pod network namespace as non-root with NET_ADMIN and NET_RAW.\n")
+		b.WriteString("# The pod resolver points at the tunneler. Do not set hostNetwork: it changes the node iptables.\n")
 	}
 	b.WriteString("spec:\n  template:\n    spec:\n")
+	if s.Mode == "Host" {
+		b.WriteString("      securityContext:\n        sysctls:\n          - name: net.ipv4.ip_unprivileged_port_start\n            value: \"0\"\n")
+		b.WriteString("      dnsPolicy: None\n")
+		b.WriteString("      dnsConfig:\n        nameservers:\n          - 127.0.0.1\n")
+	}
 
 	b.WriteString("      volumes:\n")
 	b.WriteString("        - name: ziti-identity\n")
@@ -37,7 +46,7 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 
 	b.WriteString("      containers:\n")
 	fmt.Fprintf(&b, "        - name: %s\n", sidecarContainerName)
-	fmt.Fprintf(&b, "          image: %q\n", sidecarImage(version))
+	fmt.Fprintf(&b, "          image: %q\n", sidecarImage(s, version))
 	b.WriteString("          imagePullPolicy: IfNotPresent\n")
 	b.WriteString("          command:\n")
 	for _, arg := range sidecarCommand(s) {
@@ -47,7 +56,10 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("            allowPrivilegeEscalation: false\n")
 	b.WriteString("            readOnlyRootFilesystem: false\n")
 	if s.Mode == "Host" {
+		b.WriteString("            runAsNonRoot: true\n")
+		b.WriteString("            runAsUser: 2171\n")
 		b.WriteString("            capabilities:\n")
+		b.WriteString("              drop:\n                - ALL\n")
 		b.WriteString("              add:\n")
 		b.WriteString("                - NET_ADMIN\n")
 		b.WriteString("                - NET_RAW\n")
@@ -60,18 +72,31 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 
 const sidecarContainerName = "ziti-tunneler"
 
-// sidecarCommand builds the tunneler command line. Proxy mode needs no resolver: it forwards to the addresses
+// sidecarCommand builds the tunneler command line. Proxy mode needs no resolver or upstream: it forwards to the addresses
 // Ziti hands it rather than resolving names in the pod.
 func sidecarCommand(s zitiv1.ZitiSidecarSpec) []string {
-	cmd := []string{"ziti", "tunnel", strings.ToLower(s.Mode), "-i", IdentityMountPath + "/identity.json",
+	mode := "proxy"
+	if s.Mode == "Host" {
+		mode = "tproxy"
+	}
+	cmd := []string{"ziti", "tunnel", mode, "-i", IdentityMountPath + "/identity.json",
 		"--svcPollRate", fmt.Sprint(s.ServicePollRate)}
 	if s.Mode == "Host" {
-		cmd = append(cmd, "-r", s.Resolver)
+		cmd = append(cmd, "-r", "udp://127.0.0.1:53")
+		if s.Resolver != "" {
+			cmd = append(cmd, "--dnsUpstream", s.Resolver)
+		}
 	}
 	return cmd
 }
 
-func sidecarImage(version string) string {
+func sidecarImage(s zitiv1.ZitiSidecarSpec, version string) string {
+	switch {
+	case s.Image != "":
+		return s.Image
+	case s.Mode == "Host":
+		return TunnelerRepository + ":" + strings.TrimPrefix(version, "v")
+	}
 	return "openziti/ziti-router:" + strings.TrimPrefix(version, "v")
 }
 

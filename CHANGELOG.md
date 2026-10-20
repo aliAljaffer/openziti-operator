@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `ZitiSidecar` in `Host` mode now runs `ziti tunnel tproxy`. It ran `ziti tunnel host`, which does not intercept, so the workload could not dial Ziti services by name. The patch runs as non-root with `drop: [ALL]` plus `NET_ADMIN` and `NET_RAW`, sets `dnsPolicy: None` and `dnsConfig` with the tunneler (`127.0.0.1`) as the pod resolver, and sets the `net.ipv4.ip_unprivileged_port_start` sysctl. It no longer suggests `hostNetwork`.
+
+### Added
+
+- `ZitiSidecar.spec.image` sets the tunneler image, for a mirror in an air-gapped cluster.
+- `ghcr.io/alialjaffer/ziti-tunneler` is `ziti-router` with file capabilities on `ziti` and `iptables`. It is the `Host` mode default at the controller version, so `tproxy` runs as non-root. `Proxy` mode still uses `openziti/ziti-router` at the controller version. Build a mirror from `images/tunneler/Dockerfile`.
+
+### Changed
+
+- `ZitiSidecar.spec.resolver` is now passed as `--dnsUpstream`, and the tunneler listens on `127.0.0.1:53`. It has no default. Set it to the cluster DNS IP, for example `udp://10.96.0.10:53`. When it is empty, the patch omits `--dnsUpstream` and cluster Service names do not resolve in the pod.
+- Re-applying a `Host` patch restarts the workload and changes its pod DNS. Remove `hostNetwork: true` if you set it from the old docs.
+
 ## v0.3.0
 
 Adds a validating admission webhook, Prometheus alerts and an optional Grafana dashboard, conditions and metrics for every kind, and a portable router bundle. Nothing in `v0.2.0` changes shape: the webhook is off by default, the new `ZitiRouter` fields are optional, and no existing field changes meaning.
