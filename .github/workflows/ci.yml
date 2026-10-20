@@ -86,7 +86,7 @@ jobs:
   e2e:
     name: E2E Tests
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
     permissions:
       contents: read
     uses: ./.github/workflows/test-e2e.yml
