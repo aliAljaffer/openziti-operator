@@ -5,7 +5,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -190,8 +189,8 @@ func (r *entityReconciler[T]) finalize(ctx context.Context, obj T) error {
 
 func (r *entityReconciler[T]) sync(ctx context.Context, obj T, conn *zitiv1.ZitiConnection, zc ziti.Client) error {
 	name := desired.EntityName(obj.EntityCommon(), &metav1.ObjectMeta{Name: obj.GetName(), Namespace: obj.GetNamespace()})
-	if strings.ContainsAny(name, `"\`) {
-		return &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
 	}
 	if obj.EntityCommon().ManagementPolicy == zitiv1.ManagementObserve {
 		return r.observe(ctx, obj, zc, name)

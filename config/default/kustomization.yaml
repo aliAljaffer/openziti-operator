@@ -19,7 +19,10 @@ resources:
 - ../rbac
 - ../manager
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
-# crd/kustomization.yaml
+# crd/kustomization.yaml.
+# The Helm chart installs the webhook and its TLS for you (webhook.enabled). This kustomize path leaves
+# the webhook off, because it ships no CA injection: the ValidatingWebhookConfiguration caBundle and the
+# serving certificate must come from cert-manager or another injector.
 #- ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager

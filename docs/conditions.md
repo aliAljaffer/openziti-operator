@@ -54,6 +54,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 
 The operator did not finish writing to Ziti. Nothing more is written until the cause is fixed.
 
+Some of these cases fail admission first when the validating webhook is installed. See [Validation](validation.md). The condition and reason below are the same either way.
+
 | Reason | Meaning | What to do |
 |---|---|---|
 | `InvalidSpec` | The operator rejected a value. Examples: a malformed port range, a router outside `hostingRouters`, `#all` or `@id` roles under `Namespaced`, an unknown auth policy. | Read the message and fix the spec. Nothing was created. |

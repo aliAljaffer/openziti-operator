@@ -153,9 +153,9 @@ spec:
                 description: |-
                   enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
                   Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
-                  The Secret also holds the keys "docker-compose.yml" and "deployment.yaml", ready-made files for a router
-                  you install yourself. The operator removes all three keys once the router has enrolled, and issues a new
-                  JWT when an unused one expires. Without it, the JWT stays in Ziti.
+                  The Secret also holds the keys "docker-compose.yml" and "router.yaml", ready-made bundles for a router
+                  you install yourself, in another cluster or on a VM. The operator removes all three keys once the router
+                  has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti.
                 properties:
                   name:
                     description: name of the Secret.
@@ -181,6 +181,24 @@ spec:
                 maximum: 65535
                 minimum: 1024
                 type: integer
+              portable:
+                description: |-
+                  portable controls the ready-made router.yaml and docker-compose.yml bundles the operator writes to
+                  enrollmentSecretRef. The bundle installs a router you run outside this cluster, in another cluster or on
+                  a VM. It is the drag-and-drop file for another cluster's admin. The operator creates nothing here.
+                properties:
+                  serviceType:
+                    default: LoadBalancer
+                    description: |-
+                      serviceType is the type of the Service in router.yaml. LoadBalancer (the default) gives a router in
+                      another cluster an address. Use NodePort where that cluster has no load balancer, then set
+                      advertisedAddress to a node address. ClusterIP is reachable only inside that cluster.
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
+                    type: string
+                type: object
               roleAttributes:
                 description: |-
                   roleAttributes are the groups the router belongs to. Edge router policies select routers by them.
@@ -190,7 +208,7 @@ spec:
                 type: array
               storageClassName:
                 description: |-
-                  storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default.
+                  storageClassName is the StorageClass of the volume in the generated router.yaml. Empty uses the cluster default.
                   Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind.
                 maxLength: 253
                 type: string
@@ -212,6 +230,8 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: portable needs enrollmentSecretRef, where the bundle is written
+              rule: '!has(self.portable) || has(self.enrollmentSecretRef)'
           status:
             description: status defines the observed state of ZitiRouter
             properties:

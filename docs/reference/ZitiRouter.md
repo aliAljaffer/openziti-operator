@@ -37,13 +37,15 @@
 | `spec.deployment.namespace` | string | yes |  | namespace is where the Deployment, Service, and volume claim go. The operator may only use Secrets in rbac.secretNamespaces and the release namespace, and may only write Services in rbac.serviceNamespaces when that list is set. Minimum length 1. Maximum length 63. Must match `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`. |
 | `spec.deployment.serviceType` | string | no | `"ClusterIP"` | serviceType for the Service that clients and other routers reach. Default ClusterIP, which only clients inside the cluster reach. Use LoadBalancer where the cluster has one, or NodePort, then set advertisedAddress to a node address. One of: `ClusterIP`, `NodePort`, `LoadBalancer`. |
 | `spec.disabled` | boolean | no |  | disabled takes the router out of service without deleting it. |
-| `spec.enrollmentSecretRef` | object | no |  | enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt". Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart. The Secret also holds the keys "docker-compose.yml" and "deployment.yaml", ready-made files for a router you install yourself. The operator removes all three keys once the router has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti. |
+| `spec.enrollmentSecretRef` | object | no |  | enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt". Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart. The Secret also holds the keys "docker-compose.yml" and "router.yaml", ready-made bundles for a router you install yourself, in another cluster or on a VM. The operator removes all three keys once the router has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti. |
 | `spec.enrollmentSecretRef.name` | string | yes |  | name of the Secret. |
 | `spec.enrollmentSecretRef.namespace` | string | yes |  | namespace of the Secret. |
 | `spec.noTraversal` | boolean | no |  | noTraversal keeps other traffic off this router. The router only serves its own edge connections. |
 | `spec.port` | integer | no | `3022` | port is the port the router listens on for clients and links. It is used in the generated manifests. It must be 1024 or higher, because the generated manifests drop all capabilities. The image writes its configuration on first start and keeps it, so a later change has no effect. Minimum 1024. Maximum 65535. |
+| `spec.portable` | object | no |  | portable controls the ready-made router.yaml and docker-compose.yml bundles the operator writes to enrollmentSecretRef. The bundle installs a router you run outside this cluster, in another cluster or on a VM. It is the drag-and-drop file for another cluster's admin. The operator creates nothing here. |
+| `spec.portable.serviceType` | string | no | `"LoadBalancer"` | serviceType is the type of the Service in router.yaml. LoadBalancer (the default) gives a router in another cluster an address. Use NodePort where that cluster has no load balancer, then set advertisedAddress to a node address. ClusterIP is reachable only inside that cluster. One of: `ClusterIP`, `NodePort`, `LoadBalancer`. |
 | `spec.roleAttributes` | list of string | no |  | roleAttributes are the groups the router belongs to. Edge router policies select routers by them. They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter. |
-| `spec.storageClassName` | string | no |  | storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default. Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind. Maximum length 253. |
+| `spec.storageClassName` | string | no |  | storageClassName is the StorageClass of the volume in the generated router.yaml. Empty uses the cluster default. Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind. Maximum length 253. |
 | `spec.tunnelerEnabled` | boolean | no |  | tunnelerEnabled lets the router host and dial services itself. Routers that host services need it. |
 | `spec.zitiName` | string | no |  | zitiName is the router name in Ziti. It defaults to &lt;clusterId&gt;-&lt;name&gt;. Routers created before this default keep the resource name. It cannot change later. Minimum length 1. Maximum length 1000. |
 
@@ -53,6 +55,7 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
+- `spec`: portable needs enrollmentSecretRef, where the bundle is written
 
 ## Status
 

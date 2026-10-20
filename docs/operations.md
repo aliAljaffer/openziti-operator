@@ -11,12 +11,20 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | Metric | Meaning |
 |---|---|
 | `ziti_operator_api_requests_total{method,kind,code}` | Calls to the Ziti API. `code` is the HTTP status, or `error`. |
-| `ziti_operator_resource_conditions{kind,type,status}` | Resources by condition. |
+| `ziti_operator_resource_conditions{kind,type,status}` | Resources by condition, for every kind. |
+| `ziti_operator_identity_certificate_expires_seconds{namespace,name}` | Seconds until the earliest client certificate of a `ZitiIdentity` expires. Negative when already expired. |
+| `ziti_operator_app_service_terminators{namespace,name,service}` | Terminators hosting each Ziti service of a `ZitiApp`. |
 | `ziti_operator_managed_entities{kind}` | Ziti entities tagged for this cluster. Set by the sweeper. |
 | `ziti_operator_orphaned_entities{kind}` | Tagged entities whose owner is gone. |
 | `ziti_operator_sweep_errors_total` | Failed sweeps. |
 | `ziti_operator_reconcile_total{kind}` | Reconcile loops per custom resource kind. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
+
+The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics. Set
+`prometheus.enabled=true` for the ServiceMonitor and the alert rules (set `prometheus.rules.enabled=false`
+to keep only the ServiceMonitor), and `grafanaDashboard.enabled=true` to install the dashboard as a
+ConfigMap for the kube-prometheus-stack sidecar. Both need prometheus-operator, or kube-prometheus-stack
+with its dashboard sidecar.
 
 ## Orphan sweeper
 

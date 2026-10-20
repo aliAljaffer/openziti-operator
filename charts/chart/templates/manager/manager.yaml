@@ -84,6 +84,10 @@ spec:
         - --metrics-bind-address=0
         {{- end }}
         - --health-probe-bind-address=:{{ .Values.manager.healthProbe.port }}
+        {{- if .Values.webhook.enabled }}
+        - --enable-webhook
+        - --webhook-cert-path=/etc/webhook/certs
+        {{- end }}
         - --ziti-requests-per-second={{ .Values.operator.zitiRequestsPerSecond }}
         - --orphan-policy={{ .Values.operator.orphanPolicy }}
         - --orphan-sweep-interval={{ .Values.operator.orphanSweepInterval }}
@@ -138,6 +142,11 @@ spec:
         - containerPort: {{ .Values.manager.healthProbe.port }}
           name: health
           protocol: TCP
+        {{- if .Values.webhook.enabled }}
+        - containerPort: {{ .Values.webhook.port }}
+          name: webhook
+          protocol: TCP
+        {{- end }}
         readinessProbe:
           httpGet:
             path: /readyz
@@ -157,9 +166,14 @@ spec:
           {}
           {{- end }}
         volumeMounts:
+          {{- if .Values.webhook.enabled }}
+          - mountPath: /etc/webhook/certs
+            name: webhook-server-cert
+            readOnly: true
+          {{- end }}
           {{- if .Values.manager.extraVolumeMounts }}
           {{- toYaml .Values.manager.extraVolumeMounts | nindent 10 }}
-          {{- else }}
+          {{- else if not .Values.webhook.enabled }}
           []
           {{- end }}
       securityContext:
@@ -173,9 +187,15 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.manager.terminationGracePeriodSeconds }}
       {{- end }}
       volumes:
+        {{- if .Values.webhook.enabled }}
+        - name: webhook-server-cert
+          secret:
+            defaultMode: 420
+            secretName: {{ include "ziti-operator.resourceName" (dict "suffix" "webhook-server-cert" "context" $) }}
+        {{- end }}
         {{- if .Values.manager.extraVolumes }}
         {{- toYaml .Values.manager.extraVolumes | nindent 8 }}
-        {{- else }}
+        {{- else if not .Values.webhook.enabled }}
         []
         {{- end }}
 {{- end }}

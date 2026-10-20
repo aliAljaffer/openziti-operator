@@ -23,6 +23,7 @@ import (
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+// +kubebuilder:validation:XValidation:rule="!has(self.portable) || has(self.enrollmentSecretRef)",message="portable needs enrollmentSecretRef, where the bundle is written"
 type ZitiRouterSpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -60,9 +61,9 @@ type ZitiRouterSpec struct {
 
 	// enrollmentSecretRef names the Secret that receives the enrollment JWT under the key "enrollment.jwt".
 	// Give it to the router at install, for example as the enrollmentJwt of the ziti-router Helm chart.
-	// The Secret also holds the keys "docker-compose.yml" and "deployment.yaml", ready-made files for a router
-	// you install yourself. The operator removes all three keys once the router has enrolled, and issues a new
-	// JWT when an unused one expires. Without it, the JWT stays in Ziti.
+	// The Secret also holds the keys "docker-compose.yml" and "router.yaml", ready-made bundles for a router
+	// you install yourself, in another cluster or on a VM. The operator removes all three keys once the router
+	// has enrolled, and issues a new JWT when an unused one expires. Without it, the JWT stays in Ziti.
 	// +optional
 	EnrollmentSecretRef *SecretRef `json:"enrollmentSecretRef,omitempty"`
 
@@ -85,7 +86,7 @@ type ZitiRouterSpec struct {
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
-	// storageClassName is the StorageClass of the volume in the generated deployment.yaml. Empty uses the cluster default.
+	// storageClassName is the StorageClass of the volume in the generated router.yaml. Empty uses the cluster default.
 	// Check its reclaim policy: with Retain, deleting the volume claim leaves the volume behind.
 	// +kubebuilder:validation:MaxLength=253
 	// +optional
@@ -103,6 +104,23 @@ type ZitiRouterSpec struct {
 	// Without it the router runs somewhere else and the operator only writes the manifests.
 	// +optional
 	Deployment *ZitiRouterDeployment `json:"deployment,omitempty"`
+
+	// portable controls the ready-made router.yaml and docker-compose.yml bundles the operator writes to
+	// enrollmentSecretRef. The bundle installs a router you run outside this cluster, in another cluster or on
+	// a VM. It is the drag-and-drop file for another cluster's admin. The operator creates nothing here.
+	// +optional
+	Portable *ZitiRouterPortable `json:"portable,omitempty"`
+}
+
+// ZitiRouterPortable controls the ready-made manifest for a router you run outside this cluster.
+type ZitiRouterPortable struct {
+	// serviceType is the type of the Service in router.yaml. LoadBalancer (the default) gives a router in
+	// another cluster an address. Use NodePort where that cluster has no load balancer, then set
+	// advertisedAddress to a node address. ClusterIP is reachable only inside that cluster.
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	// +kubebuilder:default=LoadBalancer
+	// +optional
+	ServiceType string `json:"serviceType,omitempty"`
 }
 
 // ZitiRouterDeployment runs the router in the cluster instead of on a VM.

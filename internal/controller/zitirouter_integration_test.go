@@ -199,7 +199,7 @@ func TestRouterEnrollsWithDeliveredJWT(t *testing.T) {
 	}
 }
 
-// Applies the deployment.yaml that the operator writes to the Secret. Needs ZITI_KUBECTL (kubectl and its cluster flags)
+// Applies the router.yaml that the operator writes to the Secret. Needs ZITI_KUBECTL (kubectl and its cluster flags)
 // and ZITI_K8S_NAMESPACE, and a controller that the router pod can reach at the address in its enrollment JWT.
 func TestRouterKubernetesManifestOnCluster(t *testing.T) {
 	mgmt, kubectl, ns := os.Getenv("ZITI_MGMT_URL"), strings.Fields(os.Getenv("ZITI_KUBECTL")), os.Getenv("ZITI_K8S_NAMESPACE")
@@ -257,9 +257,9 @@ func TestRouterKubernetesManifestOnCluster(t *testing.T) {
 	if err := e.k.Get(t.Context(), types.NamespacedName{Namespace: "routers", Name: "edge-1-enrollment"}, &secret); err != nil {
 		t.Fatal(err)
 	}
-	manifest = string(secret.Data[SecretKeyDeployment])
+	manifest = string(secret.Data[SecretKeyRouter])
 	if manifest == "" {
-		t.Fatal("no deployment.yaml delivered")
+		t.Fatal("no router.yaml delivered")
 	}
 	if out, err := k(manifest, "apply", "-f", "-"); err != nil {
 		t.Fatalf("kubectl apply: %v: %s", err, out)

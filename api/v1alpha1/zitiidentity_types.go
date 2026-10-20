@@ -160,6 +160,7 @@ type ZitiIdentityStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ztid,categories=ziti
+// +kubebuilder:webhook:path=/validate-ziti-alialjaffer-com-v1alpha1-zitiidentity,mutating=false,failurePolicy=Ignore,sideEffects=None,groups=ziti.alialjaffer.com,resources=zitiidentities,verbs=create;update,versions=v1alpha1,name=vzitiidentity.kb.io,admissionReviewVersions=v1
 // +kubebuilder:printcolumn:name="Policy",type=string,JSONPath=".spec.managementPolicy"
 // +kubebuilder:printcolumn:name="Enrolled",type=boolean,JSONPath=".status.enrolled"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"

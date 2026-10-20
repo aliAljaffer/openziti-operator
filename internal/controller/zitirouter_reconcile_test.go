@@ -754,7 +754,7 @@ func TestRouterDeploymentSecretKeepsNoManifestsForTheOperatorsOwn(t *testing.T) 
 		t.Fatal(err)
 	}
 	// The manifests are for a hand-installed router. With no enrollmentSecretRef the pod only needs the JWT.
-	if len(s.Data[SecretKeyCompose]) != 0 || len(s.Data[SecretKeyDeployment]) != 0 {
+	if len(s.Data[SecretKeyCompose]) != 0 || len(s.Data[SecretKeyRouter]) != 0 {
 		t.Errorf("secret keys = %v", keysOf(s.Data))
 	}
 	if string(s.Data[SecretKeyJWT]) == "" {
@@ -779,7 +779,7 @@ func TestRouterDeploymentSecretKeepsNoManifestsForTheOperatorsOwn(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Data[SecretKeyCompose]) == 0 || len(s.Data[SecretKeyDeployment]) == 0 {
+	if len(s.Data[SecretKeyCompose]) == 0 || len(s.Data[SecretKeyRouter]) == 0 {
 		t.Errorf("named secret keys = %v", keysOf(s.Data))
 	}
 }
@@ -807,7 +807,7 @@ func TestRouterManifestsFollowTheAddressAndLeaveWithTheJWT(t *testing.T) {
 	e.reconcile(t)
 	s, _ := e.secret(t)
 	if c := string(s.Data[SecretKeyCompose]); !strings.Contains(c, "CHANGE_ME.invalid") || !strings.Contains(c, string(s.Data[SecretKeyJWT])) ||
-		!strings.Contains(c, "ziti-router:2.0.4") || len(s.Data[SecretKeyDeployment]) == 0 {
+		!strings.Contains(c, "ziti-router:2.0.4") || len(s.Data[SecretKeyRouter]) == 0 {
 		t.Errorf("manifests = %q", s.Data)
 	}
 
@@ -825,7 +825,41 @@ func TestRouterManifestsFollowTheAddressAndLeaveWithTheJWT(t *testing.T) {
 	e.router()["isVerified"] = true
 	e.reconcile(t)
 	s, _ = e.secret(t)
-	if len(s.Data[SecretKeyJWT])+len(s.Data[SecretKeyCompose])+len(s.Data[SecretKeyDeployment]) != 0 {
+	if len(s.Data[SecretKeyJWT])+len(s.Data[SecretKeyCompose])+len(s.Data[SecretKeyRouter]) != 0 {
 		t.Errorf("the JWT and manifests must leave the Secret once the router has enrolled: %v", s.Data)
+	}
+}
+
+func TestRouterBundleServiceTypeFollowsPortable(t *testing.T) {
+	e := setupRouter(t, func(r *zitiv1.ZitiRouter) { r.Spec.AdvertisedAddress = "edge.example.com" })
+	var conn zitiv1.ZitiConnection
+	if err := e.k.Get(t.Context(), types.NamespacedName{Name: "default"}, &conn); err != nil {
+		t.Fatal(err)
+	}
+	conn.Status.ControllerVersion = "v2.0.4"
+	if err := e.k.Update(t.Context(), &conn); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	s, err := e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(s.Data[SecretKeyRouter]); !strings.Contains(got, "type: LoadBalancer") {
+		t.Errorf("router.yaml default Service type:\n%s", got)
+	}
+
+	rt := e.reconcile(t)
+	rt.Spec.Portable = &zitiv1.ZitiRouterPortable{ServiceType: "NodePort"}
+	if err := e.k.Update(t.Context(), rt); err != nil {
+		t.Fatal(err)
+	}
+	e.reconcile(t)
+	s, err = e.secret(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(s.Data[SecretKeyRouter]); !strings.Contains(got, "type: NodePort") {
+		t.Errorf("router.yaml did not honor portable.serviceType:\n%s", got)
 	}
 }

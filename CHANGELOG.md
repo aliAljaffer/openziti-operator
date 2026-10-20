@@ -16,6 +16,36 @@
 - `ZitiSidecar.spec.resolver` is now passed as `--dnsUpstream`, and the tunneler listens on `127.0.0.1:53`. It has no default. Set it to the cluster DNS IP, for example `udp://10.96.0.10:53`. When it is empty, the patch omits `--dnsUpstream` and cluster Service names do not resolve in the pod.
 - Re-applying a `Host` patch restarts the workload and changes its pod DNS. Remove `hostNetwork: true` if you set it from the old docs.
 
+## v0.3.0
+
+Adds a validating admission webhook, Prometheus alerts and an optional Grafana dashboard, conditions and metrics for every kind, and a portable router bundle. Nothing in `v0.2.0` changes shape: the webhook is off by default, the new `ZitiRouter` fields are optional, and no existing field changes meaning.
+
+### Notes
+
+**The webhook is off by default.** The chart ships `webhook.enabled=false`, so an existing install is unchanged. Set `webhook.enabled=true` to validate `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy`, and `ZitiConnection` at admission with the same offline checks the reconciler runs.
+
+**The webhook ships with `failurePolicy: Ignore`.** A webhook outage, or a call that never reaches the operator, falls through to the reconciler, which still reports `InvalidSpec`. Move to `Fail` only after the install is proven, because `Fail` blocks every edit of the covered kinds while the webhook is down.
+
+**The router bundle key is now `router.yaml`.** `ZitiRouter` without `spec.deployment` writes a self-contained bundle to `enrollmentSecretRef` under the key `router.yaml`, replacing `deployment.yaml`. The bundle is portable: the enrollment JWT carries the controller address, and the router image fetches and pins the controller certificate, so no CA bundle or `ZitiConnection` data travel with it. Set `spec.portable.serviceType` to choose the Service type in the bundle.
+
+### Added
+
+- An optional validating admission webhook for the everyday kinds. The chart generates a self-signed serving certificate, mounts it on the manager, and writes the CA into the `ValidatingWebhookConfiguration` `caBundle`. It never calls Ziti, so admission works while the controller is down.
+- `ZitiRouter.spec.portable.serviceType` chooses the Service type (`ClusterIP`, `NodePort`, or `LoadBalancer`) in the portable `router.yaml` bundle. The default is `LoadBalancer`.
+- A `PrometheusRule` with alerts for resource conditions, identity certificate expiry, orphaned entities, and Ziti API errors, shipped when `prometheus.enabled=true` (set `prometheus.rules.enabled=false` to keep only the ServiceMonitor).
+- An optional Grafana dashboard, installed as a ConfigMap for the kube-prometheus-stack sidecar with `grafanaDashboard.enabled=true`.
+- `ziti_operator_resource_conditions` now reports all fifteen kinds, up from four, plus `ziti_operator_identity_certificate_expires_seconds` and `ziti_operator_app_service_terminators`. All are computed at scrape time, so no series goes stale.
+
+### Upgrade
+
+```bash
+helm upgrade ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.3.0 -n ziti-operator-system
+```
+
+The chart defaults its image tag to the chart app version, so no image override is needed. The webhook stays off until you set `webhook.enabled=true`.
+
+See [Installation](docs/install.md) for a fresh install, [Validation](docs/validation.md) for the webhook, and [Compatibility](docs/compatibility.md) for tested versions.
+
 ## v0.2.0
 
 Adds in-cluster router deployment, a sidecar tunneler, Ingress support, session visibility, port forwarding, and Service selectors. Nothing in `v0.1.2` changes shape: `spec.deployment` and `deployment.serviceType` are new fields, so there is nothing to migrate.

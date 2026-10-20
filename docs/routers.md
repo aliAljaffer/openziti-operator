@@ -30,7 +30,7 @@ The operator writes two ready-made files to the Secret, next to the JWT.
 | Secret key | Use |
 |---|---|
 | `docker-compose.yml` | Start the router on a VM with Docker Compose. |
-| `deployment.yaml` | Start the router in a Kubernetes cluster. It holds a Secret, a PersistentVolumeClaim, a Deployment, and a Service of type LoadBalancer. |
+| `router.yaml` | The drag-and-drop bundle for a Kubernetes cluster. It holds a Secret with the enrollment JWT, a PersistentVolumeClaim, a Deployment, and a Service. |
 
 On a VM:
 
@@ -42,8 +42,28 @@ docker compose up -d
 In a cluster:
 
 ```sh
-kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.deployment\.yaml}' | base64 -d | kubectl apply -f -
+kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.router\.yaml}' | base64 -d | kubectl apply -f -
 ```
+
+## Run the router in another cluster
+
+`router.yaml` is self-contained and needs nothing from this cluster. The enrollment JWT carries the controller
+address in its `iss` claim, and the router image fetches and pins the controller certificate on first contact,
+so no CA bundle and no `ZitiConnection` data travel with it.
+
+```sh
+kubectl -n routers get secret edge-1-enrollment -o jsonpath='{.data.router\.yaml}' | base64 -d > edge-1.yaml
+kubectl --context target -n routers apply -f edge-1.yaml
+```
+
+The target cluster must reach the controller, and `advertisedAddress` must be the name or address clients and
+other routers use to reach the router from there. Set `spec.portable.serviceType` to choose the type of the
+Service in the bundle. The default is `LoadBalancer`; use `NodePort` where the target cluster has no load
+balancer, and set `advertisedAddress` to a node address. `ClusterIP` is reachable only inside that cluster.
+
+Apply the bundle within about three hours. The enrollment JWT expires after that. The operator renews the copy
+in this cluster's Secret when the pending one runs out, but it cannot reach a file you already exported. If it
+expired, fetch `router.yaml` again and reapply.
 
 Set `advertisedAddress` to the DNS name or IP where clients and other routers reach the router. If you leave it empty, the files contain `CHANGE_ME.invalid`. A router with that address enrolls and goes online. Clients cannot connect to it. Edit the address before clients use the router.
 
@@ -120,7 +140,7 @@ Check the reclaim policy of the storage class. With `Retain`, deleting the resou
 
 The router needs one replica and a volume. It does not need CPU or memory requests, and the operator does not set them.
 
-The JWT works once and expires after about three hours. The operator writes new files when it issues a new JWT. It removes the JWT and both files when the router has enrolled. The files need the controller version, so the `ZitiConnection` must be connected.
+The JWT works once and expires after about three hours. The operator writes new bundles when it issues a new JWT. It removes the JWT and both bundles when the router has enrolled. The bundles need the controller version, so the `ZitiConnection` must be connected.
 
 ## Give the JWT to the router
 
@@ -149,9 +169,10 @@ Without `enrollmentSecretRef` the JWT stays in Ziti and the operator writes no S
 | `enrollmentSecretRef` | Where the enrollment JWT and the ready-made files go. |
 | `advertisedAddress` | Where clients and other routers reach the router. Used in the ready-made files. |
 | `port` | The router port in the ready-made files. Default 3022. |
-| `storageClassName` | StorageClass of the volume in `deployment.yaml` and in the in-cluster volume claim. Default: the cluster default. |
+| `storageClassName` | StorageClass of the volume in `router.yaml` and in the in-cluster volume claim. Default: the cluster default. |
 | `deletionPolicy` | `Delete` (default) removes the router from Ziti with the resource. `Orphan` only removes the operator tags. |
 | `deployment` | Run the router in the cluster. Absent means the operator only writes manifests to a Secret. |
+| `portable.serviceType` | The Service type in `router.yaml`. Default `LoadBalancer`. Use `NodePort` where the target cluster has no load balancer, then set `advertisedAddress` to a node address. |
 
 ## Conditions
 
