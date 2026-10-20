@@ -24,10 +24,14 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("# Add the Ziti tunneler to a workload with:\n")
 	fmt.Fprintf(&b, "#   kubectl patch deployment %q -n %s --patch-file sidecar-patch.yaml --type=strategic\n", "<name>", sc.Namespace)
 	if s.Mode == "Host" {
-		b.WriteString("# Host mode rewrites iptables in the pod network namespace, so the pod needs NET_ADMIN and NET_RAW.\n")
-		b.WriteString("# It usually needs hostNetwork too, and that is the workload's own setting to make.\n")
+		b.WriteString("# Host mode runs tproxy in the pod network namespace. It needs root, NET_ADMIN, and NET_RAW.\n")
+		b.WriteString("# The pod resolver points at the tunneler. Do not set hostNetwork: it changes the node iptables.\n")
 	}
 	b.WriteString("spec:\n  template:\n    spec:\n")
+	if s.Mode == "Host" {
+		b.WriteString("      dnsPolicy: None\n")
+		b.WriteString("      dnsConfig:\n        nameservers:\n          - 127.0.0.1\n")
+	}
 
 	b.WriteString("      volumes:\n")
 	b.WriteString("        - name: ziti-identity\n")
@@ -47,6 +51,7 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 	b.WriteString("            allowPrivilegeEscalation: false\n")
 	b.WriteString("            readOnlyRootFilesystem: false\n")
 	if s.Mode == "Host" {
+		b.WriteString("            runAsUser: 0\n")
 		b.WriteString("            capabilities:\n")
 		b.WriteString("              add:\n")
 		b.WriteString("                - NET_ADMIN\n")
@@ -60,13 +65,20 @@ func SidecarPatch(sc *zitiv1.ZitiSidecar, version string) string {
 
 const sidecarContainerName = "ziti-tunneler"
 
-// sidecarCommand builds the tunneler command line. Proxy mode needs no resolver: it forwards to the addresses
+// sidecarCommand builds the tunneler command line. Proxy mode needs no resolver or upstream: it forwards to the addresses
 // Ziti hands it rather than resolving names in the pod.
 func sidecarCommand(s zitiv1.ZitiSidecarSpec) []string {
-	cmd := []string{"ziti", "tunnel", strings.ToLower(s.Mode), "-i", IdentityMountPath + "/identity.json",
+	mode := "proxy"
+	if s.Mode == "Host" {
+		mode = "tproxy"
+	}
+	cmd := []string{"ziti", "tunnel", mode, "-i", IdentityMountPath + "/identity.json",
 		"--svcPollRate", fmt.Sprint(s.ServicePollRate)}
 	if s.Mode == "Host" {
-		cmd = append(cmd, "-r", s.Resolver)
+		cmd = append(cmd, "-r", "udp://127.0.0.1:53")
+		if s.Resolver != "" {
+			cmd = append(cmd, "--dnsUpstream", s.Resolver)
+		}
 	}
 	return cmd
 }

@@ -30,8 +30,8 @@
 | `spec.manifestSecretRef` | object | no |  | manifestSecretRef names the Secret that receives the patch under the key "sidecar-patch.yaml". Without it the operator writes nothing and only reports. |
 | `spec.manifestSecretRef.name` | string | yes |  | name of the Secret. |
 | `spec.manifestSecretRef.namespace` | string | yes |  | namespace of the Secret. |
-| `spec.mode` | string | no | `"Host"` | mode is Host for tproxy interception, which needs NET_ADMIN and usually hostNetwork, or Proxy for a transparent proxy that needs neither. It cannot change later. One of: `Host`, `Proxy`. |
-| `spec.resolver` | string | no | `"udp://kube-dns.kube-system.svc.cluster.local:53"` | resolver is the DNS upstream the tunneler uses. The default is the cluster DNS, which the image default of 127.0.0.1 cannot reach. Maximum length 253. |
+| `spec.mode` | string | no | `"Host"` | mode is Host for tproxy interception, which needs root, NET_ADMIN, and NET_RAW, or Proxy for a transparent proxy that needs neither. It cannot change later. One of: `Host`, `Proxy`. |
+| `spec.resolver` | string | no |  | resolver is the DNS upstream (--dnsUpstream) for names that are not Ziti services. The tunneler itself listens on 127.0.0.1:53 and the patch points the pod resolver at it. Use the cluster DNS IP, for example udp://10.96.0.10:53. Without it, cluster Service names do not resolve in the pod. Maximum length 253. |
 | `spec.servicePollRate` | integer | no | `15` | servicePollRate is how often the tunneler asks Ziti for service changes, in seconds. Minimum 1. Maximum 3600. |
 
 ## Validation rules
@@ -71,8 +71,7 @@ metadata:
   name: zitisidecar-sample
 spec:
   identityRef: zitiidentity-sample
-  # Host is tproxy: it rewrites iptables, so the patched workload needs NET_ADMIN, NET_RAW, and usually
-  # hostNetwork. Use Proxy when the workload cannot have those.
+  # Host is tproxy: the patched workload needs root, NET_ADMIN, and NET_RAW. Use Proxy when it cannot have those.
   mode: Host
   manifestSecretRef:
     namespace: default

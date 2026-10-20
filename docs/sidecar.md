@@ -32,10 +32,10 @@ kubectl -n team-a patch deployment billing --patch-file sidecar-patch.yaml --typ
 
 | Mode | What it does | What the workload needs |
 |---|---|---|
-| `Host` (default) | tproxy. Intercepts traffic in the pod network namespace and resolves names through Ziti. | `NET_ADMIN` and `NET_RAW`, and usually `hostNetwork`. The patch adds the capabilities. |
+| `Host` (default) | tproxy. Intercepts traffic in the pod network namespace and resolves names through Ziti. | Root, `NET_ADMIN`, and `NET_RAW`. The patch adds them, and sets `dnsPolicy: None` with the tunneler as the pod resolver. Do not set `hostNetwork`. |
 | `Proxy` | Transparent proxy. Forwards to the addresses Ziti hands it. | No capabilities, no `hostNetwork`. Does not resolve names. |
 
-The patch passes `-r` with your `resolver` in `Host` mode. The image default is `udp://127.0.0.1:53`, which reaches nothing inside a pod, so the default here is the cluster DNS.
+In `Host` mode the patch runs `ziti tunnel tproxy`. The tunneler listens on `127.0.0.1:53` and passes names that are not Ziti services to your `resolver` through `--dnsUpstream`.
 
 ## Keys
 
@@ -43,7 +43,7 @@ The patch passes `-r` with your `resolver` in `Host` mode. The image default is 
 |---|---|
 | `identityRef` | The `ZitiIdentity` in the same namespace whose `identity.json` the tunneler uses. Immutable. |
 | `mode` | `Host` or `Proxy`. Immutable. |
-| `resolver` | DNS upstream for `Host` mode. Default the cluster DNS. |
+| `resolver` | `--dnsUpstream` for `Host` mode. Set it to the cluster DNS IP, for example `udp://10.96.0.10:53`. Without it, cluster Service names do not resolve in the pod. |
 | `servicePollRate` | Seconds between polls of Ziti for service changes. Default 15. |
 | `manifestSecretRef` | Secret that receives `sidecar-patch.yaml`. Without it the operator only reports. |
 

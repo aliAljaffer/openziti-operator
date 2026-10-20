@@ -93,17 +93,17 @@ spec:
               mode:
                 default: Host
                 description: |-
-                  mode is Host for tproxy interception, which needs NET_ADMIN and usually hostNetwork, or Proxy for a
+                  mode is Host for tproxy interception, which needs root, NET_ADMIN, and NET_RAW, or Proxy for a
                   transparent proxy that needs neither. It cannot change later.
                 enum:
                 - Host
                 - Proxy
                 type: string
               resolver:
-                default: udp://kube-dns.kube-system.svc.cluster.local:53
                 description: |-
-                  resolver is the DNS upstream the tunneler uses. The default is the cluster DNS, which the image default
-                  of 127.0.0.1 cannot reach.
+                  resolver is the DNS upstream (--dnsUpstream) for names that are not Ziti services. The tunneler
+                  itself listens on 127.0.0.1:53 and the patch points the pod resolver at it. Use the cluster DNS IP, for
+                  example udp://10.96.0.10:53. Without it, cluster Service names do not resolve in the pod.
                 maxLength: 253
                 type: string
               servicePollRate:

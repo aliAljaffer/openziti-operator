@@ -16,7 +16,7 @@ func sidecar(mut func(*zitiv1.ZitiSidecar)) *zitiv1.ZitiSidecar {
 	sc.Name = "side"
 	sc.Namespace = "team-a"
 	sc.Spec = zitiv1.ZitiSidecarSpec{IdentityRef: "alice", Mode: "Host",
-		Resolver: "udp://kube-dns.kube-system.svc.cluster.local:53", ServicePollRate: 15}
+		Resolver: "udp://10.96.0.10:53", ServicePollRate: 15}
 	if mut != nil {
 		mut(sc)
 	}
@@ -54,8 +54,8 @@ func TestSidecarPatchIsValidYAMLAndAValidStrategicPatch(t *testing.T) {
 	if c.Name != "ziti-tunneler" || c.Image != "openziti/ziti-router:2.0.4" {
 		t.Errorf("container = %+v", c)
 	}
-	want := []string{"ziti", "tunnel", "host", "-i", "/ziti/identity.json", "--svcPollRate", "15",
-		"-r", "udp://kube-dns.kube-system.svc.cluster.local:53"}
+	want := []string{"ziti", "tunnel", "tproxy", "-i", "/ziti/identity.json", "--svcPollRate", "15",
+		"-r", "udp://127.0.0.1:53", "--dnsUpstream", "udp://10.96.0.10:53"}
 	if strings.Join(c.Command, " ") != strings.Join(want, " ") {
 		t.Errorf("command = %v, want %v", c.Command, want)
 	}
@@ -69,7 +69,7 @@ func TestSidecarPatchIsValidYAMLAndAValidStrategicPatch(t *testing.T) {
 
 func TestSidecarProxyModeNeedsNoResolverOrCapabilities(t *testing.T) {
 	patch := SidecarPatch(sidecar(func(s *zitiv1.ZitiSidecar) { s.Spec.Mode = "Proxy" }), "v2.0.4")
-	if strings.Contains(patch, "-r ") || strings.Contains(patch, "udp://") {
+	if strings.Contains(patch, "\"-r\"") || strings.Contains(patch, "udp://") || strings.Contains(patch, "dnsPolicy") {
 		t.Errorf("proxy mode must not pass a resolver: %s", patch)
 	}
 	if strings.Contains(patch, "NET_ADMIN") || strings.Contains(patch, "capabilities") {
@@ -82,14 +82,13 @@ func TestSidecarProxyModeNeedsNoResolverOrCapabilities(t *testing.T) {
 
 func TestSidecarHostModeAsksForTheTproxyCapabilities(t *testing.T) {
 	patch := SidecarPatch(sidecar(nil), "v2.0.4")
-	for _, want := range []string{"NET_ADMIN", "NET_RAW", "allowPrivilegeEscalation: false", "readOnlyRootFilesystem: false"} {
+	for _, want := range []string{"NET_ADMIN", "NET_RAW", "runAsUser: 0", "dnsPolicy: None", "- 127.0.0.1", "allowPrivilegeEscalation: false", "readOnlyRootFilesystem: false"} {
 		if !strings.Contains(patch, want) {
 			t.Errorf("host mode patch is missing %q: %s", want, patch)
 		}
 	}
-	// The image default cannot resolve anything inside a pod.
-	if strings.Contains(patch, "127.0.0.1:53") {
-		t.Errorf("the patch must not use the image default resolver: %s", patch)
+	if strings.Contains(patch, "hostNetwork: true") {
+		t.Errorf("the patch must not set hostNetwork: %s", patch)
 	}
 }
 
