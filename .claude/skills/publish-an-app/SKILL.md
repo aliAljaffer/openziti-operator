@@ -33,7 +33,7 @@ Ingress limits: every path must go to one Service and port. TLS Ingresses are no
 
 ## Access
 
-`allow.groups` and `allow.identities` set who may dial. `memberOf` sets the service role attributes. Groups follow role scope (skill `access-and-scope`). `entryRouters` and `hostedBy` must come from the connection lists.
+`allow.groups` and `allow.identities` set who may dial. `memberOf` sets the service role attributes. Groups follow role scope (`.claude/skills/access-and-scope/SKILL.md`). `entryRouters` and `hostedBy` must come from the connection lists.
 
 ## Existing services
 
@@ -45,4 +45,4 @@ Ingress limits: every path must go to one Service and port. TLS Ingresses are no
 kubectl -n <ns> get ztapp <name> -o wide
 ```
 
-`HOSTED`, `DIALABLE`, `ROUTEPATH`, `READY` must be `True`. `HOSTED` can lag several minutes. Dial the service without `curl -k`. Failures: skill `troubleshoot-resources`, `docs/conditions.md`.
+`HOSTED`, `DIALABLE`, `ROUTEPATH`, `READY` must be `True`. `HOSTED` can lag several minutes. Dial the service without `curl -k`. Failures: `.claude/skills/troubleshoot-resources/SKILL.md`, `docs/conditions.md`.

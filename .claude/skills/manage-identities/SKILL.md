@@ -34,4 +34,4 @@ Details: `docs/reference/ZitiIdentity.md`, `docs/cert-manager.md`, `docs/service
 
 ## Checks
 
-`kubectl get ztid`: `ENROLLED`, `READY`, cert expiry, sessions. Certificates renew when the smaller of 30 days and one third of the lifetime remains. Failures: skill `troubleshoot-resources`.
+`kubectl get ztid`: `ENROLLED`, `READY`, cert expiry, sessions. Certificates renew when the smaller of 30 days and one third of the lifetime remains. Failures: `.claude/skills/troubleshoot-resources/SKILL.md`.

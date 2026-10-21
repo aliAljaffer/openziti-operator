@@ -28,7 +28,7 @@ Without Helm: `make build-installer IMG=...`, apply `dist/install.yaml`, then ap
 | Key | Rule |
 |---|---|
 | `managementUrl` | Starts with `https://`. The host must be in the controller certificate SAN. |
-| `roleScope` | `Namespaced` (default) or `Global`. See skill `access-and-scope`. |
+| `roleScope` | `Namespaced` (default) or `Global`. See `.claude/skills/access-and-scope/SKILL.md`. |
 | `hostingRouters` | Routers an app may use as `hostedBy`. The first is the default. |
 | `entryRouters`, `defaultEdgeRouters` | Limit and add routers for dial paths. |
 | `allowedNamespaces` | Label selector of namespaces that may use the connection. |
@@ -44,4 +44,4 @@ Without Helm: `make build-installer IMG=...`, apply `dist/install.yaml`, then ap
 
 ## If not connected
 
-Run the skill `troubleshoot-resources`, section ZitiConnection.
+See `.claude/skills/troubleshoot-resources/SKILL.md`, section ZitiConnection.

@@ -29,4 +29,4 @@ Fetch a key: `kubectl -n <ns> get secret <name> -o jsonpath='{.data.<key with \.
 
 ## Check
 
-`kubectl get ztrouter -o wide`: `ENROLLED`, `ONLINE`. Condition `Serving` is `True` when every service that picked this router has a terminator on it. Failures: skill `troubleshoot-resources`.
+`kubectl get ztrouter -o wide`: `ENROLLED`, `ONLINE`. Condition `Serving` is `True` when every service that picked this router has a terminator on it. Failures: `.claude/skills/troubleshoot-resources/SKILL.md`.
