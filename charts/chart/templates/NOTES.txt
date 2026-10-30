@@ -1,15 +1,45 @@
 Thank you for installing {{ .Chart.Name }}.
 
 Your release is named {{ .Release.Name }}.
+The controller and CRDs are installed in namespace {{ .Release.Namespace }}.
 
-The controller and CRDs have been installed in namespace {{ .Release.Namespace }}.
+Check that the operator reached the Ziti controller:
 
-To verify the installation:
+  kubectl get ztconn
+  kubectl get ziti -A
 
-  kubectl get pods -n {{ .Release.Namespace }}
-  kubectl get customresourcedefinitions
+CONNECTED must show True. The second command lists every Ziti resource in one table.
 
-To learn more about the release, try:
+Publish your first app: https://github.com/aliAljaffer/openziti-operator/blob/main/docs/first-app.md
 
-  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
-  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+{{ if .Values.metrics.enabled -}}
+Metrics are served on port {{ .Values.metrics.port }} of the manager pod.
+{{ if .Values.prometheus.enabled -}}
+A ServiceMonitor and the alert rules are installed.
+{{- else -}}
+Set prometheus.enabled=true to install a ServiceMonitor and the alert rules.
+{{- end }}
+{{ end -}}
+
+{{ if .Values.webhook.enabled -}}
+Validating admission webhooks are enabled. A bad spec is rejected at apply time.
+{{- else -}}
+Validating admission webhooks are off. Set webhook.enabled=true to reject bad specs at apply time.
+{{- end }}
+
+To learn more about the release:
+
+  helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+To uninstall:
+
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{ if .Values.crd.keep -}}
+The CRDs stay after uninstall. Delete your Ziti resources before uninstalling to remove their Ziti
+entities, or use deletionPolicy: Orphan to keep them.
+{{- else -}}
+The CRDs are removed with the release. Delete your Ziti resources before uninstalling to remove
+their Ziti entities, or use deletionPolicy: Orphan to keep them.
+{{- end }}
