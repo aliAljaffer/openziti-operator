@@ -78,9 +78,11 @@ type ZitiTerminatorStatus struct {
 	// +optional
 	ZitiID string `json:"zitiId,omitempty"`
 
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

@@ -86,7 +86,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var backend corev1.Service
 	if err := r.Get(ctx, client.ObjectKey{Namespace: ing.Namespace, Name: backendName}, &backend); err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{RequeueAfter: dependencyRetry}, nil
+			return ctrl.Result{RequeueAfter: DependencyRetry}, nil
 		}
 		return ctrl.Result{}, err
 	}

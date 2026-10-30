@@ -94,8 +94,10 @@ type ZitiJwtSignerSpec struct {
 }
 
 type ZitiJwtSignerStatus struct {
+	// signerId is the Ziti ID of the external JWT signer.
 	// +optional
 	SignerID string `json:"signerId,omitempty"`
+	// authPolicyId is the Ziti ID of the auth policy that uses the signer.
 	// +optional
 	AuthPolicyID string `json:"authPolicyId,omitempty"`
 	// issuer is the token issuer that Ziti accepts.
@@ -104,9 +106,11 @@ type ZitiJwtSignerStatus struct {
 	// keyId is the id of the signing key that Ziti uses. Empty with jwksEndpoint.
 	// +optional
 	KeyID string `json:"keyId,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

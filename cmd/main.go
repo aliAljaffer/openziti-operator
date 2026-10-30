@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -43,8 +44,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/audit"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
+	"github.com/aliAljaffer/openziti-operator/internal/version"
 	webhookv1alpha1 "github.com/aliAljaffer/openziti-operator/internal/webhook/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -64,6 +67,9 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "audit" {
+		os.Exit(audit.Main(os.Args[2:]))
+	}
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -79,8 +85,10 @@ func main() {
 	var leaderElectionNamespace string
 	var orphanInterval time.Duration
 	var createZitiConnection bool
+	var showVersion bool
 	var connectionFlags providerflags.Flags
 	var tlsOpts []func(*tls.Config)
+	flag.BoolVar(&showVersion, "version", false, "Print the version and exit.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -103,7 +111,7 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Float64Var(&zitiRequestsPerSecond, "ziti-requests-per-second", 10,
@@ -115,11 +123,27 @@ func main() {
 	flag.StringVar(&orphanPolicy, "orphan-policy", string(controller.OrphanReport),
 		"What to do with Ziti entities of this cluster whose owner resource is gone: report or delete.")
 	flag.DurationVar(&orphanInterval, "orphan-sweep-interval", time.Hour, "How often to look for orphaned Ziti entities.")
+	flag.DurationVar(&controller.ServiceResync, "resync-interval", controller.ServiceResync,
+		"How often to reconcile a resource that matches its Ziti entities.")
+	flag.DurationVar(&controller.DependencyRetry, "dependency-retry-interval", controller.DependencyRetry,
+		"How soon to look again when a resource names a Ziti entity that does not exist yet.")
+	flag.DurationVar(&controller.PendingRecheck, "pending-retry-interval", controller.PendingRecheck,
+		"How soon to look again while a certificate or enrollment is pending.")
+	flag.DurationVar(&controller.CAResync, "ca-resync-interval", controller.CAResync,
+		"How often to check a ZitiCA for a rotated certificate.")
+	flag.DurationVar(&controller.ConnectionResync, "connection-resync-interval", controller.ConnectionResync,
+		"How often to check a healthy ZitiConnection.")
+	flag.DurationVar(&controller.ConnectionRetry, "connection-retry-interval", controller.ConnectionRetry,
+		"How soon to retry a ZitiConnection that cannot reach the controller.")
 	flag.BoolVar(&createZitiConnection, "create-connection", false,
 		"Create a ZitiConnection named \"default\" in the operator namespace from the connection flags if none exists. "+
 			"The generated resource has no owner, so it is not pruned when the release is uninstalled.")
 	connectionFlags.Bind(flag.CommandLine)
 	flag.Parse()
+	if showVersion {
+		fmt.Println(version.Get())
+		return
+	}
 	if orphanPolicy != string(controller.OrphanReport) && orphanPolicy != string(controller.OrphanDelete) {
 		setupLog.Error(nil, "Invalid --orphan-policy, use report or delete", "value", orphanPolicy)
 		os.Exit(1)
@@ -128,6 +152,20 @@ func main() {
 	if orphanInterval <= 0 {
 		setupLog.Error(nil, "Invalid --orphan-sweep-interval, use a duration above zero", "value", orphanInterval.String())
 		os.Exit(1)
+	}
+
+	for name, value := range map[string]time.Duration{
+		"resync-interval":            controller.ServiceResync,
+		"dependency-retry-interval":  controller.DependencyRetry,
+		"pending-retry-interval":     controller.PendingRecheck,
+		"ca-resync-interval":         controller.CAResync,
+		"connection-resync-interval": controller.ConnectionResync,
+		"connection-retry-interval":  controller.ConnectionRetry,
+	} {
+		if value <= 0 {
+			setupLog.Error(nil, "Invalid interval, use a duration above zero", "flag", name, "value", value.String())
+			os.Exit(1)
+		}
 	}
 
 	if enableWebhook && webhookCertPath == "" {
@@ -383,6 +421,10 @@ func main() {
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up ready check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("ziti", (&controller.ZitiReadiness{Reader: mgr.GetClient()}).Check); err != nil {
+		setupLog.Error(err, "Failed to set up Ziti ready check")
 		os.Exit(1)
 	}
 

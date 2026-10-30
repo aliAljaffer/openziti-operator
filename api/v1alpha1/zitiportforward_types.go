@@ -49,9 +49,11 @@ type ZitiPortForwardStatus struct {
 	// deploymentName is the Deployment that runs the proxy.
 	// +optional
 	DeploymentName string `json:"deploymentName,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

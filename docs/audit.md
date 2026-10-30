@@ -2,12 +2,36 @@
 
 The `audit` command reads a whole Ziti network and lists problems. It never writes.
 
+The manager image includes it as a subcommand. With a kubeconfig, point it at a `ZitiConnection` and it
+reads the URL, the CA bundle, and the credentials from the cluster:
+
+```sh
+go run ./cmd/main.go audit --connection default [-o table|json]
+```
+
+The same command runs in the manager pod:
+
+```sh
+kubectl -n ziti-operator-system exec deploy/ziti-operator -c manager -- \
+  /manager audit --connection default
+```
+
+To audit a controller that the operator does not manage, pass the URL and the credentials in the
+environment:
+
 ```sh
 ZITI_USERNAME=<user> ZITI_PASSWORD=<password> \
   go run ./cmd/audit --url https://<controller>/edge/management/v1 [--ca-file ca.pem] [-o table|json]
 ```
 
-It needs `ZITI_USERNAME` and `ZITI_PASSWORD` in the environment. Without `--ca-file` it uses the controller's own CA.
+`--ca-file` is a PEM bundle. Without it the command uses the controller's well-known CA.
+
+Set `--fail-on` to make the command usable as a CI check. It exits 1 when any finding matches. Use
+`any` or a comma separated list of codes:
+
+```sh
+go run ./cmd/main.go audit --connection default --fail-on NoTerminator,NoDialer
+```
 
 ## Findings
 

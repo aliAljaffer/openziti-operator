@@ -55,7 +55,6 @@ const (
 	ManagedByLabelValue  = "ziti-operator"
 	defaultAuthPolicy    = "Default"
 	enrollmentTTL        = 24 * time.Hour
-	pendingRecheck       = time.Minute
 	certWarnBefore       = 30 * 24 * time.Hour
 	CondCertValid        = "CertificateValid"
 	CondSessionsObserved = "SessionsObserved"
@@ -116,21 +115,21 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var next ctrl.Result
 	switch {
 	case err == nil && id.Spec.Certificate != nil && !meta.IsStatusConditionTrue(id.Status.Conditions, CondReady):
-		next.RequeueAfter = jitter(pendingRecheck)
+		next.RequeueAfter = jitter(PendingRecheck)
 	case err == nil && (id.Status.Enrolled || id.Spec.EnrollmentMode == zitiv1alpha1.EnrollmentNone):
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case err == nil:
-		next.RequeueAfter = jitter(pendingRecheck)
+		next.RequeueAfter = jitter(PendingRecheck)
 	case errors.As(err, &se):
-		markFailed(&id.Status.Conditions, id.Generation, se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &id, &id.Status.Conditions, id.Generation, se.reason, se.msg)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&id.Status.Conditions, id.Generation, "ZitiRejected", err.Error())
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &id, &id.Status.Conditions, id.Generation, "ZitiRejected", err.Error())
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
-		markFailed(&id.Status.Conditions, id.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &id, &id.Status.Conditions, id.Generation, "Error", err.Error())
 	}
 	id.Status.ObservedGeneration = id.Generation
 

@@ -61,7 +61,7 @@ The API server rejects a resource that breaks one of these rules.
 
 | Field | Type | Description |
 |---|---|---|
-| `status.conditions` | list of object |  |
+| `status.conditions` | list of object | conditions report the state of the resource. Ready is the summary. |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
 | `status.conditions[].message` | string | message is a human readable message indicating details about the transition. This may be an empty string. Maximum length 32768. |
 | `status.conditions[].observedGeneration` | integer | observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance. Minimum 0. |
@@ -70,9 +70,9 @@ The API server rejects a resource that breaks one of these rules.
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
 | `status.enrolled` | boolean | enrolled is true once the router has enrolled with its JWT. |
 | `status.enrollmentExpiresAt` | string | enrollmentExpiresAt is when the pending JWT expires. Empty once the router has enrolled. |
-| `status.observedGeneration` | integer |  |
+| `status.observedGeneration` | integer | observedGeneration is the metadata generation that this status reflects. |
 | `status.online` | boolean | online is true while the router is connected to the controller. |
-| `status.routerId` | string |  |
+| `status.routerId` | string | routerId is the Ziti ID of the edge router. |
 | `status.services` | list of string | services are the names of the services that have a terminator on this router. |
 | `status.zitiName` | string | zitiName is the name the router has in Ziti. It is set once and does not change. |
 

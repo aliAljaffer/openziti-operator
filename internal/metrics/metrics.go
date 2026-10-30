@@ -6,6 +6,8 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	"github.com/aliAljaffer/openziti-operator/internal/version"
 )
 
 var (
@@ -38,8 +40,16 @@ var (
 		Name: "ziti_operator_reconcile_total",
 		Help: "Reconcile loops per custom resource kind.",
 	}, []string{"kind"})
+
+	// BuildInfo reports the version, commit, and Go version of the running manager.
+	BuildInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ziti_operator_build_info",
+		Help: "Build information. The value is always 1.",
+	}, []string{"version", "commit", "go"})
 )
 
 func init() {
-	ctrlmetrics.Registry.MustRegister(APIRequests, ManagedEntities, Orphans, SweepErrors, Reconciliations)
+	info := version.Get()
+	BuildInfo.WithLabelValues(info.Version, info.Commit, info.Go).Set(1)
+	ctrlmetrics.Registry.MustRegister(APIRequests, ManagedEntities, Orphans, SweepErrors, Reconciliations, BuildInfo)
 }

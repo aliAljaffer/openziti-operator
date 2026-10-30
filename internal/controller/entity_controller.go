@@ -5,7 +5,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,10 +21,6 @@ import (
 	"github.com/aliAljaffer/openziti-operator/internal/metrics"
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
-
-// dependencyRetry is how soon to look again when a resource names a Ziti entity that does not exist yet.
-// Such resources are often applied together, so waiting the long resync would feel broken.
-const dependencyRetry = 30 * time.Second
 
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
@@ -131,21 +126,21 @@ func (r *entityReconciler[T]) Reconcile(ctx context.Context, req ctrl.Request) (
 	var next ctrl.Result
 	switch {
 	case err == nil:
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case errors.As(err, &me):
-		markFailed(&st.Conditions, obj.GetGeneration(), "TargetNotFound", me.Error())
-		next.RequeueAfter = dependencyRetry
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "TargetNotFound", me.Error())
+		next.RequeueAfter = DependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&st.Conditions, obj.GetGeneration(), se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), se.reason, se.msg)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&st.Conditions, obj.GetGeneration(), "ZitiRejected", err.Error())
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "ZitiRejected", err.Error())
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
-		markFailed(&st.Conditions, obj.GetGeneration(), "Error", err.Error())
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "Error", err.Error())
 	}
 	st.ObservedGeneration = obj.GetGeneration()
 

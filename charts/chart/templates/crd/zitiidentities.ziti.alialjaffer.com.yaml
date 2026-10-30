@@ -208,6 +208,8 @@ spec:
                 format: date-time
                 type: string
               conditions:
+                description: conditions report the state of the resource. Ready is
+                  the summary.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -279,14 +281,20 @@ spec:
                   type: string
                 type: array
               enrolled:
+                description: enrolled is true once the identity has enrolled.
                 type: boolean
               enrollmentExpiresAt:
+                description: enrollmentExpiresAt is when the pending enrollment JWT
+                  expires.
                 format: date-time
                 type: string
               observedGeneration:
+                description: observedGeneration is the metadata generation that this
+                  status reflects.
                 format: int64
                 type: integer
               zitiId:
+                description: zitiId is the Ziti ID of the identity.
                 type: string
               zitiName:
                 description: zitiName is the name the identity has in Ziti. It is

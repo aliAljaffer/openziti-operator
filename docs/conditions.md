@@ -6,7 +6,7 @@ Every resource reports its state in `status.conditions`. Read them with:
 kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}'
 ```
 
-`kubectl get -o wide` shows the `Ready` message. `kubectl describe` shows Events for every create, update, and delete of a Ziti entity.
+`kubectl get -o wide` shows the `Ready` message. `kubectl describe` shows Events for every create, update, and delete of a Ziti entity, and a Warning Event whenever a reconcile fails.
 
 ## Conditions by kind
 
@@ -53,6 +53,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 ## Reasons when `Synced` is false
 
 The operator did not finish writing to Ziti. Nothing more is written until the cause is fixed.
+The message ends with the short action from the table below, so `kubectl describe` and
+`kubectl get -o wide` carry the fix as well as the cause.
 
 Some of these cases fail admission first when the validating webhook is installed. See [Validation](validation.md). The condition and reason below are the same either way.
 
@@ -118,6 +120,7 @@ Some of these cases fail admission first when the validating webhook is installe
 | Event | Meaning |
 |---|---|
 | `Created`, `Updated`, `Deleted` | The operator changed a Ziti entity. |
+| Warning with the condition reason, for example `InvalidSpec` or `TargetNotFound` | The reconcile failed. The reason and message match the `Ready` condition, so `kubectl describe` shows the same cause as `status`. |
 | `Released` | The operator removed its tags and left the entity in Ziti (`Orphan` or an adopted identity). |
 | `Adopted` | The operator took over an existing identity. |
 | `Enrolled`, `EnrollmentCreated`, `EnrollmentExpired` | Identity enrollment steps. |

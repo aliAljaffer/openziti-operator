@@ -49,8 +49,8 @@ The API server rejects a resource that breaks one of these rules.
 
 | Field | Type | Description |
 |---|---|---|
-| `status.authPolicyId` | string |  |
-| `status.conditions` | list of object |  |
+| `status.authPolicyId` | string | authPolicyId is the Ziti ID of the auth policy that uses the signer. |
+| `status.conditions` | list of object | conditions report the state of the resource. Ready is the summary. |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
 | `status.conditions[].message` | string | message is a human readable message indicating details about the transition. This may be an empty string. Maximum length 32768. |
 | `status.conditions[].observedGeneration` | integer | observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance. Minimum 0. |
@@ -59,8 +59,8 @@ The API server rejects a resource that breaks one of these rules.
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
 | `status.issuer` | string | issuer is the token issuer that Ziti accepts. |
 | `status.keyId` | string | keyId is the id of the signing key that Ziti uses. Empty with jwksEndpoint. |
-| `status.observedGeneration` | integer |  |
-| `status.signerId` | string |  |
+| `status.observedGeneration` | integer | observedGeneration is the metadata generation that this status reflects. |
+| `status.signerId` | string | signerId is the Ziti ID of the external JWT signer. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).
 

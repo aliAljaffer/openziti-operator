@@ -65,21 +65,21 @@ func (r *ZitiTerminatorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var next ctrl.Result
 	switch {
 	case err == nil:
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case errors.As(err, &me):
-		markFailed(&t.Status.Conditions, t.Generation, "TargetNotFound", me.Error())
-		next.RequeueAfter = dependencyRetry
+		markFailed(r.Recorder, &t, &t.Status.Conditions, t.Generation, "TargetNotFound", me.Error())
+		next.RequeueAfter = DependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&t.Status.Conditions, t.Generation, se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &t, &t.Status.Conditions, t.Generation, se.reason, se.msg)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&t.Status.Conditions, t.Generation, "ZitiRejected", err.Error())
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &t, &t.Status.Conditions, t.Generation, "ZitiRejected", err.Error())
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
-		markFailed(&t.Status.Conditions, t.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &t, &t.Status.Conditions, t.Generation, "Error", err.Error())
 	}
 	t.Status.ObservedGeneration = t.Generation
 

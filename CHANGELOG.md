@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.3.2
+
+A quality-of-life release. No API fields change shape and existing resources keep working. Manager
+logs now default to JSON, and the chart can set the level and encoder.
+
+### Added
+
+- `manager audit`: the audit command ships in the manager image and can read a `ZitiConnection` from the cluster with `--connection`. `--fail-on any|CODE,...` makes it usable as a CI check.
+- `--version` and the `ziti_operator_build_info{version,commit,go}` metric.
+- A readiness check for the Ziti connection at `/readyz/ziti`. A fresh install with no `ZitiConnection` is ready.
+- Configurable resync and retry intervals through manager flags and `operator.intervals`.
+- Remediation hints at the end of failure condition messages, matching the tables in [Conditions and reasons](docs/conditions.md).
+- `make check` runs lint, tests, the docs and YAML checks, and the chart checks.
+- Descriptions on every CRD status field, so `kubectl explain` covers them.
+
+### Changed
+
+- Manager logs default to production JSON. Set `manager.logFormat=console` or `--zap-encoder=console` for console output; `manager.logLevel` sets the level.
+- Chart notes now show the connection check, metrics, webhook state, and uninstall behavior.
+- The sample manifests are valid and apply as a set.
+
+### Fixed
+
+- Reconcile failures produce Warning Events, so `kubectl describe` shows the cause.
+
+### Dependencies
+
+- `github.com/go-jose/go-jose/v4` 4.1.6 for CVE-2026-116587.
+- `docker/login-action` 4.7.0.
+
 ## v0.3.1
 
 Fixes `ZitiSidecar` `Host` mode, which did not intercept traffic. Existing `ZitiSidecar` resources keep working. Re-apply the patch to get the fix.

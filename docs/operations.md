@@ -4,6 +4,16 @@
 
 The Deployment runs two replicas with leader election. One replica works. The other waits. After the leader stops, the other takes over in about 20 seconds (measured with a killed process).
 
+## Health and readiness
+
+`/healthz` reports that the manager process is alive. `/readyz` also checks the Ziti connection:
+the manager is not ready while every `ZitiConnection` reports `Connected=False`. A fresh install with
+no `ZitiConnection` is ready, so the first connection can be created. Query the individual checks at
+`/readyz` and `/readyz/ziti` on the probe port.
+
+The reconcilers retry on their own schedule. `operator.intervals` and the matching manager flags
+control the healthy resync and the faster retries. See [Install](install.md#manager-flags).
+
 ## Metrics
 
 The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`.
@@ -18,6 +28,7 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | `ziti_operator_orphaned_entities{kind}` | Tagged entities whose owner is gone. |
 | `ziti_operator_sweep_errors_total` | Failed sweeps. |
 | `ziti_operator_reconcile_total{kind}` | Reconcile loops per custom resource kind. |
+| `ziti_operator_build_info{version,commit,go}` | Version, commit, and Go version of the running manager. The value is always 1. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
 
 The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics. Set

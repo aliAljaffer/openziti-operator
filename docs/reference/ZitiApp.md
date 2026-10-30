@@ -72,37 +72,37 @@ The API server rejects a resource that breaks one of these rules.
 
 | Field | Type | Description |
 |---|---|---|
-| `status.conditions` | list of object |  |
+| `status.conditions` | list of object | conditions report the state of the resource. Ready is the summary. |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
 | `status.conditions[].message` | string | message is a human readable message indicating details about the transition. This may be an empty string. Maximum length 32768. |
 | `status.conditions[].observedGeneration` | integer | observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance. Minimum 0. |
 | `status.conditions[].reason` | string | reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty. Minimum length 1. Maximum length 1024. Must match `^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`. |
 | `status.conditions[].status` | string | status of the condition, one of True, False, Unknown. One of: `True`, `False`, `Unknown`. |
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
-| `status.ids` | object |  |
-| `status.ids.bind` | string |  |
-| `status.ids.dial` | string |  |
-| `status.ids.erp` | string |  |
-| `status.ids.host` | string |  |
-| `status.ids.intercept` | string |  |
-| `status.ids.serp` | string |  |
-| `status.ids.service` | string |  |
-| `status.observedGeneration` | integer |  |
+| `status.ids` | object | ids are the Ziti IDs of the app entities. |
+| `status.ids.bind` | string | bind is the Bind service policy ID. |
+| `status.ids.dial` | string | dial is the Dial service policy ID. |
+| `status.ids.erp` | string | erp is the edge router policy ID. |
+| `status.ids.host` | string | host is the host config ID. |
+| `status.ids.intercept` | string | intercept is the intercept config ID. |
+| `status.ids.serp` | string | serp is the service edge router policy ID. |
+| `status.ids.service` | string | service is the Ziti service ID. |
+| `status.observedGeneration` | integer | observedGeneration is the metadata generation that this status reflects. |
 | `status.services` | list of object | services are the Ziti services this app owns, one per distinct target port set. For a single service this repeats zitiName, ids, and terminators. |
 | `status.services[].ids` | object | ids are the Ziti ids of the entities of this service. |
-| `status.services[].ids.bind` | string |  |
-| `status.services[].ids.dial` | string |  |
-| `status.services[].ids.erp` | string |  |
-| `status.services[].ids.host` | string |  |
-| `status.services[].ids.intercept` | string |  |
-| `status.services[].ids.serp` | string |  |
-| `status.services[].ids.service` | string |  |
+| `status.services[].ids.bind` | string | bind is the Bind service policy ID. |
+| `status.services[].ids.dial` | string | dial is the Dial service policy ID. |
+| `status.services[].ids.erp` | string | erp is the edge router policy ID. |
+| `status.services[].ids.host` | string | host is the host config ID. |
+| `status.services[].ids.intercept` | string | intercept is the intercept config ID. |
+| `status.services[].ids.serp` | string | serp is the service edge router policy ID. |
+| `status.services[].ids.service` | string | service is the Ziti service ID. |
 | `status.services[].name` | string | name is the service name in Ziti. |
 | `status.services[].terminators` | list of object | terminators are the routers that host this service. |
-| `status.services[].terminators[].router` | string |  |
-| `status.terminators` | list of object |  |
-| `status.terminators[].router` | string |  |
-| `status.zitiName` | string |  |
+| `status.services[].terminators[].router` | string | router is the name of the edge router that hosts the service. |
+| `status.terminators` | list of object | terminators are the routers that host the app. |
+| `status.terminators[].router` | string | router is the name of the edge router that hosts the service. |
+| `status.zitiName` | string | zitiName is the service name in Ziti. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).
 

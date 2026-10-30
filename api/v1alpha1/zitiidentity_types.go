@@ -127,13 +127,16 @@ const (
 )
 
 type ZitiIdentityStatus struct {
+	// zitiId is the Ziti ID of the identity.
 	// +optional
 	ZitiID string `json:"zitiId,omitempty"`
 	// zitiName is the name the identity has in Ziti. It is set once and does not change.
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
+	// enrolled is true once the identity has enrolled.
 	// +optional
 	Enrolled bool `json:"enrolled,omitempty"`
+	// enrollmentExpiresAt is when the pending enrollment JWT expires.
 	// +optional
 	EnrollmentExpiresAt *metav1.Time `json:"enrollmentExpiresAt,omitempty"`
 	// certNotAfter is the earliest expiry of the identity's client certificates.
@@ -148,9 +151,11 @@ type ZitiIdentityStatus struct {
 	// connectedRouters are the edge routers used by current sessions for this identity.
 	// +optional
 	ConnectedRouters []string `json:"connectedRouters,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

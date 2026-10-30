@@ -125,7 +125,7 @@ func condStatus(s *zitiv1.ZitiApp, typ string) metav1.ConditionStatus {
 func TestCreatesEntitiesAndIsIdempotent(t *testing.T) {
 	e := setup(t, nil)
 	res := e.reconcile(t)
-	if res.RequeueAfter < serviceResync {
+	if res.RequeueAfter < ServiceResync {
 		t.Errorf("requeue = %v", res.RequeueAfter)
 	}
 
@@ -518,7 +518,7 @@ func TestAppSelectorWithNoMatchesWaitsForServices(t *testing.T) {
 	if c := meta.FindStatusCondition(e.get(t).Status.Conditions, CondSynced); c == nil || c.Reason != "TargetNotFound" {
 		t.Errorf("synced condition = %+v", c)
 	}
-	if res.RequeueAfter != dependencyRetry {
+	if res.RequeueAfter != DependencyRetry {
 		t.Errorf("requeueAfter = %v", res.RequeueAfter)
 	}
 }

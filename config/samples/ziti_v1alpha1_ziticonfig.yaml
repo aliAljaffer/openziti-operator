@@ -4,6 +4,16 @@ metadata:
   labels:
     app.kubernetes.io/name: ziti-operator
     app.kubernetes.io/managed-by: kustomize
-  name: ziticonfig-sample
+  name: web-intercept
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  zitiName: web-intercept
+  type: intercept.v1
+  data:
+    protocols:
+      - tcp
+    addresses:
+      - web.example.com
+    portRanges:
+      - low: 443
+        high: 443

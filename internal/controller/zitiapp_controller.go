@@ -56,7 +56,6 @@ const (
 	CondRoutePath      = "RoutePath"
 	CondReady          = "Ready"
 	CondAccess         = "AccessResolved"
-	serviceResync      = 10 * time.Minute
 	maxConcurrentSvcs  = 2
 )
 
@@ -109,21 +108,21 @@ func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	switch {
 	case err == nil:
 		applyResult(&svc, out)
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case errors.As(err, &missing):
-		markFailed(&svc.Status.Conditions, svc.Generation, "TargetNotFound", missing.Error())
-		next.RequeueAfter = dependencyRetry
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "TargetNotFound", missing.Error())
+		next.RequeueAfter = DependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&svc.Status.Conditions, svc.Generation, se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, se.reason, se.msg)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&svc.Status.Conditions, svc.Generation, "ZitiRejected", err.Error())
-		next.RequeueAfter = jitter(serviceResync)
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "ZitiRejected", err.Error())
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
-		markFailed(&svc.Status.Conditions, svc.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "Error", err.Error())
 	}
 	svc.Status.ObservedGeneration = svc.Generation
 
@@ -529,10 +528,38 @@ func reasonOr(r, def string) string {
 	return r
 }
 
-func markFailed(conds *[]metav1.Condition, gen int64, reason, msg string) {
+func markFailed(rec record.EventRecorder, obj client.Object, conds *[]metav1.Condition, gen int64, reason, msg string) {
+	msg = withRemediation(reason, msg)
+	if rec != nil {
+		rec.Eventf(obj, corev1.EventTypeWarning, reason, "%s", msg)
+	}
 	for _, t := range []string{CondSynced, CondReady} {
 		setCond(conds, gen, t, false, "", reason, msg)
 	}
+}
+
+var remediationHints = map[string]string{
+	"InvalidSpec":                "Fix the spec; nothing was written to Ziti.",
+	"TargetNotFound":             "Create the missing entity; the operator checks again soon.",
+	"NotFound":                   "Fix zitiName, or create the entity in Ziti.",
+	"ZitiRejected":               "Fix the spec; the operator retries later.",
+	"Error":                      "The operator retries with backoff.",
+	"NamespaceNotAllowed":        "Label the namespace, or change allowedNamespaces.",
+	"InvalidConnection":          "Fix the allowedNamespaces selector.",
+	"ConnectionFailed":           "Check the Secret, the CA ConfigMap, and the URL.",
+	"SecretConflict":             "Set another secretName.",
+	"KeyAmbiguous":               "Run the operator in the cluster, or use keys.jwksEndpoint.",
+	"SecretNamespaceNotAllowed":  "Add the namespace to rbac.secretNamespaces.",
+	"ServiceNamespaceNotAllowed": "Add the namespace to rbac.serviceNamespaces, or apply the Service yourself.",
+}
+
+// withRemediation appends the short action from docs/conditions.md to a failure message.
+func withRemediation(reason, msg string) string {
+	hint := remediationHints[reason]
+	if hint == "" || strings.Contains(msg, hint) {
+		return msg
+	}
+	return msg + " " + hint
 }
 
 func (r *ZitiAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
