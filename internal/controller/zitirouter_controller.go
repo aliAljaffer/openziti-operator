@@ -107,15 +107,15 @@ func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	case err == nil:
 		next.RequeueAfter = jitter(pendingRecheck)
 	case errors.As(err, &se):
-		markFailed(&rt.Status.Conditions, rt.Generation, se.reason, se.msg)
+		markFailed(r.Recorder, &rt, &rt.Status.Conditions, rt.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&rt.Status.Conditions, rt.Generation, "ZitiRejected", err.Error())
+		markFailed(r.Recorder, &rt, &rt.Status.Conditions, rt.Generation, "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&rt.Status.Conditions, rt.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &rt, &rt.Status.Conditions, rt.Generation, "Error", err.Error())
 	}
 	rt.Status.ObservedGeneration = rt.Generation
 

@@ -133,19 +133,19 @@ func (r *entityReconciler[T]) Reconcile(ctx context.Context, req ctrl.Request) (
 	case err == nil:
 		next.RequeueAfter = jitter(serviceResync)
 	case errors.As(err, &me):
-		markFailed(&st.Conditions, obj.GetGeneration(), "TargetNotFound", me.Error())
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "TargetNotFound", me.Error())
 		next.RequeueAfter = dependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&st.Conditions, obj.GetGeneration(), se.reason, se.msg)
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&st.Conditions, obj.GetGeneration(), "ZitiRejected", err.Error())
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&st.Conditions, obj.GetGeneration(), "Error", err.Error())
+		markFailed(r.Recorder, obj, &st.Conditions, obj.GetGeneration(), "Error", err.Error())
 	}
 	st.ObservedGeneration = obj.GetGeneration()
 

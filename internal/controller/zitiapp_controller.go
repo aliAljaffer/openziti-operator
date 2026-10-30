@@ -111,19 +111,19 @@ func (r *ZitiAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		applyResult(&svc, out)
 		next.RequeueAfter = jitter(serviceResync)
 	case errors.As(err, &missing):
-		markFailed(&svc.Status.Conditions, svc.Generation, "TargetNotFound", missing.Error())
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "TargetNotFound", missing.Error())
 		next.RequeueAfter = dependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&svc.Status.Conditions, svc.Generation, se.reason, se.msg)
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&svc.Status.Conditions, svc.Generation, "ZitiRejected", err.Error())
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&svc.Status.Conditions, svc.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &svc, &svc.Status.Conditions, svc.Generation, "Error", err.Error())
 	}
 	svc.Status.ObservedGeneration = svc.Generation
 
@@ -529,7 +529,10 @@ func reasonOr(r, def string) string {
 	return r
 }
 
-func markFailed(conds *[]metav1.Condition, gen int64, reason, msg string) {
+func markFailed(rec record.EventRecorder, obj client.Object, conds *[]metav1.Condition, gen int64, reason, msg string) {
+	if rec != nil {
+		rec.Eventf(obj, corev1.EventTypeWarning, reason, "%s", msg)
+	}
 	for _, t := range []string{CondSynced, CondReady} {
 		setCond(conds, gen, t, false, "", reason, msg)
 	}

@@ -84,15 +84,15 @@ func (r *ZitiJwtSignerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	case err == nil:
 		next.RequeueAfter = jitter(serviceResync)
 	case errors.As(err, &se):
-		markFailed(&sg.Status.Conditions, sg.Generation, se.reason, se.msg)
+		markFailed(r.Recorder, &sg, &sg.Status.Conditions, sg.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	case ziti.IsSpecError(err):
-		markFailed(&sg.Status.Conditions, sg.Generation, "ZitiRejected", err.Error())
+		markFailed(r.Recorder, &sg, &sg.Status.Conditions, sg.Generation, "ZitiRejected", err.Error())
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&sg.Status.Conditions, sg.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &sg, &sg.Status.Conditions, sg.Generation, "Error", err.Error())
 	}
 	sg.Status.ObservedGeneration = sg.Generation
 

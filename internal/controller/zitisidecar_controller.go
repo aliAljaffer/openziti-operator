@@ -84,15 +84,15 @@ func (r *ZitiSidecarReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	case err == nil:
 		next.RequeueAfter = jitter(serviceResync)
 	case errors.As(err, &me):
-		markFailed(&sc.Status.Conditions, sc.Generation, "TargetNotFound", me.Error())
+		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, "TargetNotFound", me.Error())
 		next.RequeueAfter = dependencyRetry
 		err = nil
 	case errors.As(err, &se):
-		markFailed(&sc.Status.Conditions, sc.Generation, se.reason, se.msg)
+		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, se.reason, se.msg)
 		next.RequeueAfter = jitter(serviceResync)
 		err = nil
 	default:
-		markFailed(&sc.Status.Conditions, sc.Generation, "Error", err.Error())
+		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, "Error", err.Error())
 	}
 	sc.Status.ObservedGeneration = sc.Generation
 
