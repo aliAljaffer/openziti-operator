@@ -103,3 +103,4 @@
 | `--secret-namespaces` | empty | Namespaces where the operator may use Secrets. Empty means all. |
 | `--orphan-policy` | `report` | `report` or `delete`. See [operations](operations.md). |
 | `--orphan-sweep-interval` | 1h | How often to look for orphaned entities. |
+| `--version` | | Print the version, commit, and Go version, then exit. |

@@ -18,6 +18,7 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | `ziti_operator_orphaned_entities{kind}` | Tagged entities whose owner is gone. |
 | `ziti_operator_sweep_errors_total` | Failed sweeps. |
 | `ziti_operator_reconcile_total{kind}` | Reconcile loops per custom resource kind. |
+| `ziti_operator_build_info{version,commit,go}` | Version, commit, and Go version of the running manager. The value is always 1. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
 
 The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics. Set

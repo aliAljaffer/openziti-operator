@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ import (
 	"github.com/aliAljaffer/openziti-operator/internal/audit"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
+	"github.com/aliAljaffer/openziti-operator/internal/version"
 	webhookv1alpha1 "github.com/aliAljaffer/openziti-operator/internal/webhook/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -83,8 +85,10 @@ func main() {
 	var leaderElectionNamespace string
 	var orphanInterval time.Duration
 	var createZitiConnection bool
+	var showVersion bool
 	var connectionFlags providerflags.Flags
 	var tlsOpts []func(*tls.Config)
+	flag.BoolVar(&showVersion, "version", false, "Print the version and exit.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -124,6 +128,10 @@ func main() {
 			"The generated resource has no owner, so it is not pruned when the release is uninstalled.")
 	connectionFlags.Bind(flag.CommandLine)
 	flag.Parse()
+	if showVersion {
+		fmt.Println(version.Get())
+		return
+	}
 	if orphanPolicy != string(controller.OrphanReport) && orphanPolicy != string(controller.OrphanDelete) {
 		setupLog.Error(nil, "Invalid --orphan-policy, use report or delete", "value", orphanPolicy)
 		os.Exit(1)
