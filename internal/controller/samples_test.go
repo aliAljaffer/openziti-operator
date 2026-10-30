@@ -14,7 +14,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
@@ -48,7 +47,9 @@ var _ = Describe("Sample manifests", func() {
 					continue
 				}
 				if ns := obj.GetNamespace(); ns != "" {
-					err := k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+					namespace := &corev1.Namespace{}
+					namespace.Name = ns
+					err := k8sClient.Create(ctx, namespace)
 					if !apierrors.IsAlreadyExists(err) {
 						Expect(err).NotTo(HaveOccurred(), file)
 					}
