@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,8 +36,6 @@ import (
 
 const (
 	ConditionConnected = "Connected"
-	connectionResync   = 10 * time.Minute
-	connectionRetry    = time.Minute
 )
 
 type ZitiConnectionReconciler struct {
@@ -102,15 +99,15 @@ func (r *ZitiConnectionReconciler) reconcileConnection(ctx context.Context, req 
 	before := conn.Status.DeepCopy()
 
 	cond := metav1.Condition{Type: ConditionConnected, ObservedGeneration: conn.Generation}
-	after := connectionResync
+	after := ConnectionResync
 	zc, err := r.Clients.For(ctx, &conn)
 	var version string
 	if err == nil {
 		version, err = zc.Version(ctx)
 	}
 	if err != nil {
-		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "ConnectionFailed", err.Error()
-		after = connectionRetry
+		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "ConnectionFailed", withRemediation("ConnectionFailed", err.Error())
+		after = ConnectionRetry
 	} else {
 		cond.Status, cond.Reason = metav1.ConditionTrue, "Connected"
 		conn.Status.ControllerVersion = version

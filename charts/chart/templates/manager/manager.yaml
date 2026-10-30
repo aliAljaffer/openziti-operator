@@ -91,6 +91,14 @@ spec:
         - --ziti-requests-per-second={{ .Values.operator.zitiRequestsPerSecond }}
         - --orphan-policy={{ .Values.operator.orphanPolicy }}
         - --orphan-sweep-interval={{ .Values.operator.orphanSweepInterval }}
+        - --resync-interval={{ .Values.operator.intervals.resync }}
+        - --dependency-retry-interval={{ .Values.operator.intervals.dependencyRetry }}
+        - --pending-retry-interval={{ .Values.operator.intervals.pendingRetry }}
+        - --ca-resync-interval={{ .Values.operator.intervals.caResync }}
+        - --connection-resync-interval={{ .Values.operator.intervals.connectionResync }}
+        - --connection-retry-interval={{ .Values.operator.intervals.connectionRetry }}
+        - --zap-log-level={{ .Values.manager.logLevel }}
+        - --zap-encoder={{ .Values.manager.logFormat }}
         {{- if include "ziti-operator.limitSecrets" . }}
         - --secret-namespaces={{ include "ziti-operator.secretNamespaces" . }}
         {{- end }}

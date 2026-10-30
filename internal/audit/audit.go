@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -45,6 +46,8 @@ type Options struct {
 	Format string
 	// RequestsPerSecond limits calls to the Ziti API.
 	RequestsPerSecond float64
+	// FailOn exits 1 when a finding matches. Use any or a comma separated list of finding codes.
+	FailOn string
 }
 
 // Main parses the audit flags and returns the process exit code.
@@ -58,6 +61,7 @@ func Main(args []string) int {
 	fs.StringVar(&opts.CAFile, "ca-file", "", "PEM CA bundle. Default: the controller's well-known CA. Ignored with --connection.")
 	fs.StringVar(&opts.Format, "o", "table", "Output format: table or json")
 	fs.Float64Var(&opts.RequestsPerSecond, "requests-per-second", 10, "Rate limit for calls to the API")
+	fs.StringVar(&opts.FailOn, "fail-on", "", "Exit 1 when a finding matches: any or a comma separated list of codes.")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -70,6 +74,9 @@ func Main(args []string) int {
 	}
 	if err := Run(context.Background(), opts); err != nil {
 		fmt.Fprintln(os.Stderr, "audit:", err)
+		if _, ok := errors.AsType[*FindingsError](err); ok {
+			return 1
+		}
 		return 2
 	}
 	return 0
@@ -101,14 +108,56 @@ func Run(ctx context.Context, opts Options) error {
 		if findings == nil {
 			findings = []check.Finding{}
 		}
-		return enc.Encode(findings)
+		if err := enc.Encode(findings); err != nil {
+			return err
+		}
+	} else {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		_, _ = fmt.Fprintln(w, "CODE\tENTITY\tMESSAGE")
+		for _, f := range findings {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", f.Code, f.Entity, f.Message)
+		}
+		if err := w.Flush(); err != nil {
+			return err
+		}
 	}
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "CODE\tENTITY\tMESSAGE")
-	for _, f := range findings {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", f.Code, f.Entity, f.Message)
+
+	if opts.FailOn != "" {
+		if matched := filterFindings(findings, opts.FailOn); len(matched) > 0 {
+			return &FindingsError{Count: len(matched), Filter: opts.FailOn}
+		}
 	}
-	return w.Flush()
+	return nil
+}
+
+// FindingsError says that the audit should fail because findings matched --fail-on.
+type FindingsError struct {
+	Count  int
+	Filter string
+}
+
+func (e *FindingsError) Error() string {
+	return fmt.Sprintf("%d finding(s) matched --fail-on %s", e.Count, e.Filter)
+}
+
+func filterFindings(findings []check.Finding, filter string) []check.Finding {
+	filter = strings.TrimSpace(filter)
+	if strings.EqualFold(filter, "any") {
+		return findings
+	}
+	codes := map[string]bool{}
+	for code := range strings.SplitSeq(filter, ",") {
+		if code = strings.TrimSpace(code); code != "" {
+			codes[strings.ToUpper(code)] = true
+		}
+	}
+	var matched []check.Finding
+	for _, finding := range findings {
+		if codes[strings.ToUpper(finding.Code)] {
+			matched = append(matched, finding)
+		}
+	}
+	return matched
 }
 
 func clientFor(ctx context.Context, opts Options) (ziti.Client, error) {

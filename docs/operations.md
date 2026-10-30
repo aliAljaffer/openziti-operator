@@ -4,6 +4,16 @@
 
 The Deployment runs two replicas with leader election. One replica works. The other waits. After the leader stops, the other takes over in about 20 seconds (measured with a killed process).
 
+## Health and readiness
+
+`/healthz` reports that the manager process is alive. `/readyz` also checks the Ziti connection:
+the manager is not ready while every `ZitiConnection` reports `Connected=False`. A fresh install with
+no `ZitiConnection` is ready, so the first connection can be created. Query the individual checks at
+`/readyz` and `/readyz/ziti` on the probe port.
+
+The reconcilers retry on their own schedule. `operator.intervals` and the matching manager flags
+control the healthy resync and the faster retries. See [Install](install.md#manager-flags).
+
 ## Metrics
 
 The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`.

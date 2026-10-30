@@ -81,18 +81,18 @@ func (r *ZitiPortForwardReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	var next ctrl.Result
 	switch {
 	case err == nil:
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case errors.As(err, &me):
 		markFailed(r.Recorder, &pf, &pf.Status.Conditions, pf.Generation, "TargetNotFound", me.Error())
-		next.RequeueAfter = dependencyRetry
+		next.RequeueAfter = DependencyRetry
 		err = nil
 	case errors.As(err, &se):
 		markFailed(r.Recorder, &pf, &pf.Status.Conditions, pf.Generation, se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	case ziti.IsSpecError(err):
 		markFailed(r.Recorder, &pf, &pf.Status.Conditions, pf.Generation, "ZitiRejected", err.Error())
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
 		markFailed(r.Recorder, &pf, &pf.Status.Conditions, pf.Generation, "Error", err.Error())

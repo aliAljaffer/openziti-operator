@@ -61,7 +61,7 @@ The API server rejects a resource that breaks one of these rules.
 |---|---|---|
 | `status.activeSessions` | integer | activeSessions is the number of current client sessions for this identity. |
 | `status.certNotAfter` | string | certNotAfter is the earliest expiry of the identity's client certificates. |
-| `status.conditions` | list of object |  |
+| `status.conditions` | list of object | conditions report the state of the resource. Ready is the summary. |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
 | `status.conditions[].message` | string | message is a human readable message indicating details about the transition. This may be an empty string. Maximum length 32768. |
 | `status.conditions[].observedGeneration` | integer | observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance. Minimum 0. |
@@ -70,10 +70,10 @@ The API server rejects a resource that breaks one of these rules.
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
 | `status.connectedRouters` | list of string | connectedRouters are the edge routers used by current sessions for this identity. |
 | `status.connectedServices` | list of string | connectedServices are the Ziti services with current sessions for this identity. |
-| `status.enrolled` | boolean |  |
-| `status.enrollmentExpiresAt` | string |  |
-| `status.observedGeneration` | integer |  |
-| `status.zitiId` | string |  |
+| `status.enrolled` | boolean | enrolled is true once the identity has enrolled. |
+| `status.enrollmentExpiresAt` | string | enrollmentExpiresAt is when the pending enrollment JWT expires. |
+| `status.observedGeneration` | integer | observedGeneration is the metadata generation that this status reflects. |
+| `status.zitiId` | string | zitiId is the Ziti ID of the identity. |
 | `status.zitiName` | string | zitiName is the name the identity has in Ziti. It is set once and does not change. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).

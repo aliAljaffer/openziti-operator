@@ -11,6 +11,13 @@ git commit -s
 ## Run the tests
 
 ```sh
+make check
+```
+
+`make check` runs lint, tests, the docs and YAML checks, and the chart checks. To run only the Go
+tests:
+
+```sh
 go test ./...
 ```
 

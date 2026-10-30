@@ -155,6 +155,7 @@ type ZitiRouterDeployment struct {
 }
 
 type ZitiRouterStatus struct {
+	// routerId is the Ziti ID of the edge router.
 	// +optional
 	RouterID string `json:"routerId,omitempty"`
 	// zitiName is the name the router has in Ziti. It is set once and does not change.
@@ -172,9 +173,11 @@ type ZitiRouterStatus struct {
 	// services are the names of the services that have a terminator on this router.
 	// +optional
 	Services []string `json:"services,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

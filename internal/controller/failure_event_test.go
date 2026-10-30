@@ -24,7 +24,7 @@ func TestMarkFailedEmitsWarningEvent(t *testing.T) {
 
 	select {
 	case event := <-rec.Events:
-		for _, want := range []string{corev1.EventTypeWarning, "InvalidSpec", "port 0 is not allowed"} {
+		for _, want := range []string{corev1.EventTypeWarning, "InvalidSpec", "port 0 is not allowed", "Fix the spec"} {
 			if !strings.Contains(event, want) {
 				t.Errorf("event %q does not contain %q", event, want)
 			}
@@ -35,7 +35,8 @@ func TestMarkFailedEmitsWarningEvent(t *testing.T) {
 
 	for _, condType := range []string{CondSynced, CondReady} {
 		c := apimeta.FindStatusCondition(conds, condType)
-		if c == nil || c.Status != metav1.ConditionFalse || c.Reason != "InvalidSpec" || c.ObservedGeneration != 7 {
+		if c == nil || c.Status != metav1.ConditionFalse || c.Reason != "InvalidSpec" || c.ObservedGeneration != 7 ||
+			!strings.Contains(c.Message, "Fix the spec") {
 			t.Errorf("%s condition = %+v", condType, c)
 		}
 	}

@@ -42,14 +42,14 @@ The API server rejects a resource that breaks one of these rules.
 
 | Field | Type | Description |
 |---|---|---|
-| `status.conditions` | list of object |  |
+| `status.conditions` | list of object | conditions report the state of the resource. Ready is the summary. |
 | `status.conditions[].lastTransitionTime` | string | lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable. |
 | `status.conditions[].message` | string | message is a human readable message indicating details about the transition. This may be an empty string. Maximum length 32768. |
 | `status.conditions[].observedGeneration` | integer | observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance. Minimum 0. |
 | `status.conditions[].reason` | string | reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty. Minimum length 1. Maximum length 1024. Must match `^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`. |
 | `status.conditions[].status` | string | status of the condition, one of True, False, Unknown. One of: `True`, `False`, `Unknown`. |
 | `status.conditions[].type` | string | type of condition in CamelCase or in foo.example.com/CamelCase. Maximum length 316. Must match `^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`. |
-| `status.observedGeneration` | integer |  |
+| `status.observedGeneration` | integer | observedGeneration is the metadata generation that this status reflects. |
 | `status.zitiId` | string | zitiId is the ID of the object in Ziti. |
 
 Conditions and their reasons are listed in [Conditions and reasons](../conditions.md).

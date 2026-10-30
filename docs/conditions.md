@@ -53,6 +53,8 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 ## Reasons when `Synced` is false
 
 The operator did not finish writing to Ziti. Nothing more is written until the cause is fixed.
+The message ends with the short action from the table below, so `kubectl describe` and
+`kubectl get -o wide` carry the fix as well as the cause.
 
 Some of these cases fail admission first when the validating webhook is installed. See [Validation](validation.md). The condition and reason below are the same either way.
 

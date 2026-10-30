@@ -28,6 +28,12 @@ manager:
   args:
     - --leader-elect
 
+  ## Log settings. The manager uses production JSON logs by default.
+  ## logFormat is json or console. Development mode also enables stack traces.
+  ##
+  logLevel: info
+  logFormat: json
+
   ## Health probes.
   ## The manager serves the liveness (/healthz) and readiness (/readyz) endpoints on this port.
   ##
@@ -121,6 +127,21 @@ operator:
   orphanPolicy: report
   ## How often to look for orphaned entities.
   orphanSweepInterval: 1h
+  ## How soon the reconcilers look again. Each key maps to a manager flag.
+  ##
+  intervals:
+    ## Healthy resources that match their Ziti entities.
+    resync: 10m
+    ## A resource names a Ziti entity that does not exist yet.
+    dependencyRetry: 30s
+    ## A certificate or enrollment is still pending.
+    pendingRetry: 1m
+    ## A ZitiCA may have a rotated certificate.
+    caResync: 2m
+    ## A healthy ZitiConnection.
+    connectionResync: 10m
+    ## A ZitiConnection that cannot reach the controller.
+    connectionRetry: 1m
 
 ## Connection to a Ziti controller. When create is true the chart creates the ZitiConnection.
 ## Without it, create the ZitiConnection yourself.

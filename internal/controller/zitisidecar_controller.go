@@ -82,14 +82,14 @@ func (r *ZitiSidecarReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	var next ctrl.Result
 	switch {
 	case err == nil:
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 	case errors.As(err, &me):
 		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, "TargetNotFound", me.Error())
-		next.RequeueAfter = dependencyRetry
+		next.RequeueAfter = DependencyRetry
 		err = nil
 	case errors.As(err, &se):
 		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, se.reason, se.msg)
-		next.RequeueAfter = jitter(serviceResync)
+		next.RequeueAfter = jitter(ServiceResync)
 		err = nil
 	default:
 		markFailed(r.Recorder, &sc, &sc.Status.Conditions, sc.Generation, "Error", err.Error())

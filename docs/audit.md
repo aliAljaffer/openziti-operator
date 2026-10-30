@@ -26,6 +26,13 @@ ZITI_USERNAME=<user> ZITI_PASSWORD=<password> \
 
 `--ca-file` is a PEM bundle. Without it the command uses the controller's well-known CA.
 
+Set `--fail-on` to make the command usable as a CI check. It exits 1 when any finding matches. Use
+`any` or a comma separated list of codes:
+
+```sh
+go run ./cmd/main.go audit --connection default --fail-on NoTerminator,NoDialer
+```
+
 ## Findings
 
 | Code | Meaning |

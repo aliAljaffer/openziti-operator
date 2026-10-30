@@ -127,6 +127,8 @@ spec:
             description: status defines the observed state of ZitiEdgeRouterPolicy
             properties:
               conditions:
+                description: conditions report the state of the resource. Ready is
+                  the summary.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -186,6 +188,8 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               observedGeneration:
+                description: observedGeneration is the metadata generation that this
+                  status reflects.
                 format: int64
                 type: integer
               zitiId:

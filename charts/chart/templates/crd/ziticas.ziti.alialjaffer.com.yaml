@@ -228,8 +228,11 @@ spec:
             description: status defines the observed state of ZitiCA
             properties:
               caId:
+                description: caId is the Ziti ID of the certificate authority.
                 type: string
               conditions:
+                description: conditions report the state of the resource. Ready is
+                  the summary.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -293,6 +296,8 @@ spec:
                   in Ziti.
                 type: string
               observedGeneration:
+                description: observedGeneration is the metadata generation that this
+                  status reflects.
                 format: int64
                 type: integer
               verificationToken:

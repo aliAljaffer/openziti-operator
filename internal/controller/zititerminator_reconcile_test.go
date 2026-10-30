@@ -152,7 +152,7 @@ func TestTerminatorNeedsGlobalScopeAndExistingTargets(t *testing.T) {
 	}
 	var cur zitiv1.ZitiTerminator
 	_ = e.k.Get(t.Context(), e.key, &cur)
-	if c := termCond(&cur, CondReady); c.Reason != "TargetNotFound" || res.RequeueAfter != dependencyRetry {
+	if c := termCond(&cur, CondReady); c.Reason != "TargetNotFound" || res.RequeueAfter != DependencyRetry {
 		t.Errorf("missing service: %+v, requeue %v", c, res.RequeueAfter)
 	}
 }

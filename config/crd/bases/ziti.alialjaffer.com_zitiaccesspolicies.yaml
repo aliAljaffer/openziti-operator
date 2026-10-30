@@ -122,6 +122,8 @@ spec:
             description: status defines the observed state of ZitiAccessPolicy
             properties:
               conditions:
+                description: conditions report the state of the resource. Ready is
+                  the summary.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -181,8 +183,11 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               dialPolicyId:
+                description: dialPolicyId is the Ziti ID of the Dial service policy.
                 type: string
               edgeRouterPolicyId:
+                description: edgeRouterPolicyId is the Ziti ID of the edge router
+                  policy, when one is created.
                 type: string
               identities:
                 description: identities is how many identities the Dial policy selects
@@ -190,6 +195,8 @@ spec:
                 format: int32
                 type: integer
               observedGeneration:
+                description: observedGeneration is the metadata generation that this
+                  status reflects.
                 format: int64
                 type: integer
               services:
@@ -198,6 +205,7 @@ spec:
                 format: int32
                 type: integer
               zitiName:
+                description: zitiName is the name of the Dial policy in Ziti.
                 type: string
             type: object
         required:

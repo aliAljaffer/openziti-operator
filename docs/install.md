@@ -22,7 +22,7 @@
 2. Install the chart. It creates the CRDs, the RBAC, a Deployment with two replicas, and the `ZitiConnection`. The chart is published for every release. The image is `ghcr.io/alialjaffer/openziti-operator`, tag from the chart `appVersion`. To install from a clone of the repository instead, use `charts/chart` in place of the `oci://` address. Use `--set manager.image.repository=<registry>/ziti-operator --set manager.image.tag=<tag>` for your own build.
 
    ```sh
-   helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.3.1 -n ziti-operator-system \
+   helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.3.2 -n ziti-operator-system \
      --set connection.create=true \
      --set connection.managementUrl=https://<controller>/edge/management/v1 \
      --set 'connection.hostingRouters={<router>}' \
@@ -45,6 +45,8 @@
 | `operator.zitiRequestsPerSecond` | 10 | Rate limit for the Ziti API. |
 | `operator.orphanPolicy` | `report` | `report` or `delete`. See [operations](operations.md). |
 | `operator.orphanSweepInterval` | `1h` | How often to look for orphaned entities. |
+| `operator.intervals.resync`, `dependencyRetry`, `pendingRetry`, `caResync`, `connectionResync`, `connectionRetry` | `10m`, `30s`, `1m`, `2m`, `10m`, `1m` | How soon the reconcilers look again. See [Operations](operations.md). |
+| `manager.logLevel`, `manager.logFormat` | `info`, `json` | Manager log level and encoder. Set `manager.logFormat=console` for local-style logs. |
 | `connection.create` | `false` | Create the `ZitiConnection`. Without it, create your own. |
 | `connection.managementUrl`, `connection.hostingRouters` | none | Required when `connection.create` is true. |
 | `connection.auth.updb.secretName` or `connection.auth.cert.secretName` | none | Set exactly one. |
@@ -103,4 +105,12 @@
 | `--secret-namespaces` | empty | Namespaces where the operator may use Secrets. Empty means all. |
 | `--orphan-policy` | `report` | `report` or `delete`. See [operations](operations.md). |
 | `--orphan-sweep-interval` | 1h | How often to look for orphaned entities. |
+| `--resync-interval` | 10m | How often to reconcile a resource that matches its Ziti entities. |
+| `--dependency-retry-interval` | 30s | Retry when a resource names a Ziti entity that does not exist yet. |
+| `--pending-retry-interval` | 1m | Retry while a certificate or enrollment is pending. |
+| `--ca-resync-interval` | 2m | Check a `ZitiCA` for a rotated certificate. |
+| `--connection-resync-interval` | 10m | Check a healthy `ZitiConnection`. |
+| `--connection-retry-interval` | 1m | Retry a `ZitiConnection` that cannot reach the controller. |
+| `--zap-log-level` | `info` | Log level. The chart sets it from `manager.logLevel`. |
+| `--zap-encoder` | `json` | Log encoder, `json` or `console`. The chart sets it from `manager.logFormat`. |
 | `--version` | | Print the version, commit, and Go version, then exit. |

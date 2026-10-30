@@ -116,9 +116,11 @@ type ZitiConnectionSpec struct {
 }
 
 type ZitiConnectionStatus struct {
+	// controllerVersion is the version reported by the Ziti controller.
 	// +optional
 	ControllerVersion string `json:"controllerVersion,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

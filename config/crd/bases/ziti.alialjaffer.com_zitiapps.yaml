@@ -304,6 +304,8 @@ spec:
             description: status defines the observed state of ZitiApp
             properties:
               conditions:
+                description: conditions report the state of the resource. Ready is
+                  the summary.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -363,23 +365,33 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               ids:
+                description: ids are the Ziti IDs of the app entities.
                 properties:
                   bind:
+                    description: bind is the Bind service policy ID.
                     type: string
                   dial:
+                    description: dial is the Dial service policy ID.
                     type: string
                   erp:
+                    description: erp is the edge router policy ID.
                     type: string
                   host:
+                    description: host is the host config ID.
                     type: string
                   intercept:
+                    description: intercept is the intercept config ID.
                     type: string
                   serp:
+                    description: serp is the service edge router policy ID.
                     type: string
                   service:
+                    description: service is the Ziti service ID.
                     type: string
                 type: object
               observedGeneration:
+                description: observedGeneration is the metadata generation that this
+                  status reflects.
                 format: int64
                 type: integer
               services:
@@ -394,18 +406,25 @@ spec:
                       description: ids are the Ziti ids of the entities of this service.
                       properties:
                         bind:
+                          description: bind is the Bind service policy ID.
                           type: string
                         dial:
+                          description: dial is the Dial service policy ID.
                           type: string
                         erp:
+                          description: erp is the edge router policy ID.
                           type: string
                         host:
+                          description: host is the host config ID.
                           type: string
                         intercept:
+                          description: intercept is the intercept config ID.
                           type: string
                         serp:
+                          description: serp is the service edge router policy ID.
                           type: string
                         service:
+                          description: service is the Ziti service ID.
                           type: string
                       type: object
                     name:
@@ -416,6 +435,8 @@ spec:
                       items:
                         properties:
                           router:
+                            description: router is the name of the edge router that
+                              hosts the service.
                             type: string
                         required:
                         - router
@@ -424,15 +445,19 @@ spec:
                   type: object
                 type: array
               terminators:
+                description: terminators are the routers that host the app.
                 items:
                   properties:
                     router:
+                      description: router is the name of the edge router that hosts
+                        the service.
                       type: string
                   required:
                   - router
                   type: object
                 type: array
               zitiName:
+                description: zitiName is the service name in Ziti.
                 type: string
             type: object
         required:

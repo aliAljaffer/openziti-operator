@@ -160,6 +160,7 @@ type ZitiCASpec struct {
 }
 
 type ZitiCAStatus struct {
+	// caId is the Ziti ID of the certificate authority.
 	// +optional
 	CAID string `json:"caId,omitempty"`
 	// fingerprint is the SHA-1 fingerprint of the CA certificate in Ziti.
@@ -171,9 +172,11 @@ type ZitiCAStatus struct {
 	// verificationToken is the common name of the certificate to sign and send to Ziti. Set only while unverified.
 	// +optional
 	VerificationToken string `json:"verificationToken,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

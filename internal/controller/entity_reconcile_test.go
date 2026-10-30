@@ -138,8 +138,8 @@ func TestEntityServiceUsesConfigNamesAndRetriesSoonWhenOneIsMissing(t *testing.T
 	if c := readyOf(obj); c.Reason != "TargetNotFound" || !strings.Contains(c.Message, "team-a.web-intercept") {
 		t.Fatalf("ready = %+v", c)
 	}
-	if res.RequeueAfter != dependencyRetry {
-		t.Errorf("requeue = %v, want %v", res.RequeueAfter, dependencyRetry)
+	if res.RequeueAfter != DependencyRetry {
+		t.Errorf("requeue = %v, want %v", res.RequeueAfter, DependencyRetry)
 	}
 	if len(e.zc.Objects[ziti.Services]) != 2-1 { // only the seeded "legacy" service
 		t.Errorf("services = %d", len(e.zc.Objects[ziti.Services]))
@@ -157,7 +157,7 @@ func TestEntityServiceUsesConfigNamesAndRetriesSoonWhenOneIsMissing(t *testing.T
 		created["terminatorStrategy"] != "smartrouting" || created["encryptionRequired"] != true {
 		t.Fatalf("service = %v", created)
 	}
-	if readyOf(obj).Status != metav1.ConditionTrue || res.RequeueAfter < serviceResync {
+	if readyOf(obj).Status != metav1.ConditionTrue || res.RequeueAfter < ServiceResync {
 		t.Errorf("ready = %+v requeue %v", readyOf(obj), res.RequeueAfter)
 	}
 }
@@ -198,7 +198,7 @@ func TestEntityPolicyNamesThatDoNotExistRetrySoon(t *testing.T) {
 	}}
 	e := newEntityEnv(t, zitiv1.RoleScopeGlobal, p)
 	obj, res := reconcileEntity(t, e, "bind", ziti.ServicePolicies, func() *zitiv1.ZitiServicePolicy { return &zitiv1.ZitiServicePolicy{} }, buildServicePolicy)
-	if c := readyOf(obj); c.Reason != "TargetNotFound" || !strings.Contains(c.Message, `"ghost"`) || res.RequeueAfter != dependencyRetry {
+	if c := readyOf(obj); c.Reason != "TargetNotFound" || !strings.Contains(c.Message, `"ghost"`) || res.RequeueAfter != DependencyRetry {
 		t.Errorf("ready = %+v requeue %v", c, res.RequeueAfter)
 	}
 	if len(e.zc.Objects[ziti.ServicePolicies]) != 0 {

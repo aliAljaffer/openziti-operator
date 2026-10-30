@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/check"
 )
 
 func TestRunRejectsUnknownFormat(t *testing.T) {
@@ -106,4 +107,28 @@ func testCA(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+}
+
+func TestFilterFindings(t *testing.T) {
+	findings := []check.Finding{
+		{Code: "NoTerminator", Entity: "a"},
+		{Code: "NoDialer", Entity: "b"},
+		{Code: "OfflinePath", Entity: "c"},
+	}
+
+	for _, tc := range []struct {
+		filter string
+		want   int
+	}{
+		{"", 0},
+		{"any", 3},
+		{"NoDialer", 1},
+		{"nodialer,offlinepath", 2},
+		{" NoDialer , NoTerminator ", 2},
+		{"MissingConfig", 0},
+	} {
+		if got := len(filterFindings(findings, tc.filter)); got != tc.want {
+			t.Errorf("filterFindings(%q) = %d, want %d", tc.filter, got, tc.want)
+		}
+	}
 }

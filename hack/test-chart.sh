@@ -16,6 +16,10 @@ out=$(render)
 check "default: no ZitiConnection" '[ -z "$(yq "select(.kind==\"ZitiConnection\")" <<<"$out")" ]'
 check "default: no trust-manager Bundle" '[ -z "$(yq "select(.kind==\"Bundle\")" <<<"$out")" ]'
 check "default: two replicas" 'grep -q "replicas: 2" <<<"$out"'
+check "default: log arguments" 'grep -q -- "--zap-log-level=info" <<<"$out" && grep -q -- "--zap-encoder=json" <<<"$out"'
+check "default: interval arguments" 'grep -q -- "--resync-interval=10m" <<<"$out" && grep -q -- "--ca-resync-interval=2m" <<<"$out"'
+out_custom=$(render --set manager.logLevel=debug --set manager.logFormat=console --set operator.intervals.resync=2m)
+check "custom: log and interval arguments" 'grep -q -- "--zap-log-level=debug" <<<"$out_custom" && grep -q -- "--zap-encoder=console" <<<"$out_custom" && grep -q -- "--resync-interval=2m" <<<"$out_custom"'
 check "default: ClusterRole has no secrets" '! yq "select(.kind==\"ClusterRole\" and (.metadata.name|test(\"manager-role\"))) | .rules[].resources[]" <<<"$out" | grep -qx secrets'
 check "default: secrets limited to the release namespace" 'grep -q -- "--secret-namespaces=ns$" <<<"$out" && yq "select(.kind==\"Role\" and (.metadata.name|test(\"secret-access\"))) | .metadata.namespace" <<<"$out" | grep -qx ns'
 out_cw=$(render --set rbac.clusterWideSecrets=true)

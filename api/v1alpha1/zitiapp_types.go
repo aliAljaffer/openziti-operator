@@ -179,16 +179,24 @@ type ZitiAppSpec struct {
 }
 
 type EntityIDs struct {
-	Service   string `json:"service,omitempty"`
+	// service is the Ziti service ID.
+	Service string `json:"service,omitempty"`
+	// intercept is the intercept config ID.
 	Intercept string `json:"intercept,omitempty"`
-	Host      string `json:"host,omitempty"`
-	Bind      string `json:"bind,omitempty"`
-	SERP      string `json:"serp,omitempty"`
-	Dial      string `json:"dial,omitempty"`
-	ERP       string `json:"erp,omitempty"`
+	// host is the host config ID.
+	Host string `json:"host,omitempty"`
+	// bind is the Bind service policy ID.
+	Bind string `json:"bind,omitempty"`
+	// serp is the service edge router policy ID.
+	SERP string `json:"serp,omitempty"`
+	// dial is the Dial service policy ID.
+	Dial string `json:"dial,omitempty"`
+	// erp is the edge router policy ID.
+	ERP string `json:"erp,omitempty"`
 }
 
 type Terminator struct {
+	// router is the name of the edge router that hosts the service.
 	Router string `json:"router"`
 }
 
@@ -208,12 +216,16 @@ type ServiceStatus struct {
 }
 
 type ZitiAppStatus struct {
+	// zitiName is the service name in Ziti.
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
+	// ids are the Ziti IDs of the app entities.
 	// +optional
 	IDs EntityIDs `json:"ids,omitzero"`
+	// terminators are the routers that host the app.
 	// +optional
 	Terminators []Terminator `json:"terminators,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -222,6 +234,7 @@ type ZitiAppStatus struct {
 	// +optional
 	Services []ServiceStatus `json:"services,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

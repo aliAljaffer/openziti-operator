@@ -60,10 +60,13 @@ type ZitiAccessPolicySpec struct {
 }
 
 type ZitiAccessPolicyStatus struct {
+	// zitiName is the name of the Dial policy in Ziti.
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
+	// dialPolicyId is the Ziti ID of the Dial service policy.
 	// +optional
 	DialPolicyID string `json:"dialPolicyId,omitempty"`
+	// edgeRouterPolicyId is the Ziti ID of the edge router policy, when one is created.
 	// +optional
 	EdgeRouterPolicyID string `json:"edgeRouterPolicyId,omitempty"`
 	// identities is how many identities the Dial policy selects now.
@@ -72,9 +75,11 @@ type ZitiAccessPolicyStatus struct {
 	// services is how many services the Dial policy selects now.
 	// +optional
 	Services int32 `json:"services,omitempty"`
+	// observedGeneration is the metadata generation that this status reflects.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// conditions report the state of the resource. Ready is the summary.
 	// +listType=map
 	// +listMapKey=type
 	// +optional
