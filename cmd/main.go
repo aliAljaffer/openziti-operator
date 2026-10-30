@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/audit"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
 	webhookv1alpha1 "github.com/aliAljaffer/openziti-operator/internal/webhook/v1alpha1"
@@ -64,6 +65,9 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "audit" {
+		os.Exit(audit.Main(os.Args[2:]))
+	}
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
