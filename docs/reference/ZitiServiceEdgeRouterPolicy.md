@@ -63,8 +63,12 @@ metadata:
   labels:
     app.kubernetes.io/name: ziti-operator
     app.kubernetes.io/managed-by: kustomize
-  name: zitiserviceedgerouterpolicy-sample
+  name: web
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  serviceRoles:
+    - "#web"
+  edgeRouterRoles:
+    - "#edge"
 ```
 

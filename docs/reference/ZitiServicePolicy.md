@@ -67,8 +67,13 @@ metadata:
   labels:
     app.kubernetes.io/name: ziti-operator
     app.kubernetes.io/managed-by: kustomize
-  name: zitiservicepolicy-sample
+  name: web-bind
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  type: Bind
+  identityRoles:
+    - "#team-a"
+  serviceRoles:
+    - "#web"
 ```
 

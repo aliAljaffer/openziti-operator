@@ -70,8 +70,9 @@ metadata:
     app.kubernetes.io/name: ziti-operator
     app.kubernetes.io/managed-by: kustomize
   name: zitisidecar-sample
+  namespace: default
 spec:
-  identityRef: zitiidentity-sample
+  identityRef: backend
   # Host is tproxy: the patched workload needs NET_ADMIN and NET_RAW. Use Proxy when it cannot have those.
   mode: Host
   manifestSecretRef:

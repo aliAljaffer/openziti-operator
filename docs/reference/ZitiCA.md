@@ -87,6 +87,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: zitica-sample
 spec:
-  # TODO(user): Add fields here
+  # The Secret needs tls.crt and tls.key, for example from a cert-manager CA Issuer.
+  certificate:
+    secretRef:
+      namespace: default
+      name: zitica-sample
 ```
 

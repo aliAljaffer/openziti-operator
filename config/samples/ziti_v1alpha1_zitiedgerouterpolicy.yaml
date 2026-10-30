@@ -4,6 +4,10 @@ metadata:
   labels:
     app.kubernetes.io/name: ziti-operator
     app.kubernetes.io/managed-by: kustomize
-  name: zitiedgerouterpolicy-sample
+  name: team-a
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  identityRoles:
+    - "#team-a"
+  edgeRouterRoles:
+    - "#edge"
