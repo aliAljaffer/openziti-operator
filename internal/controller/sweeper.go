@@ -4,6 +4,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -66,12 +67,13 @@ func (s *OrphanSweeper) SweepAll(ctx context.Context) error {
 	if err := s.Reader.List(ctx, &conns); err != nil {
 		return err
 	}
+	var errs []error
 	for i := range conns.Items {
 		if err := s.Sweep(ctx, &conns.Items[i]); err != nil {
-			return fmt.Errorf("connection %s: %w", conns.Items[i].Name, err)
+			errs = append(errs, fmt.Errorf("connection %s: %w", conns.Items[i].Name, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // Sweep checks one connection. It lists Ziti first and Kubernetes second, so an entity that a reconcile creates during

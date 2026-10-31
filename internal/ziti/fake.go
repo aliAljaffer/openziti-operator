@@ -40,6 +40,14 @@ func (f *Fake) Put(kind Kind, e Entity) string {
 	return f.put(kind, "", clone(e))
 }
 
+// Has reports whether the fake still holds an object, so a test can observe a sweep on another goroutine.
+func (f *Fake) Has(kind Kind, id string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.Objects[kind][id]
+	return ok
+}
+
 func (f *Fake) put(kind Kind, id string, e Entity) string {
 	if id == "" {
 		if id = e.ID(); id == "" {

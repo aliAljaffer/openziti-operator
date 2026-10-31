@@ -16,6 +16,12 @@ manager:
   ## Two replicas: one leader and one standby.
   replicas: 2
 
+  ## Keep one replica available during voluntary disruptions such as a node drain.
+  ##
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
   image:
     repository: ghcr.io/alialjaffer/openziti-operator
     ## Image tag (defaults to Chart.appVersion if not set)

@@ -20,21 +20,33 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/openziti/edge-api/rest_util"
 
 	"github.com/aliAljaffer/openziti-operator/test/utils"
 )
 
 // namespace where the project is deployed in
 const namespace = "ziti-operator-system"
+
+const appNamespace = "team-a"
+
+// These names must match the Docker network names in the connection and app specs.
+const (
+	zitiControllerName = "ziti-e2e-ctrl"
+	zitiTargetName     = "ziti-e2e-target"
+)
 
 // serviceAccountName created for the project
 const serviceAccountName = "ziti-operator-controller-manager"
@@ -52,16 +64,20 @@ var _ = Describe("Manager", Ordered, func() {
 	// enforce the restricted security policy to the namespace, installing CRDs,
 	// and deploying the controller.
 	BeforeAll(func() {
+		By("starting a Ziti controller and target on the kind network")
+		startZiti()
+
 		By("creating manager namespace")
-		cmd := exec.Command("kubectl", "create", "ns", namespace)
-		_, err := utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
+		applyYAML(fmt.Sprintf("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: %s\n", namespace))
 
 		By("labeling the namespace to enforce the restricted security policy")
-		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+		cmd := exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
 			"pod-security.kubernetes.io/enforce=restricted")
-		_, err = utils.Run(cmd)
+		_, err := utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
+
+		By("storing the Ziti CA and credentials")
+		createCredential()
 
 		By("installing CRDs")
 		cmd = exec.Command("make", "install")
@@ -81,6 +97,9 @@ var _ = Describe("Manager", Ordered, func() {
 		cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
 		_, _ = utils.Run(cmd)
 
+		By("deleting the Ziti resources")
+		deleteZitiResources()
+
 		By("undeploying the controller-manager")
 		cmd = exec.Command("make", "undeploy")
 		_, _ = utils.Run(cmd)
@@ -92,6 +111,9 @@ var _ = Describe("Manager", Ordered, func() {
 		By("removing manager namespace")
 		cmd = exec.Command("kubectl", "delete", "ns", namespace)
 		_, _ = utils.Run(cmd)
+
+		By("stopping the Ziti controller and target")
+		stopZiti()
 	})
 
 	// After each test, check for failures and collect logs, events,
@@ -269,16 +291,31 @@ var _ = Describe("Manager", Ordered, func() {
 		})
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
+	})
 
-		// TODO: Customize the e2e test suite with scenarios specific to your project.
-		// Consider applying sample/CR(s) and check their status and/or verifying
-		// the reconciliation by using the metrics, i.e.:
-		// metricsOutput, err := getMetricsOutput()
-		// Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
-		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
-		//    strings.ToLower(<Kind>),
-		// ))
+	Context("Operator", func() {
+		It("reconciles a connection, identity, and app against Ziti", func() {
+			By("creating the app namespace")
+			applyYAML(fmt.Sprintf("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: %s\n", appNamespace))
+			DeferCleanup(func() {
+				deleteZitiResources()
+				cmd := exec.Command("kubectl", "delete", "ns", appNamespace)
+				_, _ = utils.Run(cmd)
+			})
+
+			By("creating the ZitiConnection")
+			applyYAML(connectionYAML())
+			Eventually(kubectlCondition("ziticonnection", "", "default", "Connected"), 2*time.Minute).Should(Equal("True"))
+
+			By("creating the ZitiIdentity")
+			applyYAML(identityYAML())
+			Eventually(kubectlCondition("zitiidentity", appNamespace, "e2e", "Ready"), 2*time.Minute).Should(Equal("True"))
+
+			By("creating the ZitiApp")
+			applyYAML(appYAML())
+			Eventually(kubectlCondition("zitiapp", appNamespace, "e2e", "Hosted"), 3*time.Minute).Should(Equal("True"))
+			Eventually(kubectlCondition("zitiapp", appNamespace, "e2e", "Ready"), 3*time.Minute).Should(Equal("True"))
+		})
 	})
 })
 
@@ -336,4 +373,161 @@ type tokenRequest struct {
 	Status struct {
 		Token string `json:"token"`
 	} `json:"status"`
+}
+
+func startZiti() {
+	stopZiti()
+	run := func(args ...string) {
+		out, err := utils.Run(exec.Command("docker", args...))
+		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "docker %s failed: %s", strings.Join(args, " "), out)
+	}
+	run("run", "-d", "--name", zitiControllerName, "--network", "kind", "-p", "1280:1280",
+		"openziti/ziti-cli:2.0.4",
+		"edge", "quickstart",
+		"--ctrl-address", zitiControllerName,
+		"--ctrl-port", "1280",
+		"--router-address", zitiControllerName,
+		"--password", "admin123")
+	run("run", "-d", "--name", zitiTargetName, "--network", "kind", "nginx:alpine")
+}
+
+func stopZiti() {
+	for _, name := range []string{zitiControllerName, zitiTargetName} {
+		_, _ = utils.Run(exec.Command("docker", "rm", "-f", name))
+	}
+}
+
+func createCredential() {
+	var caPEM []byte
+	Eventually(func(g Gomega) {
+		certs, err := rest_util.GetControllerWellKnownCas("https://localhost:1280")
+		g.Expect(err).NotTo(HaveOccurred())
+		var buf bytes.Buffer
+		for _, cert := range certs {
+			g.Expect(pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})).To(Succeed())
+		}
+		caPEM = buf.Bytes()
+	}, 3*time.Minute, 2*time.Second).Should(Succeed())
+
+	file, err := os.CreateTemp("", "ziti-ca-*.crt")
+	Expect(err).NotTo(HaveOccurred())
+	defer func() { _ = os.Remove(file.Name()) }()
+	_, err = file.Write(caPEM)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(file.Close()).To(Succeed())
+
+	cm, err := utils.Run(exec.Command("kubectl", "create", "configmap", "ziti-root-ca", "-n", namespace,
+		"--from-file=ca.crt="+file.Name(), "--dry-run=client", "-o", "yaml"))
+	Expect(err).NotTo(HaveOccurred(), "Failed to render the CA ConfigMap")
+	applyYAML(cm)
+
+	secret, err := utils.Run(exec.Command("kubectl", "create", "secret", "generic", "ziti-operator-credential",
+		"-n", namespace, "--from-literal=username=admin", "--from-literal=password=admin123",
+		"--dry-run=client", "-o", "yaml"))
+	Expect(err).NotTo(HaveOccurred(), "Failed to render the credential Secret")
+	applyYAML(secret)
+}
+
+func applyYAML(manifest string) {
+	cmd := exec.Command("kubectl", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(manifest)
+	out, err := utils.Run(cmd)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "kubectl apply failed: %s", out)
+}
+
+func kubectlCondition(kind, ns, name, condition string) func(Gomega) string {
+	return func(g Gomega) string {
+		jsonpath := fmt.Sprintf("jsonpath={.status.conditions[?(@.type=='%s')].status}", condition)
+		args := []string{"get", kind, name, "-o", jsonpath}
+		if ns != "" {
+			args = append(args, "-n", ns)
+		}
+		out, err := utils.Run(exec.Command("kubectl", args...))
+		g.Expect(err).NotTo(HaveOccurred())
+		return out
+	}
+}
+
+func deleteZitiResources() {
+	for _, r := range []struct{ kind, namespace, name string }{
+		{"zitiapp", appNamespace, "e2e"},
+		{"zitiidentity", appNamespace, "e2e"},
+		{"ziticonnection", "", "default"},
+	} {
+		args := []string{"delete", r.kind, r.name, "--ignore-not-found", "--timeout=30s"}
+		if r.namespace != "" {
+			args = append(args, "-n", r.namespace)
+		}
+		if out, err := utils.Run(exec.Command("kubectl", args...)); err != nil {
+			patch := []string{"patch", r.kind, r.name, "--type=merge", "-p", `{"metadata":{"finalizers":null}}`}
+			if r.namespace != "" {
+				patch = append(patch, "-n", r.namespace)
+			}
+			_, _ = utils.Run(exec.Command("kubectl", patch...))
+			_, _ = fmt.Fprintf(GinkgoWriter, "cleanup: %v: %s\n", err, out)
+		}
+	}
+}
+
+func connectionYAML() string {
+	return fmt.Sprintf(`apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiConnection
+metadata:
+  name: default
+spec:
+  managementUrl: https://%s:1280/edge/management/v1
+  caBundle:
+    configMapRef:
+      namespace: %s
+      name: ziti-root-ca
+      key: ca.crt
+  auth:
+    updb:
+      secretRef:
+        namespace: %s
+        name: ziti-operator-credential
+  roleScope: Global
+  hostingRouters:
+    - router-instance-1
+`, zitiControllerName, namespace, namespace)
+}
+
+func identityYAML() string {
+	return fmt.Sprintf(`apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiIdentity
+metadata:
+  name: e2e
+  namespace: %s
+spec:
+  connectionRef: default
+  roleAttributes:
+    - team-a
+  enrollmentMode: OperatorEnrolled
+`, appNamespace)
+}
+
+func appYAML() string {
+	return fmt.Sprintf(`apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiApp
+metadata:
+  name: e2e
+  namespace: %s
+spec:
+  connectionRef: default
+  expose:
+    addresses:
+      - e2e.example.test
+    ports:
+      - 80
+    protocols:
+      - tcp
+  targets:
+    - address: %s
+      port: 80
+  allow:
+    groups:
+      - team-a
+  entryRouters:
+    - router-instance-1
+`, appNamespace, zitiTargetName)
 }

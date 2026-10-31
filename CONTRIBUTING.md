@@ -26,8 +26,10 @@ Integration tests need a Ziti controller:
 ```sh
 ZITI_MGMT_URL=https://localhost:1280/edge/management/v1 \
 ZITI_USERNAME=admin ZITI_PASSWORD=admin123 \
-go test -tags integration ./internal/ziti/
+go test -tags integration -count=1 ./internal/...
 ```
+
+The controller package also has envtest-based tests, so run `make test` once to download the envtest binaries, or pass `-skip '^TestControllers$'`.
 
 To start a local controller:
 
