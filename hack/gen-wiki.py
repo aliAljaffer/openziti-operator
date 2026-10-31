@@ -46,8 +46,10 @@ PAGES = {
     "CONTRIBUTING.md": "Contributing",
     "SECURITY.md": "Security",
 }
-for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiAccessPolicy", "ZitiJwtSigner", "ZitiCA",
-             "ZitiRouter", "ZitiConfig", "ZitiService", "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy", "ZitiTerminator"):
+for kind in ("ZitiConnection", "ZitiApp", "ZitiIdentity", "ZitiGroup", "ZitiAuthPolicy", "ZitiPostureCheck",
+             "ZitiAccessPolicy", "ZitiJwtSigner", "ZitiCA", "ZitiRouter", "ZitiConfig", "ZitiService",
+             "ZitiServicePolicy", "ZitiEdgeRouterPolicy", "ZitiServiceEdgeRouterPolicy", "ZitiTerminator",
+             "ZitiSidecar", "ZitiPortForward"):
     PAGES[f"docs/reference/{kind}.md"] = kind
 
 LINK = re.compile(r"\]\(((?:\.\./|\./)*(?:docs/|reference/|adr/)*)([A-Za-z0-9_.-]+\.md)(#[^)]*)?\)")
@@ -73,6 +75,9 @@ SIDEBAR = """**[Home](Home)**
 - [ZitiConnection](ZitiConnection)
 - [ZitiApp](ZitiApp)
 - [ZitiIdentity](ZitiIdentity)
+- [ZitiGroup](ZitiGroup)
+- [ZitiAuthPolicy](ZitiAuthPolicy)
+- [ZitiPostureCheck](ZitiPostureCheck)
 - [ZitiAccessPolicy](ZitiAccessPolicy)
 - [ZitiJwtSigner](ZitiJwtSigner)
 - [ZitiCA](ZitiCA)
@@ -83,6 +88,8 @@ SIDEBAR = """**[Home](Home)**
 - [ZitiEdgeRouterPolicy](ZitiEdgeRouterPolicy)
 - [ZitiServiceEdgeRouterPolicy](ZitiServiceEdgeRouterPolicy)
 - [ZitiTerminator](ZitiTerminator)
+- [ZitiSidecar](ZitiSidecar)
+- [ZitiPortForward](ZitiPortForward)
 
 **Run it**
 - [Conditions and reasons](Conditions-and-Reasons)
