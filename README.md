@@ -20,6 +20,10 @@ This is an independent community project. It is not an official OpenZiti or NetF
 |---|---|
 | Publish an app so authorized people can reach it | A `ZitiApp`. The operator creates the configs, service policies, and router policies. Use `expose.selector` to derive targets and ports from labeled Kubernetes Services. |
 | Enroll or remove an identity | A `ZitiIdentity`. The operator enrolls it, writes the identity file to a Secret, renews its certificate, and reports its active sessions. |
+| Group identities for access | A `ZitiGroup`. It keeps one role attribute on its members without a Ziti group object. |
+| Define how identities log in | A `ZitiAuthPolicy`. Certificate, password, external JWT, TOTP, lockout, and identity disable. |
+| Enforce device posture | A `ZitiPostureCheck`, then `postureCheckRoles` on a policy or a `ZitiApp`. |
+| Import an existing network | `manager export` writes applyable CRs, with `Observe` as the default. |
 | Start a router on a VM or in a cluster | A `ZitiRouter`. The operator writes a ready-made `docker-compose.yml` and a Kubernetes manifest to a Secret, and reports which services the router terminates. |
 | Take over what you built by hand | `managementPolicy: Adopt` or `Observe` on the same resources. |
 | Log a workload in through a Ziti tunneler | A `ZitiSidecar`. It writes the patch that adds the tunneler, so you do not hand-write the container, identity mount, or resolver. |
@@ -95,6 +99,9 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 | `ZitiApp` | `ztapp` | namespace | Publishes an app: configs, service, bind, router and dial policies. |
 | `ZitiIdentity` | `ztid` | namespace | Creates, adopts, or observes an identity. Enrolls it and renews its certificate. Can create the cert-manager `Certificate` for certificate login. |
 | `ZitiAccessPolicy` | `ztap` | namespace | One Dial policy and an optional edge router policy. |
+| `ZitiGroup` | `ztg` | namespace | Groups identities in one namespace under one role attribute. Ziti has no group object, so this owns no Ziti entity. |
+| `ZitiAuthPolicy` | `ztapolicy` | namespace | One Ziti auth policy: certificate, username/password, external JWT, TOTP, and lockout rules. |
+| `ZitiPostureCheck` | `ztposture` | namespace | One Ziti posture check: OS, domain, MAC, process, or MFA. |
 | `ZitiRouter` | `ztrouter` | cluster | Creates an edge router and puts its enrollment JWT and ready-made manifests in a Secret. See [Edge routers](docs/routers.md). |
 | `ZitiCA` | `ztca` | cluster | Registers a CA (for example a cert-manager CA) so certificates it issues can log in. |
 | `ZitiJwtSigner` | `ztjwt` | cluster | Trusts tokens from an issuer (your cluster) and creates the auth policy. |
@@ -115,11 +122,13 @@ kubectl explain ztapp.spec     # field help, also for nested fields
 
 - [Install](docs/install.md), [First app](docs/first-app.md), [Uninstall](docs/uninstall.md)
 - [Role scope](docs/role-scope.md), [Existing Ziti resources](docs/existing-resources.md)
+- [Groups](docs/groups.md), [Authentication policies](docs/auth-policies.md), [Posture checks](docs/posture-checks.md)
 - [Edge routers](docs/routers.md), [Full control](docs/full-control.md)
+- [Export a network](docs/export.md), [Access report](docs/access-report.md)
 - [Sidecar tunneler](docs/sidecar.md), [Log in with a service account token](docs/service-account-tokens.md), [Use a cert-manager CA](docs/cert-manager.md)
 - [Conditions and reasons](docs/conditions.md), [Validation](docs/validation.md), [Audit a network](docs/audit.md), [Operations](docs/operations.md), [Serve plain and TLS ports](docs/tls.md)
 - [Compatibility](docs/compatibility.md), [Interop with ziti-k8s-agent](docs/interop-ziti-k8s-agent.md)
-- Reference for every kind: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiRouter](docs/reference/ZitiRouter.md), [ZitiCA](docs/reference/ZitiCA.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiTerminator](docs/reference/ZitiTerminator.md)
+- Reference for every kind: [ZitiConnection](docs/reference/ZitiConnection.md), [ZitiApp](docs/reference/ZitiApp.md), [ZitiIdentity](docs/reference/ZitiIdentity.md), [ZitiGroup](docs/reference/ZitiGroup.md), [ZitiAuthPolicy](docs/reference/ZitiAuthPolicy.md), [ZitiPostureCheck](docs/reference/ZitiPostureCheck.md), [ZitiAccessPolicy](docs/reference/ZitiAccessPolicy.md), [ZitiRouter](docs/reference/ZitiRouter.md), [ZitiCA](docs/reference/ZitiCA.md), [ZitiJwtSigner](docs/reference/ZitiJwtSigner.md), [ZitiTerminator](docs/reference/ZitiTerminator.md)
 
 ## Contributing and security
 

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -35,6 +36,13 @@ type ZitiRouterSpec struct {
 	// +kubebuilder:validation:MaxLength=1000
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
+
+	// managementPolicy Manage creates the router. Adopt takes over the router named zitiName. Observe only
+	// reads it and reports status, for a router that was enrolled outside the operator.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
 
 	// roleAttributes are the groups the router belongs to. Edge router policies select routers by them.
 	// They are used as written, whatever the connection roleScope. Only cluster admins can create a ZitiRouter.
@@ -152,6 +160,46 @@ type ZitiRouterDeployment struct {
 	// +kubebuilder:default=ClusterIP
 	// +optional
 	ServiceType string `json:"serviceType,omitempty"`
+
+	// resources sets the container resource requests and limits. Empty leaves them unset.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitzero"`
+
+	// nodeSelector constrains the router pod to nodes with these labels.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// tolerations let the router pod run on tainted nodes.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// affinity sets node and pod affinity for the router pod.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// topologySpreadConstraints spread router pods across failure domains.
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// priorityClassName sets the pod priority class.
+	// +optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// imagePullSecrets lets the kubelet pull the router image from a private registry.
+	// +optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// podAnnotations are added to the router pod template.
+	// +optional
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// labels are added to the router objects and pod template.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// extraEnv adds environment variables to the router container. Do not set the variables the operator owns.
+	// +optional
+	ExtraEnv []corev1.EnvVar `json:"extraEnv,omitempty"`
 }
 
 type ZitiRouterStatus struct {

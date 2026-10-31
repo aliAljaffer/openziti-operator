@@ -44,8 +44,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/accessreport"
 	"github.com/aliAljaffer/openziti-operator/internal/audit"
 	"github.com/aliAljaffer/openziti-operator/internal/controller"
+	"github.com/aliAljaffer/openziti-operator/internal/exporter"
 	"github.com/aliAljaffer/openziti-operator/internal/providerflags"
 	"github.com/aliAljaffer/openziti-operator/internal/version"
 	webhookv1alpha1 "github.com/aliAljaffer/openziti-operator/internal/webhook/v1alpha1"
@@ -69,6 +71,12 @@ func init() {
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "audit" {
 		os.Exit(audit.Main(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "export" {
+		os.Exit(exporter.Main(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "access" {
+		os.Exit(accessreport.Main(os.Args[2:]))
 	}
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
@@ -293,9 +301,18 @@ func main() {
 		Scheme:           mgr.GetScheme(),
 		Clients:          clients,
 		Recorder:         mgr.GetEventRecorderFor("ziti-operator"),
+		Reader:           mgr.GetAPIReader(),
 		SecretNamespaces: splitList(secretNamespaces),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "zitiidentity")
+		os.Exit(1)
+	}
+	if err := (&controller.ZitiGroupReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("ziti-operator"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "zitigroup")
 		os.Exit(1)
 	}
 	if err := (&controller.ZitiAccessPolicyReconciler{

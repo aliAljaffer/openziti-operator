@@ -4,6 +4,7 @@ package desired
 
 import (
 	"fmt"
+	"net"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,9 +28,13 @@ const (
 	AnnProtocols      = AnnotationPrefix + "protocols"
 	AnnAllowGroups    = AnnotationPrefix + "allow-groups"
 	AnnAllowIdentites = AnnotationPrefix + "allow-identities"
+	AnnPostureChecks  = AnnotationPrefix + "posture-check-roles"
 	AnnMemberOf       = AnnotationPrefix + "member-of"
 	AnnEntryRouters   = AnnotationPrefix + "entry-routers"
 	AnnHostedBy       = AnnotationPrefix + "hosted-by"
+	AnnAllowExpose    = AnnotationPrefix + "allow-expose"
+	AnnViaIngress     = AnnotationPrefix + "via-ingress"
+	AnnIngressBackend = AnnotationPrefix + "ingress-backend"
 )
 
 // Exposed reports whether the Service asks to be exposed.
@@ -67,7 +72,7 @@ func AppSpec(svc *corev1.Service) (zitiv1.ZitiAppSpec, error) {
 		MemberOf:      list(a[AnnMemberOf]),
 		HostedBy:      a[AnnHostedBy],
 		EntryRouters:  list(a[AnnEntryRouters]),
-		Allow:         zitiv1.Allow{Groups: list(a[AnnAllowGroups]), Identities: list(a[AnnAllowIdentites])},
+		Allow:         zitiv1.Allow{Groups: list(a[AnnAllowGroups]), Identities: list(a[AnnAllowIdentites]), PostureCheckRoles: list(a[AnnPostureChecks])},
 		Expose:        zitiv1.Expose{Addresses: []string{dns}},
 		Targets:       []zitiv1.Target{{Address: dns}},
 	}
@@ -117,15 +122,80 @@ func AppSpec(svc *corev1.Service) (zitiv1.ZitiAppSpec, error) {
 	return spec, nil
 }
 
-// IngressAppSpec builds an app for an HTTP Ingress whose rules all target the same Service port.
-// Ziti cannot preserve path routing across different backends, so mixed backends and TLS termination
-// are rejected instead of silently changing the Ingress behavior.
+func ViaIngress(annotations map[string]string) bool { return annotations[AnnViaIngress] == "true" }
+
+func IngressBackendTarget(ing *networkingv1.Ingress) (string, string, int32, error) {
+	raw := strings.TrimSpace(ing.Annotations[AnnIngressBackend])
+	if raw == "" {
+		return "", "", 0, fmt.Errorf("%s needs a Service reference namespace/name:port when %s is true", AnnIngressBackend, AnnViaIngress)
+	}
+	host, portText, err := net.SplitHostPort(raw)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("%s: %w", AnnIngressBackend, err)
+	}
+	namespace, name := ing.Namespace, host
+	if before, after, ok := strings.Cut(host, "/"); ok {
+		namespace, name = before, after
+	}
+	if namespace == "" || name == "" {
+		return "", "", 0, fmt.Errorf("%s: use namespace/name:port", AnnIngressBackend)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return "", "", 0, fmt.Errorf("%s: port must be 1-65535", AnnIngressBackend)
+	}
+	return namespace, name, int32(port), nil
+}
+
+// With via-ingress, keep path routing and TLS termination at the ingress controller; otherwise reject
+// mixed backends and TLS instead of silently changing the Ingress behavior.
 func IngressAppSpec(ing *networkingv1.Ingress, backend *corev1.Service) (zitiv1.ZitiAppSpec, error) {
-	if len(ing.Spec.TLS) > 0 {
-		return zitiv1.ZitiAppSpec{}, fmt.Errorf("TLS Ingresses are not exposed automatically; use a ZitiApp to choose the TLS backend")
+	var hosts []string
+	for _, rule := range ing.Spec.Rules {
+		if rule.Host != "" {
+			hosts = append(hosts, rule.Host)
+		}
+	}
+	if len(hosts) == 0 && len(list(ing.Annotations[AnnAddresses])) == 0 {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("ingress needs a host or the %s annotation", AnnAddresses)
 	}
 
-	var hosts []string
+	if ViaIngress(ing.Annotations) {
+		namespace, name, port, err := IngressBackendTarget(ing)
+		if err != nil {
+			return zitiv1.ZitiAppSpec{}, err
+		}
+		ports := []corev1.ServicePort{{Port: 80, Protocol: corev1.ProtocolTCP}}
+		if len(ing.Spec.TLS) > 0 {
+			ports = append(ports, corev1.ServicePort{Port: 443, Protocol: corev1.ProtocolTCP})
+		}
+		fakeService := &corev1.Service{
+			Name: name, Namespace: namespace, Annotations: ing.Annotations,
+			Spec: corev1.ServiceSpec{Ports: ports},
+		}
+		spec, err := AppSpec(fakeService)
+		if err != nil {
+			return spec, err
+		}
+		if len(list(ing.Annotations[AnnAddresses])) == 0 {
+			slices.Sort(hosts)
+			spec.Expose.Addresses = slices.Compact(hosts)
+		}
+		target := zitiv1.Target{KubernetesService: name, Port: port}
+		if namespace != ing.Namespace {
+			target.Namespace = namespace
+		}
+		spec.Targets = []zitiv1.Target{target}
+		return spec, nil
+	}
+
+	if len(ing.Spec.TLS) > 0 {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("TLS Ingresses are not exposed automatically; use %s=true with %s, or a ZitiApp to choose the TLS backend", AnnViaIngress, AnnIngressBackend)
+	}
+	if backend == nil {
+		return zitiv1.ZitiAppSpec{}, fmt.Errorf("the backend Service is missing")
+	}
+
 	var backendName string
 	var backendPort int32
 	setBackend := func(b networkingv1.IngressBackend) error {
@@ -149,9 +219,6 @@ func IngressAppSpec(ing *networkingv1.Ingress, backend *corev1.Service) (zitiv1.
 		}
 	}
 	for _, rule := range ing.Spec.Rules {
-		if rule.Host != "" {
-			hosts = append(hosts, rule.Host)
-		}
 		if rule.HTTP == nil || len(rule.HTTP.Paths) == 0 {
 			return zitiv1.ZitiAppSpec{}, fmt.Errorf("every Ingress rule needs an HTTP path")
 		}
@@ -162,9 +229,6 @@ func IngressAppSpec(ing *networkingv1.Ingress, backend *corev1.Service) (zitiv1.
 		}
 	}
 
-	if len(hosts) == 0 && len(list(ing.Annotations[AnnAddresses])) == 0 {
-		return zitiv1.ZitiAppSpec{}, fmt.Errorf("ingress needs a host or the %s annotation", AnnAddresses)
-	}
 	if backendName == "" {
 		return zitiv1.ZitiAppSpec{}, fmt.Errorf("ingress needs a Service backend")
 	}

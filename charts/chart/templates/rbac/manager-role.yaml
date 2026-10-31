@@ -88,13 +88,16 @@ rules:
   resources:
   - zitiaccesspolicies
   - zitiapps
+  - zitiauthpolicies
   - ziticas
   - ziticonfigs
   - ziticonnections
   - zitiedgerouterpolicies
+  - zitigroups
   - zitiidentities
   - zitijwtsigners
   - zitiportforwards
+  - zitiposturechecks
   - zitirouters
   - zitiserviceedgerouterpolicies
   - zitiservicepolicies
@@ -114,12 +117,14 @@ rules:
   resources:
   - zitiaccesspolicies/finalizers
   - zitiapps/finalizers
+  - zitiauthpolicies/finalizers
   - ziticas/finalizers
   - ziticonfigs/finalizers
   - ziticonnections/finalizers
   - zitiedgerouterpolicies/finalizers
   - zitiidentities/finalizers
   - zitijwtsigners/finalizers
+  - zitiposturechecks/finalizers
   - zitirouters/finalizers
   - zitiserviceedgerouterpolicies/finalizers
   - zitiservicepolicies/finalizers
@@ -133,13 +138,16 @@ rules:
   resources:
   - zitiaccesspolicies/status
   - zitiapps/status
+  - zitiauthpolicies/status
   - ziticas/status
   - ziticonfigs/status
   - ziticonnections/status
   - zitiedgerouterpolicies/status
+  - zitigroups/status
   - zitiidentities/status
   - zitijwtsigners/status
   - zitiportforwards/status
+  - zitiposturechecks/status
   - zitirouters/status
   - zitiserviceedgerouterpolicies/status
   - zitiservicepolicies/status

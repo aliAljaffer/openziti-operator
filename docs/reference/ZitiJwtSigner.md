@@ -29,11 +29,15 @@
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.createAuthPolicy` | boolean | no | `true` | createAuthPolicy creates an auth policy with the same name that accepts only this signer. Identities select it with spec.authPolicy. |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the Ziti entities when this resource is deleted. Orphan removes only the operator tags and keeps the entities. It cannot change after creation. One of: `Delete`, `Orphan`. |
+| `spec.issuer` | string | no |  | issuer is the iss claim of the tokens. It is required with keys.certPEM and ignored when the keys field supplies an issuer itself. |
 | `spec.keys` | object | yes |  | keys tells Ziti how to verify signatures. |
+| `spec.keys.certPEM` | string | no |  | certPEM is a PEM certificate that carries the public signing key. Use it to represent a signer that uses a static key, for example one imported from an existing network. |
 | `spec.keys.jwksEndpoint` | object | no |  | jwksEndpoint lets the Ziti controller fetch the keys, for any identity provider. |
 | `spec.keys.jwksEndpoint.issuer` | string | yes |  | issuer must equal the iss claim of the tokens. Minimum length 1. |
 | `spec.keys.jwksEndpoint.url` | string | yes |  | url is the JWKS endpoint. The Ziti controller must be able to reach it. Must match `^https://`. |
+| `spec.keys.kid` | string | no |  | kid is the key id that matches certPEM. Empty lets Ziti use the certificate key id. |
 | `spec.keys.kubernetes` | object | no |  | kubernetes reads the issuer and the keys from this cluster. The operator picks the key that signs its own service account token. When the cluster rotates the key, the next sync updates the signer. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the signer. Adopt takes it over. Observe only reads it and reports status, for a signer that was registered outside the operator. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.useExternalId` | boolean | no | `true` | useExternalId matches the claim to the identity externalId. False matches it to the identity id. |
 | `spec.zitiName` | string | no |  | zitiName is the signer name in Ziti. It defaults to the resource name. Minimum length 1. Maximum length 1000. |
 
@@ -43,7 +47,8 @@ The API server rejects a resource that breaks one of these rules.
 
 - `spec`: zitiName is immutable
 - `spec`: deletionPolicy is immutable
-- `keys`: set exactly one of kubernetes and jwksEndpoint
+- `spec`: issuer is required with keys.certPEM
+- `keys`: set exactly one of kubernetes, jwksEndpoint, and certPEM
 
 ## Status
 

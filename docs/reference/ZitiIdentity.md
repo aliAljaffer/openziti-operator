@@ -36,12 +36,20 @@
 | `spec.certificate.issuerRef.name` | string | yes |  | name of the issuer. Minimum length 1. Maximum length 253. |
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy does not apply to adopted identities. Those are released, never deleted. One of: `Delete`, `Orphan`. |
+| `spec.disabled` | boolean | no |  | disabled rejects this identity's API session requests. Use disabledUntil for a temporary lock. |
+| `spec.disabledUntil` | string | no |  | disabledUntil disables the identity until this time. It is ignored when disabled is false. |
 | `spec.enrollmentMode` | string | no | `"JwtOnly"` | enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it. OperatorEnrolled makes the operator enroll and write identity.json to the Secret. None creates an identity without enrollment. It logs in with a token, so authPolicy is required. One of: `JwtOnly`, `OperatorEnrolled`, `None`. |
 | `spec.externalId` | string | no |  | externalId is the value that a token claim must match to log in as this identity, for an identity provider other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject. Maximum length 1000. |
+| `spec.importFrom` | object | no |  | importFrom copies an existing identity file into the operator Secret, so an identity that enrolled elsewhere can be adopted and renewed. It needs enrollmentMode OperatorEnrolled and managementPolicy Adopt. |
+| `spec.importFrom.identityFileSecretRef` | object | yes |  | identityFileSecretRef names the Secret that holds the existing identity file. |
+| `spec.importFrom.identityFileSecretRef.name` | string | yes |  | name of the Secret. |
+| `spec.importFrom.identityFileSecretRef.namespace` | string | yes |  | namespace of the Secret. |
+| `spec.importFrom.key` | string | no | `"identity.json"` | key is the key in that Secret. It defaults to identity.json. |
 | `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates the identity. Adopt takes over an existing identity named zitiName. Set zitiName to the exact existing name, because the default name differs: it adds ownership tags, sets roleAttributes and authPolicy, and never deletes the identity. Observe only reads the existing identity and never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
-| `spec.roleAttributes` | list of string | no |  | roleAttributes follow the connection roleScope, like ZitiApp roleAttributes. |
+| `spec.roleAttributes` | list of string | no |  | roleAttributes follow the connection roleScope, like ZitiApp roleAttributes. A ZitiGroup in this namespace also adds its roleAttribute to this list. |
 | `spec.secretName` | string | no |  | secretName receives "enrollment.jwt" or "identity.json", by enrollmentMode. It defaults to the CR name. Maximum length 253. |
 | `spec.serviceAccount` | string | no |  | serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity. It sets externalId to system:serviceaccount:&lt;namespace&gt;:&lt;name&gt;. Needs a ZitiJwtSigner and an authPolicy that allows it. Maximum length 253. |
+| `spec.type` | string | no | `"Default"` | type is the Ziti identity type: User, Device, Service, or Default. It cannot change later. One of: `User`, `Device`, `Service`, `Default`. |
 | `spec.zitiName` | string | no |  | zitiName defaults to &lt;clusterId&gt;-&lt;namespace&gt;-&lt;name&gt;. Identities created before this default keep &lt;namespace&gt;.&lt;name&gt;. Minimum length 1. Maximum length 1000. |
 
 ## Validation rules
@@ -54,6 +62,8 @@ The API server rejects a resource that breaks one of these rules.
 - `spec`: set only one of serviceAccount and externalId
 - `spec`: certificate needs enrollmentMode None and externalId
 - `spec`: enrollmentMode None needs authPolicy and serviceAccount or externalId
+- `spec`: importFrom needs enrollmentMode OperatorEnrolled and managementPolicy Adopt
+- `spec`: type is immutable
 
 ## Status
 

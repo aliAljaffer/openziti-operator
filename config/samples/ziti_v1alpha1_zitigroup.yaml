@@ -1,0 +1,9 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiGroup
+metadata:
+  name: team-a
+  namespace: default
+spec:
+  members:
+    - backend
+  roleAttribute: team-a

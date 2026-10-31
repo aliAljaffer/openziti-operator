@@ -23,9 +23,10 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Ready` | The identity is enrolled and its certificate is valid. |
 | | `CertificateValid` | The certificate has more than 30 days left. Present once the identity is enrolled. |
 | | `SessionsObserved` | The operator read the controller's active session list. `status.activeSessions`, `status.connectedServices`, and `status.connectedRouters` summarize it. |
+| | `Disabled` | The identity is disabled by `spec.disabled`. Absent when it is enabled. |
 | `ZitiJwtSigner` | `Synced` | The signer (and its auth policy) exist and match. |
 | | `Ready` | Same as `Synced`. |
-| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator` | `Synced` | The Ziti object exists and matches the spec. |
+| `ZitiConfig`, `ZitiService`, `ZitiServicePolicy`, `ZitiEdgeRouterPolicy`, `ZitiServiceEdgeRouterPolicy`, `ZitiTerminator`, `ZitiAuthPolicy`, `ZitiPostureCheck` | `Synced` | The Ziti object exists and matches the spec. |
 | | `Ready` | Same as `Synced`. |
 | | `InUse` | (`ZitiConfig` only) Some service uses the config. |
 | `ZitiRouter` | `Synced` | The router exists in Ziti and matches the spec. |
@@ -45,6 +46,11 @@ kubectl get ztapp billing -o jsonpath='{range .status.conditions[*]}{.type}={.st
 | | `Ready` | The identity is ready and the proxy listener is ready. |
 | `ZitiAccessPolicy` | `Synced` | The Dial policy (and the edge router policy) exist and match. |
 | | `Ready` | The Dial policy selects at least one identity and one service. |
+| `ZitiGroup` | `Ready` | Every explicit member exists. It owns no Ziti entity. |
+| `ZitiAuthPolicy` | `Synced` | The auth policy exists and matches. |
+| | `Ready` | Same as `Synced`. |
+| `ZitiPostureCheck` | `Synced` | The posture check exists and matches. |
+| | `Ready` | Same as `Synced`. |
 
 `Dialable` and `RoutePath` can be false before the first client exists. That is not an error.
 
@@ -71,6 +77,9 @@ Some of these cases fail admission first when the validating webhook is installe
 | `SecretConflict` | A Secret with the wanted name exists and this `ZitiIdentity` does not own it. | Set another `secretName`. |
 | `KeyAmbiguous` | `ZitiJwtSigner` with `keys.kubernetes`: the cluster publishes several keys and the operator cannot tell which one signs tokens (it has no token to compare, or none matches). | Run the operator in the cluster, or use `keys.jwksEndpoint`. |
 | `SecretNamespaceNotAllowed` | The operator runs with `--secret-namespaces` (chart value `rbac.secretNamespaces`) and this namespace is not in it. | Add the namespace to the list. |
+| `ImportSourceMissing` | `importFrom` names a Secret or key that does not exist. | Create the Secret with the existing identity file, or fix the reference. |
+| `ImportSourceNotAllowed` | `importFrom` names a Secret in another namespace. | Put the identity file in the identity namespace. |
+| `TargetNotAllowed` | A target Service is in another namespace and lacks `ziti.alialjaffer.com/allow-expose=true`. | Add the annotation to the target Service, or keep the target in the app namespace. |
 | `ServiceNamespaceNotAllowed` | On `Workload`. The chart narrows where the operator may write Services (`rbac.serviceNamespaces`) and `spec.deployment.namespace` is not in it. The Deployment and the claim are still made, and the router runs without a stable address. | Add the namespace to the list, or apply the `service.yaml` from the enrollment Secret yourself. |
 | `NameConflict` on a `Deployment`, `Service`, or `PersistentVolumeClaim` | An object of that name exists in `spec.deployment.namespace` and the operator did not create it. The operator never takes over a workload it does not own. | Rename the router, or delete the object. |
 
@@ -108,6 +117,8 @@ Some of these cases fail admission first when the validating webhook is installe
 |---|---|---|
 | `ConnectionFailed` | `ZitiConnection` `Connected` | Login failed. Check the Secret, the CA ConfigMap, and the URL. |
 | `NoMatch` | `ZitiAccessPolicy` `Ready` | The Dial policy selects no identity or no service yet. |
+| `Observed` | A kind with `managementPolicy: Observe` | The operator read the existing entity and wrote nothing. |
+| `MemberNotFound` | `ZitiGroup` `Ready` | An explicit member name does not exist in the namespace. |
 | `IdentityNotFound` | `ZitiApp` `AccessResolved` | A name in `allow.identities` is not in Ziti. The policy still uses the identities that exist. |
 | `DeploymentUnavailable` | `ZitiRouter` `Workload` | The router pod has no ready replica. Look at the pod in `spec.deployment.namespace`. |
 | `ControllerVersionUnknown` | `ZitiRouter` `Workload` | The `ZitiConnection` has not reported a controller version, so the router image cannot be chosen. Set `spec.deployment.image`, or wait for the connection. |

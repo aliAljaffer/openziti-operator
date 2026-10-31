@@ -82,3 +82,7 @@ func (o *ZitiEdgeRouterPolicy) EntityCommon() *EntitySpec         { return &o.Sp
 func (o *ZitiEdgeRouterPolicy) EntityState() *EntityStatus        { return &o.Status.EntityStatus }
 func (o *ZitiServiceEdgeRouterPolicy) EntityCommon() *EntitySpec  { return &o.Spec.EntitySpec }
 func (o *ZitiServiceEdgeRouterPolicy) EntityState() *EntityStatus { return &o.Status.EntityStatus }
+func (o *ZitiAuthPolicy) EntityCommon() *EntitySpec               { return &o.Spec.EntitySpec }
+func (o *ZitiAuthPolicy) EntityState() *EntityStatus              { return &o.Status.EntityStatus }
+func (o *ZitiPostureCheck) EntityCommon() *EntitySpec             { return &o.Spec.EntitySpec }
+func (o *ZitiPostureCheck) EntityState() *EntityStatus            { return &o.Status.EntityStatus }

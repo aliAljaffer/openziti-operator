@@ -14,6 +14,8 @@ func SignerName(s *zitiv1.ZitiJwtSigner) string {
 	return s.Name
 }
 
+const keyAllowed = "allowed"
+
 func boolOrTrue(v *bool) bool {
 	if v == nil {
 		return true
@@ -53,9 +55,9 @@ func SignerAuthPolicy(s *zitiv1.ZitiJwtSigner, conn *zitiv1.ZitiConnection, sign
 	return ziti.Entity{
 		"name": SignerName(s),
 		"primary": map[string]any{
-			"cert":   map[string]any{"allowed": false, "allowExpiredCerts": false},
-			"extJwt": map[string]any{"allowed": true, "allowedSigners": []string{signerID}},
-			"updb": map[string]any{"allowed": false, "lockoutDurationMinutes": 0, "maxAttempts": 0, "minPasswordLength": 5,
+			"cert":   map[string]any{keyAllowed: false, "allowExpiredCerts": false},
+			"extJwt": map[string]any{keyAllowed: true, "allowedSigners": []string{signerID}},
+			"updb": map[string]any{keyAllowed: false, "lockoutDurationMinutes": 0, "maxAttempts": 0, "minPasswordLength": 5,
 				"requireMixedCase": false, "requireNumberChar": false, "requireSpecialChar": false},
 		},
 		"secondary": map[string]any{"requireTotp": false},

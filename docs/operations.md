@@ -37,8 +37,14 @@ to keep only the ServiceMonitor), and `grafanaDashboard.enabled=true` to install
 ConfigMap for the kube-prometheus-stack sidecar. Both need prometheus-operator, or kube-prometheus-stack
 with its dashboard sidecar.
 
-## Orphan sweeper
+## Import, export, and access review
 
+`manager export` writes the whole control-plane configuration as CR manifests, with `Observe` as the
+default. `manager access` prints who can dial or bind each service. Both commands are read-only and
+accept `--connection` to read credentials from a `ZitiConnection`. See [Export](export.md) and
+[Access report](access-report.md).
+
+## Orphan sweeper
 A crash or a removed finalizer can leave Ziti entities without an owner. Every `--orphan-sweep-interval` the leader looks for entities that carry this cluster's tag and an owner UID that no longer exists.
 
 | `--orphan-policy` | Effect |
@@ -60,3 +66,7 @@ Entities that other tools created are never touched, because they do not carry t
 ## Certificates of identities
 
 `OperatorEnrolled` identities renew automatically. Renewal starts when the smaller of 30 days and a third of the lifetime is left. `JwtOnly` identities cannot renew, because the workload holds the key. The operator sets `CertificateValid=False` and sends a Warning event 30 days before expiry.
+
+## Disable an identity
+
+`ZitiIdentity.spec.disabled` calls the Ziti disable endpoint, which rejects new API session requests. Set `disabledUntil` for a timed lock. The operator reports a `Disabled` condition and does not delete the identity. See [Authentication policies](auth-policies.md).

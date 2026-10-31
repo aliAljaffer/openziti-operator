@@ -1,0 +1,21 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiAuthPolicy
+metadata:
+  name: humans
+  namespace: default
+spec:
+  primary:
+    cert:
+      allowed: true
+    updb:
+      allowed: true
+      minPasswordLength: 12
+      maxAttempts: 5
+      lockoutDurationMinutes: 15
+      requireMixedCase: true
+      requireNumberChar: true
+      requireSpecialChar: true
+    extJwt:
+      allowed: false
+  secondary:
+    requireTotp: true

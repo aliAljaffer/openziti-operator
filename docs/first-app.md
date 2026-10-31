@@ -71,9 +71,15 @@ The selector matches **Services**, not Deployments. Services provide stable addr
 | `targets[].cost` | Lower cost is preferred. Equal costs share the load. |
 | `allow.groups` | Identities with one of these role attributes may connect. |
 | `allow.identities` | Ziti identity names. They may exist outside Kubernetes. |
+| `allow.postureCheckRoles` | Posture checks the Dial policy requires. See [Posture checks](posture-checks.md). |
 | `entryRouters` | Routers clients connect through. Creates an edge router policy for the allowed identities. |
 | `memberOf` | Groups the app belongs to. Existing policies that grant a group apply to it. |
 | `hostedBy` | Router that runs the targets. Must be in `hostingRouters`. |
+| `hostedByAnyOf` | Additional routers that may host the same targets. Use it to remove a single-router failure mode. |
+| `service` | Service-level `encryptionRequired`, `terminatorStrategy`, and `maxIdleTimeMillis`. Empty keeps the defaults. |
+| `additionalConfigs` | Extra Ziti config names to attach to every service the app creates. |
+| `targets[].namespace` | Namespace of `kubernetesService`. A cross-namespace target needs `ziti.alialjaffer.com/allow-expose=true` on the Service. |
+| `targets[].precedence` | `required`, `default`, or `failed`. |
 | `deletionPolicy` | `Delete` (default) or `Orphan`. Cannot change later. |
 
 ## Conditions
@@ -101,5 +107,7 @@ Add annotations to the Service. The operator creates a `ZitiApp` that the Servic
 | `ziti.alialjaffer.com/ports` | Default: the Service ports. Ranges allowed. |
 | `ziti.alialjaffer.com/protocols` | Default: from the Service ports. |
 | `ziti.alialjaffer.com/name`, `connection`, `member-of`, `entry-routers`, `hosted-by` | Same as the `ZitiApp` keys. |
+| `ziti.alialjaffer.com/posture-check-roles` | Posture check roles for the generated Dial policy. |
+| `ziti.alialjaffer.com/via-ingress`, `ingress-backend` | Publish through the ingress controller Service. See [Expose an Ingress](ingress.md). |
 
 Deleting the Service deletes the app and every Ziti entity it created.

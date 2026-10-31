@@ -50,3 +50,5 @@ go run ./cmd/main.go audit --connection default --fail-on NoTerminator,NoDialer
 | `ExpiredEnrollment` | An identity has an expired one-time token. |
 
 Every finding also shows up in `status` of the resource that owns the entity: `NoTerminator` and `InertBind` on the `ZitiApp` and on the `ZitiRouter` it names, `UnusedConfig` on the `ZitiConfig`. See [Conditions and reasons](conditions.md). The command stays useful for entities no resource owns.
+
+For a positive view of who can reach each service, rather than problems, use [Access report](access-report.md).

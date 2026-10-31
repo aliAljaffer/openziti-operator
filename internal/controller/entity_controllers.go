@@ -56,6 +56,22 @@ func buildServicePolicy(res *resolver, o *zitiv1.ZitiServicePolicy, conn *zitiv1
 	return desired.ServicePolicyEntity(o, conn, identities, services, posture), nil
 }
 
+func buildAuthPolicy(res *resolver, o *zitiv1.ZitiAuthPolicy, conn *zitiv1.ZitiConnection) (ziti.Entity, error) {
+	names := append([]string{}, o.Spec.Primary.ExtJWT.AllowedSigners...)
+	if o.Spec.Secondary.RequireExtJwtSigner != "" {
+		names = append(names, o.Spec.Secondary.RequireExtJwtSigner)
+	}
+	signers := map[string]string{}
+	for _, name := range names {
+		id, ok := res.lookup(ziti.ExternalJWTSigners, name)
+		if !ok {
+			return nil, &desired.MissingError{Msg: fmt.Sprintf("no signer named %q in Ziti", name)}
+		}
+		signers[name] = id
+	}
+	return desired.AuthPolicyEntity(o, conn, signers)
+}
+
 func buildEdgeRouterPolicy(res *resolver, o *zitiv1.ZitiEdgeRouterPolicy, conn *zitiv1.ZitiConnection) (ziti.Entity, error) {
 	identities, err := desired.ResolveRoles(conn, o.Namespace, "identityRoles", o.Spec.IdentityRoles, ziti.Identities, res.lookup)
 	if err != nil {
@@ -117,6 +133,17 @@ func SetupEntityControllers(mgr ctrl.Manager, clients ClientProvider) error {
 		func() error {
 			return newEntityReconciler(c, scheme, clients, rec, "zitiserviceedgerouterpolicy", ziti.ServiceEdgeRouterPolicies,
 				func() *zitiv1.ZitiServiceEdgeRouterPolicy { return &zitiv1.ZitiServiceEdgeRouterPolicy{} }, buildServiceEdgeRouterPolicy).SetupWithManager(mgr)
+		},
+		func() error {
+			return newEntityReconciler(c, scheme, clients, rec, "zitiauthpolicy", ziti.AuthPolicies,
+				func() *zitiv1.ZitiAuthPolicy { return &zitiv1.ZitiAuthPolicy{} }, buildAuthPolicy).SetupWithManager(mgr)
+		},
+		func() error {
+			return newEntityReconciler(c, scheme, clients, rec, "zitiposturecheck", ziti.PostureChecks,
+				func() *zitiv1.ZitiPostureCheck { return &zitiv1.ZitiPostureCheck{} },
+				func(_ *resolver, o *zitiv1.ZitiPostureCheck, conn *zitiv1.ZitiConnection) (ziti.Entity, error) {
+					return desired.PostureCheckEntity(o, conn)
+				}).SetupWithManager(mgr)
 		},
 	} {
 		if err := setup(); err != nil {

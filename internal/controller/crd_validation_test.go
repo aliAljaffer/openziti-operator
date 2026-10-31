@@ -301,10 +301,10 @@ var _ = Describe("ZitiJwtSigner and token identities", func() {
 		Entry("jwksEndpoint keys", func(s *zitiv1.ZitiJwtSignerSpec) {
 			s.Keys = zitiv1.SignerKeys{JwksEndpoint: &zitiv1.JwksEndpoint{URL: "https://idp.example/keys", Issuer: "https://idp.example"}}
 		}, ""),
-		Entry("no key source", func(s *zitiv1.ZitiJwtSignerSpec) { s.Keys = zitiv1.SignerKeys{} }, "set exactly one of kubernetes and jwksEndpoint"),
+		Entry("no key source", func(s *zitiv1.ZitiJwtSignerSpec) { s.Keys = zitiv1.SignerKeys{} }, "set exactly one of kubernetes, jwksEndpoint, and certPEM"),
 		Entry("two key sources", func(s *zitiv1.ZitiJwtSignerSpec) {
 			s.Keys.JwksEndpoint = &zitiv1.JwksEndpoint{URL: "https://idp.example/keys", Issuer: "i"}
-		}, "set exactly one of kubernetes and jwksEndpoint"),
+		}, "set exactly one of kubernetes, jwksEndpoint, and certPEM"),
 		Entry("http jwks url", func(s *zitiv1.ZitiJwtSignerSpec) {
 			s.Keys = zitiv1.SignerKeys{JwksEndpoint: &zitiv1.JwksEndpoint{URL: "http://idp.example/keys", Issuer: "i"}}
 		}, "should match"),
@@ -581,4 +581,44 @@ var _ = Describe("ZitiPortForward", func() {
 		Entry("port below range", func(s *zitiv1.ZitiPortForwardSpec) { s.Port = 0 }, "greater than or equal to 1"),
 		Entry("port above range", func(s *zitiv1.ZitiPortForwardSpec) { s.Port = 70000 }, "less than or equal to 65535"),
 	)
+})
+
+var _ = Describe("Additive validation", func() {
+	It("accepts a group with the default role attribute", func() {
+		g := &zitiv1.ZitiGroup{Name: "group-ok", Namespace: "default"}
+		Expect(k8sClient.Create(ctx, g)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, g) })
+	})
+
+	DescribeTable("rejects bad groups",
+		func(mut func(*zitiv1.ZitiGroupSpec), message string) {
+			g := &zitiv1.ZitiGroup{Name: "group-bad", Namespace: "default"}
+			mut(&g.Spec)
+			Expect(k8sClient.Create(ctx, g)).To(MatchError(ContainSubstring(message)))
+		},
+		Entry("role starts with a dash", func(s *zitiv1.ZitiGroupSpec) { s.RoleAttribute = "-bad" }, "spec.roleAttribute"),
+	)
+
+	It("requires Adopt and OperatorEnrolled for importFrom", func() {
+		id := &zitiv1.ZitiIdentity{Name: "import-bad", Namespace: "default",
+			Spec: zitiv1.ZitiIdentitySpec{
+				ImportFrom: &zitiv1.IdentityImport{IdentityFileSecretRef: zitiv1.SecretRef{Namespace: "default", Name: "source"}},
+			}}
+		Expect(k8sClient.Create(ctx, id)).To(MatchError(ContainSubstring("importFrom needs")))
+		id.Name = "import-ok"
+		id.Spec.ManagementPolicy = zitiv1.ManagementAdopt
+		id.Spec.EnrollmentMode = zitiv1.EnrollmentOperator
+		Expect(k8sClient.Create(ctx, id)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, id) })
+	})
+
+	It("requires an issuer for a static signer certificate", func() {
+		sg := &zitiv1.ZitiJwtSigner{Name: "signer-cert-bad",
+			Spec: zitiv1.ZitiJwtSignerSpec{Audience: "ziti", Keys: zitiv1.SignerKeys{CertPEM: "pem"}}}
+		Expect(k8sClient.Create(ctx, sg)).To(MatchError(ContainSubstring("issuer is required")))
+		sg.Name = "signer-cert-ok"
+		sg.Spec.Issuer = "https://issuer.example"
+		Expect(k8sClient.Create(ctx, sg)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, sg) })
+	})
 })

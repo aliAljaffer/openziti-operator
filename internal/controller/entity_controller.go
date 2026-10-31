@@ -22,9 +22,9 @@ import (
 	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs;zitiservices;zitiservicepolicies;zitiedgerouterpolicies;zitiserviceedgerouterpolicies;zitiauthpolicies;zitiposturechecks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/status;zitiservices/status;zitiservicepolicies/status;zitiedgerouterpolicies/status;zitiserviceedgerouterpolicies/status;zitiauthpolicies/status;zitiposturechecks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ziti.alialjaffer.com,resources=ziticonfigs/finalizers;zitiservices/finalizers;zitiservicepolicies/finalizers;zitiedgerouterpolicies/finalizers;zitiserviceedgerouterpolicies/finalizers;zitiauthpolicies/finalizers;zitiposturechecks/finalizers,verbs=update
 
 // resolver looks up Ziti entities by name. It lists each kind once per reconcile.
 type resolver struct {
@@ -228,7 +228,7 @@ func (r *entityReconciler[T]) observe(ctx context.Context, obj T, zc ziti.Client
 		return err
 	}
 	if len(found) == 0 {
-		return &specError{"NotFound", string(r.Kind) + " " + `"` + name + `"` + " not found in Ziti"}
+		return &specError{ReasonNotFound, string(r.Kind) + " " + `"` + name + `"` + " not found in Ziti"}
 	}
 	st := obj.EntityState()
 	st.ZitiID = found[0].ID()

@@ -25,11 +25,29 @@ spec:
                   number: 80
 ```
 
-The ZitiApp intercepts the Ingress hosts on port 80 and forwards to the backend Service. It uses the same annotations as an annotated Service: `connection`, `name`, `addresses`, `ports`, `protocols`, `allow-groups`, `allow-identities`, `member-of`, `entry-routers`, and `hosted-by`.
+The ZitiApp intercepts the Ingress hosts on port 80 and forwards to the backend Service. It uses the same annotations as an annotated Service: `connection`, `name`, `addresses`, `ports`, `protocols`, `allow-groups`, `allow-identities`, `posture-check-roles`, `member-of`, `entry-routers`, and `hosted-by`.
+
+For a TLS Ingress, publish through the ingress controller instead of the backend Service:
+
+```yaml
+metadata:
+  annotations:
+    ziti.alialjaffer.com/expose: "true"
+    ziti.alialjaffer.com/via-ingress: "true"
+    ziti.alialjaffer.com/ingress-backend: ingress-nginx/ingress-nginx-controller:443
+```
+
+The target Service needs `ziti.alialjaffer.com/allow-expose=true` when it is in another namespace.
 
 ## Limits
 
-- Every path must target the same Service and Service port. Ziti does not preserve Kubernetes path routing. Mixed backends would silently expose the wrong service, so the operator rejects them.
-- TLS Ingresses are not exposed automatically. An Ingress controller may terminate TLS before forwarding to the backend; bypassing it changes that behavior. Use a `ZitiApp` to choose the TLS backend explicitly.
+- Every path must target the same Service and Service port unless `ziti.alialjaffer.com/via-ingress=true`
+  is set. Ziti does not preserve Kubernetes path routing. Mixed backends would silently expose the
+  wrong service, so the operator rejects them.
+- TLS Ingresses are not exposed automatically. Set `ziti.alialjaffer.com/via-ingress=true` and
+  `ziti.alialjaffer.com/ingress-backend=<namespace>/<service>:<port>` to publish through the ingress
+  controller, which keeps TLS termination and path routing. The target Service needs
+  `ziti.alialjaffer.com/allow-expose=true` when it is in another namespace. Use a `ZitiApp` when the
+  backend serves TLS itself.
 - The Ingress must have at least one host, or set `ziti.alialjaffer.com/addresses`.
 - The operator owns the generated ZitiApp through an owner reference. Removing the annotation or deleting the Ingress deletes that app.

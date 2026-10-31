@@ -84,7 +84,7 @@ func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !rt.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, &rt)
 	}
-	if controllerutil.AddFinalizer(&rt, Finalizer) {
+	if rt.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve && controllerutil.AddFinalizer(&rt, Finalizer) {
 		if err := r.Update(ctx, &rt); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -92,11 +92,15 @@ func (r *ZitiRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	before := rt.Status.DeepCopy()
 	conn, zc, err := connect(ctx, r.Client, r.Clients, rt.Spec.ConnectionRef)
-	if err == nil {
+	if err == nil && rt.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
 		err = r.checkSecretNamespace(&rt)
 	}
 	if err == nil {
-		err = r.sync(ctx, &rt, conn, zc)
+		if rt.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+			err = r.observe(ctx, &rt, conn, zc)
+		} else {
+			err = r.sync(ctx, &rt, conn, zc)
+		}
 	}
 
 	var se *specError
@@ -150,6 +154,10 @@ func (r *ZitiRouterReconciler) finalize(ctx context.Context, rt *zitiv1alpha1.Zi
 	if !controllerutil.ContainsFinalizer(rt, Finalizer) {
 		return nil
 	}
+	if rt.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		controllerutil.RemoveFinalizer(rt, Finalizer)
+		return r.Update(ctx, rt)
+	}
 	_, zc, err := connect(ctx, r.Client, r.Clients, rt.Spec.ConnectionRef)
 	if err != nil {
 		r.Recorder.Eventf(rt, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -171,6 +179,38 @@ func (r *ZitiRouterReconciler) finalize(ctx context.Context, rt *zitiv1alpha1.Zi
 	return r.Update(ctx, rt)
 }
 
+func (r *ZitiRouterReconciler) observe(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
+	name := desired.RouterName(rt, conn)
+	if err := desired.CheckName(name); err != nil {
+		return &specError{"InvalidSpec", err.Error()}
+	}
+	found, err := zc.List(ctx, ziti.EdgeRouters, `name="`+name+`"`)
+	if err != nil {
+		return err
+	}
+	if len(found) == 0 {
+		return &specError{ReasonNotFound, "edge router " + `"` + name + `"` + " not found in Ziti"}
+	}
+	e := found[0]
+	enrolled, _ := e["isVerified"].(bool)
+	online, _ := e["isOnline"].(bool)
+	rt.Status.RouterID, rt.Status.ZitiName, rt.Status.Enrolled, rt.Status.Online = e.ID(), name, enrolled, online
+	report, err := servingReport(ctx, zc, e)
+	if err != nil {
+		return err
+	}
+	missing := report.Missing()
+	rt.Status.Services = report.Services
+	setCond(&rt.Status.Conditions, rt.Generation, CondSynced, true, "Observed", "", "")
+	setCond(&rt.Status.Conditions, rt.Generation, CondServing, len(missing) == 0, "Serving", check.NoTerminator,
+		"no terminator for: "+strings.Join(missing, ", "))
+	setCond(&rt.Status.Conditions, rt.Generation, CondEnrolled, enrolled, "Enrolled", "PendingEnrollment", "the router has not enrolled yet")
+	setCond(&rt.Status.Conditions, rt.Generation, CondOnline, online, "Online", "Offline", "the router is not connected to the controller")
+	setCond(&rt.Status.Conditions, rt.Generation, CondReady, enrolled && online, "Observed", "NotReady", "the router is not ready")
+	meta.RemoveStatusCondition(&rt.Status.Conditions, CondWorkload)
+	return nil
+}
+
 func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRouter, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.RouterName(rt, conn)
 	if err := desired.CheckName(name); err != nil {
@@ -180,6 +220,7 @@ func (r *ZitiRouterReconciler) sync(ctx context.Context, rt *zitiv1alpha1.ZitiRo
 	if err != nil {
 		return err
 	}
+	set.adopt = rt.Spec.ManagementPolicy == zitiv1alpha1.ManagementAdopt
 	id, err := set.ensure(ctx, ziti.EdgeRouters, desired.Router(rt, conn))
 	if err != nil {
 		return err

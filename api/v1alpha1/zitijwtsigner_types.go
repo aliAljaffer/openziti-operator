@@ -35,8 +35,8 @@ type JwksEndpoint struct {
 	Issuer string `json:"issuer"`
 }
 
-// SignerKeys tells Ziti how to verify token signatures. Set exactly one field.
-// +kubebuilder:validation:XValidation:rule="has(self.kubernetes) != has(self.jwksEndpoint)",message="set exactly one of kubernetes and jwksEndpoint"
+// SignerKeys tells Ziti how to verify token signatures. Set exactly one of kubernetes, jwksEndpoint, and certPEM.
+// +kubebuilder:validation:XValidation:rule="(has(self.kubernetes) ? 1 : 0) + (has(self.jwksEndpoint) ? 1 : 0) + (has(self.certPEM) ? 1 : 0) == 1",message="set exactly one of kubernetes, jwksEndpoint, and certPEM"
 type SignerKeys struct {
 	// kubernetes reads the issuer and the keys from this cluster. The operator picks the key that signs
 	// its own service account token. When the cluster rotates the key, the next sync updates the signer.
@@ -46,10 +46,20 @@ type SignerKeys struct {
 	// jwksEndpoint lets the Ziti controller fetch the keys, for any identity provider.
 	// +optional
 	JwksEndpoint *JwksEndpoint `json:"jwksEndpoint,omitempty"`
+
+	// certPEM is a PEM certificate that carries the public signing key. Use it to represent a signer that
+	// uses a static key, for example one imported from an existing network.
+	// +optional
+	CertPEM string `json:"certPEM,omitempty"`
+
+	// kid is the key id that matches certPEM. Empty lets Ziti use the certificate key id.
+	// +optional
+	Kid string `json:"kid,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
+// +kubebuilder:validation:XValidation:rule="!has(self.keys.certPEM) || has(self.issuer)",message="issuer is required with keys.certPEM"
 type ZitiJwtSignerSpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -62,9 +72,21 @@ type ZitiJwtSignerSpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
+	// managementPolicy Manage creates the signer. Adopt takes it over. Observe only reads it and reports status,
+	// for a signer that was registered outside the operator.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
+
 	// audience must equal the aud claim of the tokens. Use a value made for Ziti, for example "ziti".
 	// +kubebuilder:validation:MinLength=1
 	Audience string `json:"audience"`
+
+	// issuer is the iss claim of the tokens. It is required with keys.certPEM and ignored when the keys
+	// field supplies an issuer itself.
+	// +optional
+	Issuer string `json:"issuer,omitempty"`
 
 	// claimsProperty is the token claim that names the identity.
 	// +kubebuilder:default=sub

@@ -88,7 +88,7 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("-o must be table or json")
 	}
 
-	zc, err := clientFor(ctx, opts)
+	zc, err := ClientFor(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func filterFindings(findings []check.Finding, filter string) []check.Finding {
 	return matched
 }
 
-func clientFor(ctx context.Context, opts Options) (ziti.Client, error) {
+func ClientFor(ctx context.Context, opts Options) (ziti.Client, error) {
 	if opts.Connection != "" {
 		return connectionClient(ctx, opts)
 	}

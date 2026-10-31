@@ -41,6 +41,7 @@
 | `spec.externalIdClaim.matcherCriteria` | string | no |  | matcherCriteria is the prefix, suffix, or scheme for the matcher. Empty for ALL. |
 | `spec.externalIdClaim.parser` | string | no | `"NONE"` | parser cuts the value. SPLIT splits it at parserCriteria and takes the part at index. One of: `NONE`, `SPLIT`. |
 | `spec.externalIdClaim.parserCriteria` | string | no |  | parserCriteria is the separator for SPLIT. Empty for NONE. |
+| `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage registers the CA. Adopt takes it over. Observe only reads it and reports status, for a CA that was registered outside the operator. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.verification` | object | no |  | verification says how the operator proves that it controls the CA. Ziti trusts a CA only after that. |
 | `spec.verification.issuerRef` | object | no |  | issuerRef proves ownership through cert-manager, so the operator never reads the CA key. The operator asks the issuer for a short-lived certificate whose common name is Ziti's verification token, reads the certificate (not its key use) from the Secret, and sends it to Ziti. Set only one of signWithSecretKey and issuerRef. |
 | `spec.verification.issuerRef.kind` | string | no | `"ClusterIssuer"` | kind is Issuer or ClusterIssuer. One of: `Issuer`, `ClusterIssuer`. |

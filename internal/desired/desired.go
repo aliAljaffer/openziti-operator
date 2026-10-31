@@ -85,17 +85,35 @@ func ownerTags(conn *zitiv1.ZitiConnection, kind string, m *metav1.ObjectMeta) m
 }
 
 func (b *Builder) HostingRouter() (string, error) {
-	r := b.Svc.Spec.HostedBy
-	if r == "" {
-		if len(b.Conn.Spec.HostingRouters) == 0 {
-			return "", fmt.Errorf("connection %q has no hostingRouters", b.Conn.Name)
+	routers, err := b.HostingRouters()
+	if err != nil {
+		return "", err
+	}
+	return routers[0], nil
+}
+
+func (b *Builder) HostingRouters() ([]string, error) {
+	if len(b.Conn.Spec.HostingRouters) == 0 {
+		return nil, fmt.Errorf("connection %q has no hostingRouters", b.Conn.Name)
+	}
+	names := make([]string, 0, 1+len(b.Svc.Spec.HostedByAnyOf))
+	if b.Svc.Spec.HostedBy != "" {
+		names = append(names, b.Svc.Spec.HostedBy)
+	}
+	for _, n := range b.Svc.Spec.HostedByAnyOf {
+		if !slices.Contains(names, n) {
+			names = append(names, n)
 		}
-		r = b.Conn.Spec.HostingRouters[0]
 	}
-	if !slices.Contains(b.Conn.Spec.HostingRouters, r) {
-		return "", fmt.Errorf("hostedBy %q is not in the connection hostingRouters", r)
+	if len(names) == 0 {
+		names = append(names, b.Conn.Spec.HostingRouters[0])
 	}
-	return r, nil
+	for _, n := range names {
+		if !slices.Contains(b.Conn.Spec.HostingRouters, n) {
+			return nil, fmt.Errorf("hostedBy %q is not in the connection hostingRouters", n)
+		}
+	}
+	return names, nil
 }
 
 func (b *Builder) routerRole(name string) (string, error) {
@@ -197,9 +215,13 @@ func (b *Builder) HostConfig(typeID string) (ziti.Entity, error) {
 	terminators := make([]map[string]any, 0, len(targets))
 	for _, t := range targets {
 		address := t.Address
+		namespace := t.Namespace
+		if namespace == "" {
+			namespace = b.Svc.Namespace
+		}
 		switch {
 		case t.KubernetesService != "" && t.Address == "":
-			address = t.KubernetesService + "." + b.Svc.Namespace + ".svc"
+			address = t.KubernetesService + "." + namespace + ".svc"
 		case t.Address == "":
 			return nil, fmt.Errorf("each target needs address or kubernetesService")
 		case t.KubernetesService != "":
@@ -219,6 +241,9 @@ func (b *Builder) HostConfig(typeID string) (ziti.Entity, error) {
 		if t.Cost > 0 {
 			term["listenOptions"] = map[string]any{"cost": t.Cost}
 		}
+		if t.Precedence != "" {
+			term["precedence"] = t.Precedence
+		}
 		terminators = append(terminators, term)
 	}
 	e := b.named("-host.v2")
@@ -228,41 +253,59 @@ func (b *Builder) HostConfig(typeID string) (ziti.Entity, error) {
 }
 
 func (b *Builder) Service(interceptID, hostID string) (ziti.Entity, error) {
+	return b.ServiceWithConfigs(interceptID, hostID, nil)
+}
+
+func (b *Builder) ServiceWithConfigs(interceptID, hostID string, extra []string) (ziti.Entity, error) {
 	attrs, err := ScopeAttributes(b.scope(), b.Svc.Namespace, b.Svc.Spec.MemberOf)
 	if err != nil {
 		return nil, err
 	}
+	configs := make([]string, 0, 2+len(extra))
+	configs = append(configs, interceptID, hostID)
+	configs = append(configs, extra...)
+	strategy := b.Svc.Spec.Service.TerminatorStrategy
+	if strategy == "" {
+		strategy = "smartrouting"
+	}
 	e := ziti.Entity{"name": b.ZitiName(), "tags": b.Tags()}
-	e["encryptionRequired"] = true
-	e["terminatorStrategy"] = "smartrouting"
-	e["configs"] = []string{interceptID, hostID}
+	e["encryptionRequired"] = boolOrTrue(b.Svc.Spec.Service.EncryptionRequired)
+	e["terminatorStrategy"] = strategy
+	e["configs"] = configs
 	e["roleAttributes"] = attrs
+	if b.Svc.Spec.Service.MaxIdleTimeMillis > 0 {
+		e["maxIdleTimeMillis"] = b.Svc.Spec.Service.MaxIdleTimeMillis
+	}
 	return e, nil
 }
 
 func (b *Builder) Bind(serviceID string) (ziti.Entity, error) {
-	r, err := b.HostingRouter()
+	routers, err := b.HostingRouters()
 	if err != nil {
 		return nil, err
 	}
-	role, err := b.routerRole(r)
-	if err != nil {
-		return nil, err
+	roles := make([]string, 0, len(routers))
+	for _, name := range routers {
+		role, err := b.routerRole(name)
+		if err != nil {
+			return nil, err
+		}
+		roles = append(roles, role)
 	}
 	e := b.named("-bind")
 	e["type"] = "Bind"
 	e["semantic"] = "AnyOf"
-	e["identityRoles"] = []string{role}
+	e["identityRoles"] = roles
 	e["serviceRoles"] = []string{"@" + serviceID}
 	return e, nil
 }
 
 func (b *Builder) SERP(serviceID string) (ziti.Entity, error) {
-	host, err := b.HostingRouter()
+	routers, err := b.HostingRouters()
 	if err != nil {
 		return nil, err
 	}
-	names := append([]string{host}, b.Svc.Spec.EntryRouters...)
+	names := append(slices.Clone(routers), b.Svc.Spec.EntryRouters...)
 	names = append(names, b.Conn.Spec.DefaultEdgeRouters...)
 	var roles []string
 	for _, n := range names {
@@ -315,17 +358,29 @@ func (b *Builder) AllowedRoles(identityIDs map[string]string) (roles, missing []
 	return roles, missing, nil
 }
 
-// Dial returns nil when the app has no allow.groups and no allow.identities.
-func (b *Builder) Dial(serviceID string, roles []string) ziti.Entity {
+func (b *Builder) Dial(serviceID string, roles []string) (ziti.Entity, error) {
 	if len(b.Svc.Spec.Allow.Groups)+len(b.Svc.Spec.Allow.Identities) == 0 {
-		return nil
+		return nil, nil
+	}
+	for _, r := range b.Svc.Spec.Allow.PostureCheckRoles {
+		if strings.HasPrefix(r, "@") {
+			return nil, fmt.Errorf("postureCheckRoles: %q uses @name; use #attribute, or ZitiAccessPolicy for @name", r)
+		}
+	}
+	posture, err := ScopeRoles(b.scope(), b.Svc.Namespace, b.Svc.Spec.Allow.PostureCheckRoles)
+	if err != nil {
+		return nil, fmt.Errorf("postureCheckRoles: %w", err)
+	}
+	if posture == nil {
+		posture = []string{}
 	}
 	e := b.named("-dial")
 	e["type"] = "Dial"
 	e["semantic"] = "AnyOf"
 	e["identityRoles"] = roles
 	e["serviceRoles"] = []string{"@" + serviceID}
-	return e
+	e["postureCheckRoles"] = posture
+	return e, nil
 }
 
 // ERP gives the allowed identities access to the entry routers. It returns nil without entryRouters or roles.

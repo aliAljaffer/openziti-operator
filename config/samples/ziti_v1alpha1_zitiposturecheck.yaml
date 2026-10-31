@@ -1,0 +1,17 @@
+apiVersion: ziti.alialjaffer.com/v1alpha1
+kind: ZitiPostureCheck
+metadata:
+  name: managed-laptop
+  namespace: default
+spec:
+  type: OS
+  roleAttributes:
+    - managed
+  data:
+    operatingSystems:
+      - type: Windows
+        versions:
+          - 10.0.19045
+      - type: macOS
+        versions:
+          - 14.0

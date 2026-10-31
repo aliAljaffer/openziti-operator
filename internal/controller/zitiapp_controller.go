@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,7 @@ import (
 const (
 	Finalizer          = "ziti.alialjaffer.com/finalizer"
 	ReasonNameConflict = "NameConflict"
+	ReasonNotFound     = "NotFound"
 	CondSynced         = "Synced"
 	CondHosted         = "Hosted"
 	CondDialable       = "Dialable"
@@ -219,6 +221,9 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	if svc.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
 		return r.observeExisting(ctx, zc, name, routers)
 	}
+	if err := r.validateTargets(ctx, svc); err != nil {
+		return nil, err
+	}
 	b.RouterIDs = map[string]string{}
 	for _, rt := range routers {
 		b.RouterIDs[rt.Name()] = rt.ID()
@@ -235,6 +240,10 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		if typeIDs[n] == "" {
 			return nil, fmt.Errorf("config type %s not found in Ziti", n)
 		}
+	}
+	extraConfigs, err := r.namedConfigIDs(ctx, zc, svc.Spec.AdditionalConfigs)
+	if err != nil {
+		return nil, err
 	}
 
 	groups, err := b.Groups()
@@ -262,7 +271,7 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 
 	results := make([]groupResult, 0, len(groups))
 	for _, g := range groups {
-		res, err := ensureGroup(ctx, b.WithGroup(g), g, typeIDs, allowed, set.ensure)
+		res, err := ensureGroup(ctx, b.WithGroup(g), g, typeIDs, allowed, extraConfigs, set.ensure)
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +312,7 @@ type groupResult struct {
 
 // ensureGroup writes the configs, service, and policies of one group and returns their ids.
 func ensureGroup(ctx context.Context, gb *desired.Builder, g desired.Group, typeIDs map[string]string,
-	allowed []string, ensure func(context.Context, ziti.Kind, ziti.Entity) (string, error)) (groupResult, error) {
+	allowed, extraConfigs []string, ensure func(context.Context, ziti.Kind, ziti.Entity) (string, error)) (groupResult, error) {
 	icBody, _ := gb.InterceptConfig(typeIDs["intercept.v1"])
 	hcBody, _ := gb.HostConfig(typeIDs["host.v2"])
 	res := groupResult{group: g, ic: icBody, hc: hcBody}
@@ -314,7 +323,7 @@ func ensureGroup(ctx context.Context, gb *desired.Builder, g desired.Group, type
 	if res.ids.Host, err = ensure(ctx, ziti.Configs, hcBody); err != nil {
 		return res, err
 	}
-	if res.svc, err = gb.Service(res.ids.Intercept, res.ids.Host); err != nil {
+	if res.svc, err = gb.ServiceWithConfigs(res.ids.Intercept, res.ids.Host, extraConfigs); err != nil {
 		return res, err
 	}
 	if res.ids.Service, err = ensure(ctx, ziti.Services, res.svc); err != nil {
@@ -334,7 +343,11 @@ func ensureGroup(ctx context.Context, gb *desired.Builder, g desired.Group, type
 	if res.ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
 		return res, err
 	}
-	if dial := gb.Dial(res.ids.Service, allowed); dial != nil {
+	dial, err := gb.Dial(res.ids.Service, allowed)
+	if err != nil {
+		return res, err
+	}
+	if dial != nil {
 		if res.ids.Dial, err = ensure(ctx, ziti.ServicePolicies, dial); err != nil {
 			return res, err
 		}
@@ -383,6 +396,51 @@ func (r *ZitiAppReconciler) identityIDs(ctx context.Context, zc ziti.Client, nam
 	return out, nil
 }
 
+func (r *ZitiAppReconciler) namedConfigIDs(ctx context.Context, zc ziti.Client, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	all, err := zc.List(ctx, ziti.Configs, "")
+	if err != nil {
+		return nil, err
+	}
+	ids := map[string]string{}
+	for _, e := range all {
+		ids[e.Name()] = e.ID()
+	}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		id, ok := ids[name]
+		if !ok {
+			return nil, &desired.MissingError{Msg: fmt.Sprintf("additionalConfigs: no config named %q in Ziti", name)}
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+func (r *ZitiAppReconciler) validateTargets(ctx context.Context, svc *zitiv1alpha1.ZitiApp) error {
+	for _, t := range svc.Spec.Targets {
+		if t.Namespace == "" || t.Namespace == svc.Namespace {
+			continue
+		}
+		if t.KubernetesService == "" {
+			return &specError{"InvalidSpec", "targets[].namespace needs kubernetesService"}
+		}
+		var target corev1.Service
+		if err := r.Get(ctx, client.ObjectKey{Namespace: t.Namespace, Name: t.KubernetesService}, &target); err != nil {
+			if apierrors.IsNotFound(err) {
+				return &desired.MissingError{Msg: fmt.Sprintf("target Service %s/%s not found", t.Namespace, t.KubernetesService)}
+			}
+			return err
+		}
+		if target.Annotations[desired.AnnAllowExpose] != "true" {
+			return &specError{"TargetNotAllowed", fmt.Sprintf("Service %s/%s needs the annotation %s=true before another namespace may expose it", t.Namespace, t.KubernetesService, desired.AnnAllowExpose)}
+		}
+	}
+	return nil
+}
+
 // observeExisting reports on a service that was created outside this operator. It never writes to Ziti.
 func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers []ziti.Entity) (*syncResult, error) {
 	found, err := zc.List(ctx, ziti.Services, fmt.Sprintf(`name="%s"`, name))
@@ -390,7 +448,7 @@ func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client,
 		return nil, err
 	}
 	if len(found) == 0 {
-		return nil, &specError{"NotFound", fmt.Sprintf("service %q not found in Ziti", name)}
+		return nil, &specError{ReasonNotFound, fmt.Sprintf("service %q not found in Ziti", name)}
 	}
 	svc := found[0]
 	configTypes, err := zc.List(ctx, ziti.ConfigTypes, "")
@@ -549,7 +607,7 @@ func markFailed(rec record.EventRecorder, obj client.Object, conds *[]metav1.Con
 var remediationHints = map[string]string{
 	"InvalidSpec":                "Fix the spec; nothing was written to Ziti.",
 	"TargetNotFound":             "Create the missing entity; the operator checks again soon.",
-	"NotFound":                   "Fix zitiName, or create the entity in Ziti.",
+	ReasonNotFound:               "Fix zitiName, or create the entity in Ziti.",
 	"ZitiRejected":               "Fix the spec; the operator retries later.",
 	"Error":                      "The operator retries with backoff.",
 	"NamespaceNotAllowed":        "Label the namespace, or change allowedNamespaces.",

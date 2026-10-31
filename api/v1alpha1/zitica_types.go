@@ -130,6 +130,13 @@ type ZitiCASpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
+	// managementPolicy Manage registers the CA. Adopt takes it over. Observe only reads it and reports status,
+	// for a CA that was registered outside the operator.
+	// +kubebuilder:default=Manage
+	// +kubebuilder:validation:Enum=Manage;Adopt;Observe
+	// +optional
+	ManagementPolicy ManagementPolicy `json:"managementPolicy,omitempty"`
+
 	// certificate is where the CA certificate comes from.
 	Certificate CertificateSource `json:"certificate"`
 

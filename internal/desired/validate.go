@@ -39,6 +39,9 @@ func (b *Builder) CheckShape(groups []Group, allowed []string) error {
 				return err
 			}
 		}
+		if _, err := gb.Dial("", nil); err != nil {
+			return err
+		}
 	}
 	_, err := b.ERP(allowed)
 	return err
@@ -58,10 +61,11 @@ func PlaceholderRouterIDs(names ...string) map[string]string {
 
 // AppRouterNames collects every router name a ZitiApp spec and its connection can reference.
 func AppRouterNames(svc *zitiv1.ZitiApp, conn *zitiv1.ZitiConnection) []string {
-	names := make([]string, 0, len(svc.Spec.EntryRouters)+len(conn.Spec.HostingRouters)+len(conn.Spec.DefaultEdgeRouters)+1)
+	names := make([]string, 0, len(svc.Spec.EntryRouters)+len(conn.Spec.HostingRouters)+len(conn.Spec.DefaultEdgeRouters)+1+len(svc.Spec.HostedByAnyOf))
 	names = append(names, conn.Spec.HostingRouters...)
 	names = append(names, conn.Spec.DefaultEdgeRouters...)
 	names = append(names, svc.Spec.EntryRouters...)
 	names = append(names, svc.Spec.HostedBy)
+	names = append(names, svc.Spec.HostedByAnyOf...)
 	return names
 }

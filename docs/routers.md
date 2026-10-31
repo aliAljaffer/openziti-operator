@@ -126,6 +126,10 @@ The tunneler needs an edge listener, and an edge listener needs an advertise val
 | `deployment.namespace` | Where the three objects go. The operator may only use Secrets in `rbac.secretNamespaces` and the release namespace, and may only write Services in `rbac.serviceNamespaces` when that list is set. |
 | `deployment.image` | The router image. Defaults to the tested `openziti/ziti-router` image for the controller version. Set it for a private registry. |
 | `deployment.imagePullPolicy` | Default `IfNotPresent`. |
+| `deployment.imagePullSecrets` | Pull secrets for a private registry. |
+| `deployment.resources` | Container requests and limits. |
+| `deployment.nodeSelector`, `tolerations`, `affinity`, `topologySpreadConstraints`, `priorityClassName` | Standard scheduling controls for the router pod. |
+| `deployment.podAnnotations`, `labels`, `extraEnv` | Extra metadata and environment variables. Do not override the variables the operator owns. |
 | `deployment.serviceType` | The Service the operator creates. Default `ClusterIP`, which only clients inside the cluster reach. Use `LoadBalancer` where the cluster has one, or `NodePort`, then set `advertisedAddress` to a node address. |
 
 Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollment`, in the same namespace, because the router pod reads the token from it. With `enrollmentSecretRef` the pod reads that Secret instead.
@@ -163,6 +167,7 @@ Without `enrollmentSecretRef` the JWT stays in Ziti and the operator writes no S
 | Key | Meaning |
 |---|---|
 | `zitiName` | Router name in Ziti. Default: the resource name. Cannot change later. |
+| `managementPolicy` | `Manage` (default), `Adopt`, or `Observe`. `Observe` is for a router that enrolled outside the operator. |
 | `roleAttributes` | Groups of the router. Edge router policies select routers by them. Used as written, in every role scope. |
 | `tunnelerEnabled` | The router can host and dial services. A router that hosts a `ZitiApp` needs it. |
 | `cost`, `noTraversal`, `disabled` | Ziti router settings. |

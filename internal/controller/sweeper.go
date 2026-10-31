@@ -29,7 +29,7 @@ const (
 
 // sweepKinds is every kind the operator creates. Order matters for delete: policies before services before configs.
 var sweepKinds = []ziti.Kind{
-	ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.AuthPolicies,
+	ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.AuthPolicies, ziti.PostureChecks,
 	ziti.Terminators, ziti.Services, ziti.Configs, ziti.ExternalJWTSigners, ziti.CertificateAuthorities, ziti.Identities, ziti.EdgeRouters,
 }
 
@@ -146,6 +146,7 @@ func ownerLists() []client.ObjectList {
 		&zitiv1.ZitiJwtSignerList{}, &zitiv1.ZitiCAList{}, &zitiv1.ZitiRouterList{},
 		&zitiv1.ZitiConfigList{}, &zitiv1.ZitiServiceList{}, &zitiv1.ZitiServicePolicyList{},
 		&zitiv1.ZitiEdgeRouterPolicyList{}, &zitiv1.ZitiServiceEdgeRouterPolicyList{}, &zitiv1.ZitiTerminatorList{},
+		&zitiv1.ZitiAuthPolicyList{}, &zitiv1.ZitiPostureCheckList{},
 	}
 }
 

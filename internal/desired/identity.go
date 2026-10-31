@@ -37,7 +37,7 @@ func Identity(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection, authPolicyID
 	}
 	e := ziti.Entity{
 		"name":           IdentityName(id, conn),
-		"type":           "Default",
+		"type":           identityType(id.Spec.Type),
 		"isAdmin":        false,
 		"roleAttributes": attrs,
 		"authPolicyId":   authPolicyID,
@@ -66,6 +66,13 @@ func ExternalID(id *zitiv1.ZitiIdentity, conn *zitiv1.ZitiConnection) (string, e
 		return id.Spec.ExternalID, nil
 	}
 	return "", nil
+}
+
+func identityType(t string) string {
+	if t == "" {
+		return "Default"
+	}
+	return t
 }
 
 // AdoptTags returns the existing tags plus the ownership tags. Ziti replaces the whole tag map on PATCH.
