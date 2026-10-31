@@ -42,6 +42,7 @@
 | Value | Default | Meaning |
 |---|---|---|
 | `manager.replicas` | 2 | One leader and one standby. |
+| `manager.podDisruptionBudget.enabled`, `maxUnavailable` | `true`, `1` | Keep one manager replica available during voluntary disruptions. |
 | `operator.zitiRequestsPerSecond` | 10 | Rate limit for the Ziti API. |
 | `operator.orphanPolicy` | `report` | `report` or `delete`. See [operations](operations.md). |
 | `operator.orphanSweepInterval` | `1h` | How often to look for orphaned entities. |

@@ -16,6 +16,9 @@ out=$(render)
 check "default: no ZitiConnection" '[ -z "$(yq "select(.kind==\"ZitiConnection\")" <<<"$out")" ]'
 check "default: no trust-manager Bundle" '[ -z "$(yq "select(.kind==\"Bundle\")" <<<"$out")" ]'
 check "default: two replicas" 'grep -q "replicas: 2" <<<"$out"'
+check "default: one manager replica stays available" '[ "$(yq "select(.kind==\"PodDisruptionBudget\") | .spec.maxUnavailable" <<<"$out")" = 1 ]'
+out_pdb_off=$(render --set manager.podDisruptionBudget.enabled=false)
+check "pdb disabled: no PodDisruptionBudget" '[ -z "$(yq "select(.kind==\"PodDisruptionBudget\")" <<<"$out_pdb_off")" ]'
 check "default: log arguments" 'grep -q -- "--zap-log-level=info" <<<"$out" && grep -q -- "--zap-encoder=json" <<<"$out"'
 check "default: interval arguments" 'grep -q -- "--resync-interval=10m" <<<"$out" && grep -q -- "--ca-resync-interval=2m" <<<"$out"'
 out_custom=$(render --set manager.logLevel=debug --set manager.logFormat=console --set operator.intervals.resync=2m)

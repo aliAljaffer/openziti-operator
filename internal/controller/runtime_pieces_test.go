@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	zitiv1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
+	"github.com/aliAljaffer/openziti-operator/internal/ziti"
 )
 
 func TestJitterStaysWithinTenPercentAndNeverPanics(t *testing.T) {
@@ -37,10 +38,7 @@ func TestSweeperStartSweepsThenStopsOnCancel(t *testing.T) {
 	go func() { done <- s.Start(ctx) }()
 
 	deadline := time.After(5 * time.Second)
-	for {
-		if _, gone := zc.Objects["services"]["orphan"]; !gone {
-			break
-		}
+	for zc.Has(ziti.Services, "orphan") {
 		select {
 		case <-deadline:
 			t.Fatal("the first sweep did not delete the orphan")

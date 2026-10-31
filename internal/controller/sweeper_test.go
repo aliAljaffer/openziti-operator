@@ -3,6 +3,8 @@
 package controller
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -64,6 +66,49 @@ func sweepSetup(t *testing.T, policy OrphanPolicy) (*OrphanSweeper, *ziti.Fake) 
 	}
 
 	return &OrphanSweeper{Reader: k, Clients: staticProvider{zc}, Policy: policy}, zc
+}
+
+type providerByConnection struct {
+	clients map[string]ziti.Client
+	errs    map[string]error
+}
+
+func (p providerByConnection) For(_ context.Context, conn *zitiv1.ZitiConnection) (ziti.Client, error) {
+	if err := p.errs[conn.Name]; err != nil {
+		return nil, err
+	}
+	return p.clients[conn.Name], nil
+}
+
+func TestSweepAllContinuesAfterAConnectionFails(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := zitiv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	bad := &zitiv1.ZitiConnection{Name: "bad"}
+	good := &zitiv1.ZitiConnection{Name: "good", Spec: zitiv1.ZitiConnectionSpec{ClusterID: "prod"}}
+	k := fake.NewClientBuilder().WithScheme(scheme).WithObjects(bad, good).Build()
+
+	zc := ziti.NewFake()
+	zc.Put(ziti.Services, ziti.Entity{"id": "orphan", "name": "orphan", "tags": map[string]any{
+		desired.TagCluster: "prod", desired.TagUID: "dead",
+	}})
+
+	s := &OrphanSweeper{
+		Reader: k,
+		Clients: providerByConnection{
+			clients: map[string]ziti.Client{"good": zc},
+			errs:    map[string]error{"bad": errors.New("down")},
+		},
+		Policy: OrphanDelete,
+	}
+	err := s.SweepAll(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "bad") {
+		t.Fatalf("SweepAll error = %v, want the bad connection", err)
+	}
+	if _, ok := zc.Objects[ziti.Services]["orphan"]; ok {
+		t.Error("the good connection was not swept")
+	}
 }
 
 func TestSweeperReportsButDoesNotWrite(t *testing.T) {

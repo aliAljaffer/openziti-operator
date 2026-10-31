@@ -314,15 +314,23 @@ func ensureGroup(ctx context.Context, gb *desired.Builder, g desired.Group, type
 	if res.ids.Host, err = ensure(ctx, ziti.Configs, hcBody); err != nil {
 		return res, err
 	}
-	res.svc, _ = gb.Service(res.ids.Intercept, res.ids.Host)
+	if res.svc, err = gb.Service(res.ids.Intercept, res.ids.Host); err != nil {
+		return res, err
+	}
 	if res.ids.Service, err = ensure(ctx, ziti.Services, res.svc); err != nil {
 		return res, err
 	}
-	bind, _ := gb.Bind(res.ids.Service)
+	bind, err := gb.Bind(res.ids.Service)
+	if err != nil {
+		return res, err
+	}
 	if res.ids.Bind, err = ensure(ctx, ziti.ServicePolicies, bind); err != nil {
 		return res, err
 	}
-	serp, _ := gb.SERP(res.ids.Service)
+	serp, err := gb.SERP(res.ids.Service)
+	if err != nil {
+		return res, err
+	}
 	if res.ids.SERP, err = ensure(ctx, ziti.ServiceEdgeRouterPolicies, serp); err != nil {
 		return res, err
 	}
