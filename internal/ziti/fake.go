@@ -28,6 +28,8 @@ type Fake struct {
 	Calls         []string
 }
 
+const codeNotFound = "NOT_FOUND"
+
 var _ Client = (*Fake)(nil)
 
 func NewFake() *Fake {
@@ -180,7 +182,7 @@ func (f *Fake) Update(_ context.Context, kind Kind, id string, body Entity) erro
 	defer f.mu.Unlock()
 	f.Calls = append(f.Calls, "update "+string(kind)+" "+body.Name())
 	if _, ok := f.Objects[kind][id]; !ok {
-		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
 	}
 	if f.nameTaken(kind, body.Name(), id) {
 		return &APIError{Status: http.StatusBadRequest, Code: "COULD_NOT_VALIDATE", Message: "name must be unique"}
@@ -228,7 +230,7 @@ func (f *Fake) Enrollment(_ context.Context, kind Kind, id string) (string, time
 	f.Calls = append(f.Calls, "enrollment "+string(kind)+" "+id)
 	e, ok := f.Objects[kind][id]
 	if !ok {
-		return "", time.Time{}, &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+		return "", time.Time{}, &APIError{Status: http.StatusNotFound, Code: codeNotFound}
 	}
 	jwt, _ := e["enrollmentJwt"].(string)
 	exp, _ := time.Parse(time.RFC3339, fmt.Sprint(e["enrollmentExpiresAt"]))
@@ -241,7 +243,7 @@ func (f *Fake) ReEnroll(_ context.Context, kind Kind, id string) error {
 	f.Calls = append(f.Calls, "re-enroll "+string(kind)+" "+id)
 	e, ok := f.Objects[kind][id]
 	if !ok {
-		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
 	}
 	f.next++
 	e["enrollmentJwt"] = fmt.Sprintf("router-jwt-%d", f.next)
@@ -256,7 +258,7 @@ func (f *Fake) Verify(_ context.Context, kind Kind, id string, pemCertificate st
 	f.Calls = append(f.Calls, "verify "+string(kind)+" "+id)
 	ca, ok := f.Objects[kind][id]
 	if !ok {
-		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
 	}
 	block, _ := pem.Decode([]byte(pemCertificate))
 	if block == nil {
@@ -277,7 +279,7 @@ func (f *Fake) Patch(_ context.Context, kind Kind, id string, body Entity) error
 	f.Calls = append(f.Calls, "patch "+string(kind)+" "+id)
 	cur, ok := f.Objects[kind][id]
 	if !ok {
-		return &APIError{Status: http.StatusNotFound, Code: "NOT_FOUND"}
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
 	}
 	maps.Copy(cur, clone(body))
 	return nil
@@ -288,6 +290,34 @@ func (f *Fake) Delete(_ context.Context, kind Kind, id string) error {
 	defer f.mu.Unlock()
 	f.Calls = append(f.Calls, "delete "+string(kind)+" "+id)
 	delete(f.Objects[kind], id)
+	return nil
+}
+
+func (f *Fake) DisableIdentity(_ context.Context, id string, durationMinutes int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, fmt.Sprintf("disable identity %s %d", id, durationMinutes))
+	cur, ok := f.Objects[Identities][id]
+	if !ok {
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
+	}
+	cur["disabled"] = true
+	if durationMinutes > 0 {
+		cur["disabledUntil"] = time.Now().Add(time.Duration(durationMinutes) * time.Minute).UTC().Format(time.RFC3339)
+	}
+	return nil
+}
+
+func (f *Fake) EnableIdentity(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, "enable identity "+id)
+	cur, ok := f.Objects[Identities][id]
+	if !ok {
+		return &APIError{Status: http.StatusNotFound, Code: codeNotFound}
+	}
+	cur["disabled"] = false
+	delete(cur, "disabledUntil")
 	return nil
 }
 

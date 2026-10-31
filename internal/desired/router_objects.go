@@ -26,10 +26,20 @@ const StorageRequested = "100Mi"
 // the objects the operator creates and the manifests it writes for a VM cannot drift apart.
 type RouterWorkload struct {
 	RouterManifest
-	Namespace       string
-	Image           string
-	ImagePullPolicy corev1.PullPolicy
-	ServiceType     corev1.ServiceType
+	Namespace        string
+	Image            string
+	ImagePullPolicy  corev1.PullPolicy
+	ServiceType      corev1.ServiceType
+	Resources        corev1.ResourceRequirements
+	NodeSelector     map[string]string
+	Tolerations      []corev1.Toleration
+	Affinity         *corev1.Affinity
+	TopologySpread   []corev1.TopologySpreadConstraint
+	PriorityClass    string
+	ImagePullSecrets []corev1.LocalObjectReference
+	PodAnnotations   map[string]string
+	Labels           map[string]string
+	ExtraEnv         []corev1.EnvVar
 }
 
 // NewRouterWorkload builds the workload inputs for a router. An empty version means the ZitiConnection is not
@@ -50,6 +60,16 @@ func NewRouterWorkload(rt *zitiv1.ZitiRouter, version string) RouterWorkload {
 		w.Image = d.Image
 		w.ImagePullPolicy = corev1.PullPolicy(d.ImagePullPolicy)
 		w.ServiceType = corev1.ServiceType(d.ServiceType)
+		w.Resources = d.Resources
+		w.NodeSelector = d.NodeSelector
+		w.Tolerations = d.Tolerations
+		w.Affinity = d.Affinity
+		w.TopologySpread = d.TopologySpreadConstraints
+		w.PriorityClass = d.PriorityClassName
+		w.ImagePullSecrets = d.ImagePullSecrets
+		w.PodAnnotations = d.PodAnnotations
+		w.Labels = d.Labels
+		w.ExtraEnv = d.ExtraEnv
 	}
 	if w.ImagePullPolicy == "" {
 		w.ImagePullPolicy = corev1.PullIfNotPresent
@@ -78,6 +98,16 @@ func (w RouterWorkload) image() string {
 
 func (w RouterWorkload) labels() map[string]string { return map[string]string{"app": w.k8sName()} }
 
+func (w RouterWorkload) metaLabels() map[string]string {
+	out := w.labels()
+	for k, v := range w.Labels {
+		if k != "app" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // PersistentVolumeClaim is the router volume. The image writes as uid 2171 and a fresh volume is root-owned,
 // so the pod sets fsGroup before the container starts.
 func (w RouterWorkload) PersistentVolumeClaim() *corev1.PersistentVolumeClaim {
@@ -87,7 +117,7 @@ func (w RouterWorkload) PersistentVolumeClaim() *corev1.PersistentVolumeClaim {
 		storageClass = &w.StorageClass
 	}
 	return &corev1.PersistentVolumeClaim{
-		Name: claim, Namespace: w.Namespace, Labels: w.labels(),
+		Name: claim, Namespace: w.Namespace, Labels: w.metaLabels(),
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(StorageRequested)}},
@@ -104,13 +134,13 @@ func (w RouterWorkload) Deployment(secretName string) *appsv1.Deployment {
 	fsGroup, runAsUser, noRoot, noEscalation := int64(routerUID), int64(routerUID), true, false
 	replicas := int32(1)
 	return &appsv1.Deployment{
-		Name: name, Namespace: w.Namespace, Labels: w.labels(),
+		Name: name, Namespace: w.Namespace, Labels: w.metaLabels(),
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 			Selector: &metav1.LabelSelector{MatchLabels: w.labels()},
 			Template: corev1.PodTemplateSpec{
-				Labels: w.labels(),
+				ObjectMeta: metav1.ObjectMeta{Labels: w.metaLabels(), Annotations: w.PodAnnotations},
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
 						FSGroup:        &fsGroup,
@@ -118,13 +148,20 @@ func (w RouterWorkload) Deployment(secretName string) *appsv1.Deployment {
 						RunAsNonRoot:   &noRoot,
 						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
+					NodeSelector:              w.NodeSelector,
+					Tolerations:               w.Tolerations,
+					Affinity:                  w.Affinity,
+					TopologySpreadConstraints: w.TopologySpread,
+					PriorityClassName:         w.PriorityClass,
+					ImagePullSecrets:          w.ImagePullSecrets,
 					Containers: []corev1.Container{{
 						Name:            "router",
 						Image:           w.image(),
 						ImagePullPolicy: w.ImagePullPolicy,
 						SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: &noEscalation},
 						Ports:           []corev1.ContainerPort{{Name: "ziti", ContainerPort: w.Port, Protocol: corev1.ProtocolTCP}},
-						Env:             w.containerEnv(secretName),
+						Env:             append(w.containerEnv(secretName), w.ExtraEnv...),
+						Resources:       w.Resources,
 						VolumeMounts:    []corev1.VolumeMount{{Name: "data", MountPath: DataDir}},
 						LivenessProbe:   w.liveness(),
 					}},
@@ -166,7 +203,7 @@ func (w RouterWorkload) liveness() *corev1.Probe {
 func (w RouterWorkload) Service() *corev1.Service {
 	name, _, _ := w.Names()
 	return &corev1.Service{
-		Name: name, Namespace: w.Namespace, Labels: w.labels(),
+		Name: name, Namespace: w.Namespace, Labels: w.metaLabels(),
 		Spec: corev1.ServiceSpec{
 			Type:     w.ServiceType,
 			Selector: w.labels(),

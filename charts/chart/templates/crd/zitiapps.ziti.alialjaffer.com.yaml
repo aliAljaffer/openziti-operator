@@ -72,6 +72,13 @@ spec:
           spec:
             description: spec defines the desired state of ZitiApp
             properties:
+              additionalConfigs:
+                description: |-
+                  additionalConfigs are names of Ziti configs to attach to every service this app creates. Use them
+                  for config types that the app does not generate itself.
+                items:
+                  type: string
+                type: array
               allow:
                 description: allow creates a Dial policy for this app.
                 properties:
@@ -85,6 +92,13 @@ spec:
                     description: |-
                       identities are names of identities in Ziti. They may exist outside Kubernetes.
                       A name that does not exist yet is reported in the AccessResolved condition.
+                    items:
+                      type: string
+                    type: array
+                  postureCheckRoles:
+                    description: |-
+                      postureCheckRoles are posture check role attributes that the Dial policy requires. "#attr" selects
+                      by role attribute and follows the connection roleScope. Use ZitiAccessPolicy for "@name" selectors.
                     items:
                       type: string
                     type: array
@@ -210,6 +224,13 @@ spec:
                   hostedBy is the router that runs the targets. It must be in the connection hostingRouters.
                   It defaults to the first entry.
                 type: string
+              hostedByAnyOf:
+                description: |-
+                  hostedByAnyOf are additional routers that may host the same targets. Together with hostedBy they
+                  remove the single-router failure mode. Every name must be in the connection hostingRouters.
+                items:
+                  type: string
+                type: array
               managementPolicy:
                 default: Manage
                 description: |-
@@ -230,6 +251,25 @@ spec:
                 items:
                   type: string
                 type: array
+              service:
+                description: service sets service-level Ziti fields. Empty keeps the
+                  current defaults.
+                properties:
+                  encryptionRequired:
+                    description: encryptionRequired makes the traffic end-to-end encrypted.
+                      It defaults to true.
+                    type: boolean
+                  maxIdleTimeMillis:
+                    description: maxIdleTimeMillis closes a circuit after this idle
+                      time. Zero means never.
+                    format: int64
+                    minimum: 0
+                    type: integer
+                  terminatorStrategy:
+                    description: terminatorStrategy is how Ziti picks a terminator.
+                      It defaults to smartrouting.
+                    type: string
+                type: object
               targets:
                 description: |-
                   targets are the places the app runs. Each one becomes a terminator in Ziti. Set targets[].port to choose
@@ -265,7 +305,15 @@ spec:
                       maxItems: 16
                       type: array
                     kubernetesService:
-                      description: kubernetesService is a Service name in this namespace.
+                      description: kubernetesService is a Service name. It defaults
+                        to this namespace.
+                      type: string
+                    namespace:
+                      description: |-
+                        namespace is the namespace of kubernetesService. It defaults to the ZitiApp namespace. A
+                        cross-namespace target needs the annotation ziti.alialjaffer.com/allow-expose=true on the Service.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                       type: string
                     port:
                       description: |-
@@ -275,6 +323,14 @@ spec:
                       maximum: 65535
                       minimum: 1
                       type: integer
+                    precedence:
+                      description: 'precedence ranks this target against others: required,
+                        default, or failed.'
+                      enum:
+                      - required
+                      - default
+                      - failed
+                      type: string
                   type: object
                   x-kubernetes-validations:
                   - message: set exactly one of address and kubernetesService

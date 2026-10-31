@@ -97,6 +97,15 @@ func (c *StatusCollector) Collect(ch chan<- prometheus.Metric) {
 	var forwards zitiv1.ZitiPortForwardList
 	collectConditions(ctx, c.Reader, count, "ZitiPortForward", &forwards,
 		func(o *zitiv1.ZitiPortForward) []metav1.Condition { return o.Status.Conditions }, nil)
+	var authPolicies zitiv1.ZitiAuthPolicyList
+	collectConditions(ctx, c.Reader, count, "ZitiAuthPolicy", &authPolicies,
+		func(o *zitiv1.ZitiAuthPolicy) []metav1.Condition { return o.Status.Conditions }, nil)
+	var postureChecks zitiv1.ZitiPostureCheckList
+	collectConditions(ctx, c.Reader, count, "ZitiPostureCheck", &postureChecks,
+		func(o *zitiv1.ZitiPostureCheck) []metav1.Condition { return o.Status.Conditions }, nil)
+	var groups zitiv1.ZitiGroupList
+	collectConditions(ctx, c.Reader, count, "ZitiGroup", &groups,
+		func(o *zitiv1.ZitiGroup) []metav1.Condition { return o.Status.Conditions }, nil)
 
 	for k, n := range count {
 		ch <- prometheus.MustNewConstMetric(resourceConditionsDesc, prometheus.GaugeValue, n, k[0], k[1], k[2])

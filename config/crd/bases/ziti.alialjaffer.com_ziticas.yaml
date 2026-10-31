@@ -161,6 +161,16 @@ spec:
                       for NONE.
                     type: string
                 type: object
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage registers the CA. Adopt takes it over. Observe only reads it and reports status,
+                  for a CA that was registered outside the operator.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
               verification:
                 description: verification says how the operator proves that it controls
                   the CA. Ziti trusts a CA only after that.

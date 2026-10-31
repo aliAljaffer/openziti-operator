@@ -79,16 +79,18 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	backendName, err := desired.IngressBackendName(&ing)
-	if err != nil {
+	if err != nil && !desired.ViaIngress(ing.Annotations) {
 		r.Recorder.Eventf(&ing, "Warning", "InvalidAnnotations", "%v", err)
 		return ctrl.Result{}, nil
 	}
 	var backend corev1.Service
-	if err := r.Get(ctx, client.ObjectKey{Namespace: ing.Namespace, Name: backendName}, &backend); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{RequeueAfter: DependencyRetry}, nil
+	if !desired.ViaIngress(ing.Annotations) {
+		if err := r.Get(ctx, client.ObjectKey{Namespace: ing.Namespace, Name: backendName}, &backend); err != nil {
+			if apierrors.IsNotFound(err) {
+				return ctrl.Result{RequeueAfter: DependencyRetry}, nil
+			}
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, err
 	}
 	spec, err := desired.IngressAppSpec(&ing, &backend)
 	if err != nil {

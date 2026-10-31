@@ -122,6 +122,15 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              disabled:
+                description: disabled rejects this identity's API session requests.
+                  Use disabledUntil for a temporary lock.
+                type: boolean
+              disabledUntil:
+                description: disabledUntil disables the identity until this time.
+                  It is ignored when disabled is false.
+                format: date-time
+                type: string
               enrollmentMode:
                 default: JwtOnly
                 description: |-
@@ -139,6 +148,32 @@ spec:
                   other than Kubernetes. It needs roleScope Global on the connection, because it can name any subject.
                 maxLength: 1000
                 type: string
+              importFrom:
+                description: |-
+                  importFrom copies an existing identity file into the operator Secret, so an identity that enrolled
+                  elsewhere can be adopted and renewed. It needs enrollmentMode OperatorEnrolled and managementPolicy Adopt.
+                properties:
+                  identityFileSecretRef:
+                    description: identityFileSecretRef names the Secret that holds
+                      the existing identity file.
+                    properties:
+                      name:
+                        description: name of the Secret.
+                        type: string
+                      namespace:
+                        description: namespace of the Secret.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  key:
+                    default: identity.json
+                    description: key is the key in that Secret. It defaults to identity.json.
+                    type: string
+                required:
+                - identityFileSecretRef
+                type: object
               managementPolicy:
                 default: Manage
                 description: |-
@@ -151,8 +186,9 @@ spec:
                 - Observe
                 type: string
               roleAttributes:
-                description: roleAttributes follow the connection roleScope, like
-                  ZitiApp roleAttributes.
+                description: |-
+                  roleAttributes follow the connection roleScope, like ZitiApp roleAttributes. A ZitiGroup in this
+                  namespace also adds its roleAttribute to this list.
                 items:
                   type: string
                 type: array
@@ -166,6 +202,16 @@ spec:
                   serviceAccount is a ServiceAccount name in this namespace. Its token logs in to Ziti as this identity.
                   It sets externalId to system:serviceaccount:<namespace>:<name>. Needs a ZitiJwtSigner and an authPolicy that allows it.
                 maxLength: 253
+                type: string
+              type:
+                default: Default
+                description: 'type is the Ziti identity type: User, Device, Service,
+                  or Default. It cannot change later.'
+                enum:
+                - User
+                - Device
+                - Service
+                - Default
                 type: string
               zitiName:
                 description: zitiName defaults to <clusterId>-<namespace>-<name>.
@@ -191,6 +237,12 @@ spec:
                 externalId
               rule: self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount)
                 || has(self.externalId)))
+            - message: importFrom needs enrollmentMode OperatorEnrolled and managementPolicy
+                Adopt
+              rule: '!has(self.importFrom) || (self.enrollmentMode == ''OperatorEnrolled''
+                && self.managementPolicy == ''Adopt'')'
+            - message: type is immutable
+              rule: '!has(oldSelf.type) || (has(self.type) && self.type == oldSelf.type)'
           status:
             description: status defines the observed state of ZitiIdentity
             properties:

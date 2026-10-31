@@ -32,7 +32,7 @@ func TestRunRejectsUnknownFormat(t *testing.T) {
 }
 
 func TestConnectionNeedsClusterAccess(t *testing.T) {
-	_, err := clientFor(context.Background(), Options{
+	_, err := ClientFor(context.Background(), Options{
 		Connection: "default",
 		Kubeconfig: filepath.Join(t.TempDir(), "missing"),
 	})

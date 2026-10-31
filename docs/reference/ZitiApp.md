@@ -27,9 +27,11 @@
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
+| `spec.additionalConfigs` | list of string | no |  | additionalConfigs are names of Ziti configs to attach to every service this app creates. Use them for config types that the app does not generate itself. |
 | `spec.allow` | object | no |  | allow creates a Dial policy for this app. |
 | `spec.allow.groups` | list of string | no |  | groups are identity role attributes. Every identity with one of them may connect. |
 | `spec.allow.identities` | list of string | no |  | identities are names of identities in Ziti. They may exist outside Kubernetes. A name that does not exist yet is reported in the AccessResolved condition. |
+| `spec.allow.postureCheckRoles` | list of string | no |  | postureCheckRoles are posture check role attributes that the Dial policy requires. "#attr" selects by role attribute and follows the connection roleScope. Use ZitiAccessPolicy for "@name" selectors. |
 | `spec.connectionRef` | string | no | `"default"` | connectionRef is the name of the ZitiConnection to use. It defaults to "default". |
 | `spec.deletionPolicy` | string | no | `"Delete"` | deletionPolicy Delete removes the Ziti entities when this resource is deleted. Orphan removes only the operator tags and keeps the entities. It cannot change after creation. One of: `Delete`, `Orphan`. |
 | `spec.entryRouters` | list of string | no |  | entryRouters are the routers clients connect through. The hosting router is always allowed for the app. When set, an edge router policy gives the allowed identities access to them. |
@@ -44,14 +46,21 @@
 | `spec.expose.selector.matchExpressions[].values` | list of string | no |  | values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch. |
 | `spec.expose.selector.matchLabels` | map of string | no |  | matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed. |
 | `spec.hostedBy` | string | no |  | hostedBy is the router that runs the targets. It must be in the connection hostingRouters. It defaults to the first entry. |
+| `spec.hostedByAnyOf` | list of string | no |  | hostedByAnyOf are additional routers that may host the same targets. Together with hostedBy they remove the single-router failure mode. Every name must be in the connection hostingRouters. |
 | `spec.managementPolicy` | string | no | `"Manage"` | managementPolicy Manage creates and updates the Ziti entities. Adopt does the same, and also takes over existing entities that have the names this app would create. It updates them with a PATCH, so fields the spec cannot set (such as posture check roles) stay. Config data is replaced as a whole. Adopted entities are released on delete, never deleted. Observe only reads the existing service named zitiName and reports its status. It never writes to Ziti. One of: `Manage`, `Adopt`, `Observe`. |
 | `spec.memberOf` | list of string | no |  | memberOf are groups the app belongs to. Existing policies that grant access to a group apply to it. Groups follow the connection roleScope. |
+| `spec.service` | object | no |  | service sets service-level Ziti fields. Empty keeps the current defaults. |
+| `spec.service.encryptionRequired` | boolean | no |  | encryptionRequired makes the traffic end-to-end encrypted. It defaults to true. |
+| `spec.service.maxIdleTimeMillis` | integer | no |  | maxIdleTimeMillis closes a circuit after this idle time. Zero means never. Minimum 0. |
+| `spec.service.terminatorStrategy` | string | no |  | terminatorStrategy is how Ziti picks a terminator. It defaults to smartrouting. |
 | `spec.targets` | list of object | no |  | targets are the places the app runs. Each one becomes a terminator in Ziti. Set targets[].port to choose the backend port and targets[].exposedPorts to choose which client ports the target serves. Targets with the same targets[].exposedPorts become one Ziti service; different sets become several. Maximum items 16. Each item: set exactly one of address and kubernetesService. Each item: port is required with kubernetesService. |
 | `spec.targets[].address` | string | no |  | address is an IP or hostname the hosting router can reach. |
 | `spec.targets[].cost` | integer | no |  | cost ranks targets. Ziti prefers the lowest cost. Targets with equal cost share the load. Minimum 0. Maximum 65535. |
 | `spec.targets[].exposedPorts` | list of integer or string | no |  | exposedPorts are the client-dialed ports this target is exposed on. A client dials one of these and reaches port. It is a subset of expose.ports and sorts targets into groups: targets with the same set become one Ziti service. When empty the target is exposed on every exposed port. Set it to send some exposed ports to another backend port or address, for example the TLS port. Every exposed port must be served by exactly one group. The operator checks this and reports InvalidSpec. Maximum items 16. |
-| `spec.targets[].kubernetesService` | string | no |  | kubernetesService is a Service name in this namespace. |
+| `spec.targets[].kubernetesService` | string | no |  | kubernetesService is a Service name. It defaults to this namespace. |
+| `spec.targets[].namespace` | string | no |  | namespace is the namespace of kubernetesService. It defaults to the ZitiApp namespace. A cross-namespace target needs the annotation ziti.alialjaffer.com/allow-expose=true on the Service. Maximum length 63. Must match `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`. |
 | `spec.targets[].port` | integer | no |  | port is where the app is actually served, the backend port the router dials. It is one number per target. Without it the router uses the port the client dialed. Think of "exposedPorts:port" like "docker run -p". Minimum 1. Maximum 65535. |
+| `spec.targets[].precedence` | string | no |  | precedence ranks this target against others: required, default, or failed. One of: `required`, `default`, `failed`. |
 | `spec.zitiName` | string | no |  | zitiName is the service name in Ziti. It defaults to &lt;namespace&gt;.&lt;name&gt;. Minimum length 1. Maximum length 1000. |
 
 ## Validation rules

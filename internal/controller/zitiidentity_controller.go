@@ -40,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	zitiv1alpha1 "github.com/aliAljaffer/openziti-operator/api/v1alpha1"
 	"github.com/aliAljaffer/openziti-operator/internal/desired"
@@ -58,6 +60,7 @@ const (
 	certWarnBefore       = 30 * 24 * time.Hour
 	CondCertValid        = "CertificateValid"
 	CondSessionsObserved = "SessionsObserved"
+	CondDisabled         = "Disabled"
 )
 
 type ZitiIdentityReconciler struct {
@@ -65,6 +68,8 @@ type ZitiIdentityReconciler struct {
 	Scheme   *runtime.Scheme
 	Clients  ClientProvider
 	Recorder record.EventRecorder
+	// Reader reads Secrets that the operator does not own, such as an import source. Nil uses Client.
+	Reader client.Reader
 	// Enroll turns an enrollment JWT into identity.json. Nil uses ziti.EnrollOTT.
 	Enroll func(jwt string) ([]byte, error)
 	// Extend renews the client certificate in identity.json. Nil uses ziti.ExtendCert.
@@ -104,8 +109,19 @@ func (r *ZitiIdentityReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err == nil && len(r.SecretNamespaces) > 0 && !slices.Contains(r.SecretNamespaces, id.Namespace) && id.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve {
 		err = &specError{"SecretNamespaceNotAllowed", fmt.Sprintf("the operator may not use Secrets in namespace %q, add it to rbac.secretNamespaces (--secret-namespaces)", id.Namespace)}
 	}
+	effective := id.DeepCopy()
 	if err == nil {
-		err = r.sync(ctx, &id, conn, zc)
+		err = r.ensureImport(ctx, effective)
+	}
+	if err == nil {
+		err = r.mergeGroupAttributes(ctx, effective)
+	}
+	if err == nil {
+		err = r.sync(ctx, effective, conn, zc)
+	}
+	id.Status = effective.Status
+	if err == nil && id.Status.ZitiID != "" {
+		err = r.applyDisabled(ctx, &id, zc)
 	}
 	if err == nil && id.Status.ZitiID != "" {
 		r.observeSessions(ctx, &id, zc)
@@ -239,6 +255,130 @@ func comparable(body ziti.Entity) ziti.Entity {
 
 func isAdopted(e ziti.Entity) bool { return e.Tags()[desired.TagAdopted] == "true" }
 
+// ensureImport copies an existing identity file into the operator Secret once. The source Secret stays read only.
+func (r *ZitiIdentityReconciler) ensureImport(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) error {
+	if id.Spec.ImportFrom == nil {
+		return nil
+	}
+	src := id.Spec.ImportFrom.IdentityFileSecretRef
+	if src.Namespace == "" {
+		src.Namespace = id.Namespace
+	}
+	if src.Namespace != id.Namespace {
+		return &specError{"ImportSourceNotAllowed", "importFrom.identityFileSecretRef must be in the identity namespace"}
+	}
+	var own corev1.Secret
+	err := r.Get(ctx, r.secretKey(id), &own)
+	if err == nil && len(own.Data[SecretKeyIdentity]) > 0 {
+		return nil
+	}
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	var source corev1.Secret
+	reader := r.Reader
+	if reader == nil {
+		reader = r.Client
+	}
+	if err := reader.Get(ctx, types.NamespacedName{Namespace: src.Namespace, Name: src.Name}, &source); err != nil {
+		if apierrors.IsNotFound(err) {
+			return &specError{"ImportSourceMissing", fmt.Sprintf("Secret %s/%s not found", src.Namespace, src.Name)}
+		}
+		return err
+	}
+	key := id.Spec.ImportFrom.Key
+	if key == "" {
+		key = SecretKeyIdentity
+	}
+	data := source.Data[key]
+	if len(data) == 0 {
+		return &specError{"ImportSourceMissing", fmt.Sprintf("Secret %s/%s has no %s", src.Namespace, src.Name, key)}
+	}
+	if _, _, err := ziti.CertValidity(data); err != nil {
+		return &specError{"InvalidSpec", fmt.Sprintf("importFrom identity file: %v", err)}
+	}
+	if err := r.writeSecret(ctx, id, SecretKeyIdentity, data); err != nil {
+		return err
+	}
+	r.Recorder.Eventf(id, "Normal", "Imported", "imported identity file from Secret %s/%s", src.Namespace, src.Name)
+	return nil
+}
+
+func (r *ZitiIdentityReconciler) authPolicyName(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, name string) string {
+	var policy zitiv1alpha1.ZitiAuthPolicy
+	if err := r.Get(ctx, types.NamespacedName{Namespace: id.Namespace, Name: name}, &policy); err == nil {
+		return desired.EntityName(&policy.Spec.EntitySpec, &policy.ObjectMeta)
+	}
+	return name
+}
+
+func (r *ZitiIdentityReconciler) mergeGroupAttributes(ctx context.Context, id *zitiv1alpha1.ZitiIdentity) error {
+	if id.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		return nil
+	}
+	var groups zitiv1alpha1.ZitiGroupList
+	if err := r.List(ctx, &groups, client.InNamespace(id.Namespace)); err != nil {
+		return err
+	}
+	attrs := slices.Clone(id.Spec.RoleAttributes)
+	for i := range groups.Items {
+		if !desired.GroupHasIdentity(&groups.Items[i], id) {
+			continue
+		}
+		attr := desired.GroupRoleAttribute(&groups.Items[i])
+		if !slices.Contains(attrs, attr) {
+			attrs = append(attrs, attr)
+		}
+	}
+	id.Spec.RoleAttributes = attrs
+	return nil
+}
+
+func (r *ZitiIdentityReconciler) applyDisabled(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, zc ziti.Client) error {
+	if id.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		return nil
+	}
+	existing, err := zc.List(ctx, ziti.Identities, tagFilter(id.UID))
+	if err != nil {
+		return err
+	}
+	if len(existing) == 0 {
+		return nil
+	}
+	current, _ := existing[0]["disabled"].(bool)
+	want, minutes := id.Spec.Disabled, int64(0)
+	if want && id.Spec.DisabledUntil != nil {
+		left := time.Until(id.Spec.DisabledUntil.Time)
+		if left <= 0 {
+			want = false
+		} else {
+			minutes = int64(left/time.Minute) + 1
+		}
+	}
+	if want == current {
+		if want {
+			setCond(&id.Status.Conditions, id.Generation, CondDisabled, true, "Disabled", "", "")
+		} else {
+			meta.RemoveStatusCondition(&id.Status.Conditions, CondDisabled)
+		}
+		return nil
+	}
+	if want {
+		if err := zc.DisableIdentity(ctx, id.Status.ZitiID, minutes); err != nil {
+			return err
+		}
+		setCond(&id.Status.Conditions, id.Generation, CondDisabled, true, "Disabled", "", "")
+		r.Recorder.Eventf(id, "Warning", "Disabled", "disabled identity %s", id.Status.ZitiName)
+		return nil
+	}
+	if err := zc.EnableIdentity(ctx, id.Status.ZitiID); err != nil {
+		return err
+	}
+	meta.RemoveStatusCondition(&id.Status.Conditions, CondDisabled)
+	r.Recorder.Eventf(id, "Normal", "Enabled", "enabled identity %s", id.Status.ZitiName)
+	return nil
+}
+
 //nolint:gocyclo // one branch per enrollment mode and management policy, split when it grows
 func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.ZitiIdentity, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.IdentityName(id, conn)
@@ -253,6 +393,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 		if policyName == "" {
 			policyName = defaultAuthPolicy
 		}
+		policyName = r.authPolicyName(ctx, id, policyName)
 		policies, err := zc.List(ctx, ziti.AuthPolicies, fmt.Sprintf(`name="%s"`, policyName))
 		if err != nil {
 			return err
@@ -313,7 +454,7 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 			return err
 		}
 		if len(found) == 0 {
-			return &specError{"NotFound", fmt.Sprintf("identity %q not found in Ziti", name)}
+			return &specError{ReasonNotFound, fmt.Sprintf("identity %q not found in Ziti", name)}
 		}
 		zid = found[0]
 		if mode == zitiv1alpha1.ManagementAdopt {
@@ -669,9 +810,22 @@ func (r *ZitiIdentityReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&zitiv1alpha1.ZitiIdentity{}).
 		Owns(&corev1.Secret{}).
+		Watches(&zitiv1alpha1.ZitiGroup{}, handler.EnqueueRequestsFromMapFunc(r.identitiesForGroup)).
 		Named("zitiidentity")
 	return watchDeps(b, mgr.GetClient(), func() client.ObjectList { return &zitiv1alpha1.ZitiIdentityList{} },
 		func(o *zitiv1alpha1.ZitiIdentity) string { return o.Spec.ConnectionRef }, true).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentSvcs}).
 		Complete(r)
+}
+
+func (r *ZitiIdentityReconciler) identitiesForGroup(ctx context.Context, obj client.Object) []reconcile.Request {
+	var ids zitiv1alpha1.ZitiIdentityList
+	if err := r.List(ctx, &ids, client.InNamespace(obj.GetNamespace())); err != nil {
+		return nil
+	}
+	out := make([]reconcile.Request, 0, len(ids.Items))
+	for i := range ids.Items {
+		out = append(out, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&ids.Items[i])})
+	}
+	return out
 }

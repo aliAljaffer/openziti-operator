@@ -71,7 +71,7 @@ func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if !ca.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, &ca)
 	}
-	if controllerutil.AddFinalizer(&ca, Finalizer) {
+	if ca.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve && controllerutil.AddFinalizer(&ca, Finalizer) {
 		if err := r.Update(ctx, &ca); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -80,7 +80,11 @@ func (r *ZitiCAReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	before := ca.Status.DeepCopy()
 	conn, zc, err := connect(ctx, r.Client, r.Clients, ca.Spec.ConnectionRef)
 	if err == nil {
-		err = r.sync(ctx, &ca, conn, zc)
+		if ca.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+			err = r.observe(ctx, &ca, zc)
+		} else {
+			err = r.sync(ctx, &ca, conn, zc)
+		}
 	}
 
 	var se *specError
@@ -115,6 +119,10 @@ func (r *ZitiCAReconciler) finalize(ctx context.Context, ca *zitiv1alpha1.ZitiCA
 	if !controllerutil.ContainsFinalizer(ca, Finalizer) {
 		return nil
 	}
+	if ca.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		controllerutil.RemoveFinalizer(ca, Finalizer)
+		return r.Update(ctx, ca)
+	}
 	_, zc, err := connect(ctx, r.Client, r.Clients, ca.Spec.ConnectionRef)
 	if err != nil {
 		r.Recorder.Eventf(ca, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -144,6 +152,26 @@ func (r *ZitiCAReconciler) readSecret(ctx context.Context, ref zitiv1alpha1.Secr
 	return &secret, nil
 }
 
+func (r *ZitiCAReconciler) observe(ctx context.Context, ca *zitiv1alpha1.ZitiCA, zc ziti.Client) error {
+	name := desired.CAName(ca)
+	found, err := zc.List(ctx, ziti.CertificateAuthorities, `name="`+name+`"`)
+	if err != nil {
+		return err
+	}
+	if len(found) == 0 {
+		return &specError{ReasonNotFound, "certificate authority " + `"` + name + `"` + " not found in Ziti"}
+	}
+	e := found[0]
+	ca.Status.CAID = e.ID()
+	ca.Status.Fingerprint, _ = e["fingerprint"].(string)
+	ca.Status.Verified, _ = e["isVerified"].(bool)
+	ca.Status.VerificationToken, _ = e["verificationToken"].(string)
+	setCond(&ca.Status.Conditions, ca.Generation, CondSynced, true, "Observed", "", "")
+	setCond(&ca.Status.Conditions, ca.Generation, CondVerified, ca.Status.Verified, "Verified", "AwaitingVerification", "")
+	setCond(&ca.Status.Conditions, ca.Generation, CondReady, ca.Status.Verified, "Observed", "AwaitingVerification", "")
+	return nil
+}
+
 func (r *ZitiCAReconciler) sync(ctx context.Context, ca *zitiv1alpha1.ZitiCA, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.CAName(ca)
 	if err := desired.CheckName(name); err != nil {
@@ -170,6 +198,7 @@ func (r *ZitiCAReconciler) sync(ctx context.Context, ca *zitiv1alpha1.ZitiCA, co
 	if err != nil {
 		return err
 	}
+	set.adopt = ca.Spec.ManagementPolicy == zitiv1alpha1.ManagementAdopt
 	// Ziti ignores a new certPem on an existing CA. A renewed issuer needs a new CA entity, verified again.
 	if old, ok := set.existing[ziti.CertificateAuthorities][name]; ok {
 		if fp, _ := old["fingerprint"].(string); !strings.EqualFold(fp, fmt.Sprintf("%x", sha1.Sum(caCert.Raw))) {

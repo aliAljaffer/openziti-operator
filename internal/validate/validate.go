@@ -21,6 +21,11 @@ func App(svc *zitiv1.ZitiApp, conn *zitiv1.ZitiConnection) error {
 	if err := desired.CheckName(b.ZitiName()); err != nil {
 		return err
 	}
+	for _, t := range svc.Spec.Targets {
+		if t.Namespace != "" && t.KubernetesService == "" {
+			return fmt.Errorf("targets[].namespace needs kubernetesService")
+		}
+	}
 	groups, err := b.Groups()
 	if err != nil {
 		return err

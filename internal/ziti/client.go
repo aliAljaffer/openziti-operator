@@ -68,6 +68,10 @@ type Client interface {
 	// Patch changes only the fields in body. A "tags" field replaces the whole tag map.
 	Patch(ctx context.Context, kind Kind, id string, body Entity) error
 	Delete(ctx context.Context, kind Kind, id string) error
+	// DisableIdentity rejects this identity's API session requests. Zero means indefinitely.
+	DisableIdentity(ctx context.Context, id string, durationMinutes int64) error
+	// EnableIdentity clears the disabled state of an identity.
+	EnableIdentity(ctx context.Context, id string) error
 }
 
 type APIError struct {
@@ -320,6 +324,17 @@ func (c *REST) Delete(ctx context.Context, kind Kind, id string) error {
 	if IsNotFound(err) {
 		return nil
 	}
+	return err
+}
+
+func (c *REST) DisableIdentity(ctx context.Context, id string, durationMinutes int64) error {
+	_, err := c.do(ctx, http.MethodPost, "identities/"+url.PathEscape(id)+"/disable", nil,
+		map[string]any{"durationMinutes": durationMinutes})
+	return err
+}
+
+func (c *REST) EnableIdentity(ctx context.Context, id string) error {
+	_, err := c.do(ctx, http.MethodPost, "identities/"+url.PathEscape(id)+"/enable", nil, nil)
 	return err
 }
 

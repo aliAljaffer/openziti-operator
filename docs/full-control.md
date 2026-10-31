@@ -10,6 +10,8 @@
 | `ZitiEdgeRouterPolicy` | `zterp` | edge router policy |
 | `ZitiServiceEdgeRouterPolicy` | `ztserp` | service edge router policy |
 | `ZitiTerminator` | `ztterm` | terminator |
+| `ZitiAuthPolicy` | `ztapolicy` | auth policy |
+| `ZitiPostureCheck` | `ztposture` | posture check |
 
 The keys are the Ziti keys, in camelCase. There are no derived objects and no defaults beyond Ziti's own. Every kind is namespaced.
 

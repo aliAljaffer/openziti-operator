@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+Additive, backward-compatible features. Existing fields keep their names, types, and defaults.
+
+### Added
+
+- `ZitiGroup` groups identities in one namespace under one role attribute. It owns no Ziti entity; the identity controller applies the attribute.
+- `ZitiAuthPolicy` maps one to one to a Ziti auth policy, including certificate, UPDB, external JWT, TOTP, and lockout settings. `ZitiIdentity` resolves a policy in its namespace by resource name.
+- `ZitiIdentity.spec.disabled` and `disabledUntil` disable an identity without deleting it. `importFrom` adopts an identity that enrolled elsewhere by copying an existing identity file into an operator-owned Secret.
+- `ZitiPostureCheck` maps one to one to a Ziti posture check. `ZitiApp.spec.allow.postureCheckRoles` attaches posture to the simple Dial policy.
+- `ZitiApp.spec.hostedByAnyOf` lets several routers host the same targets. `service`, `additionalConfigs`, `targets[].precedence`, and `targets[].namespace` cover common advanced cases.
+- `ZitiRouter.spec.managementPolicy` Observe, plus deployment resources, scheduling, image pull secrets, pod annotations, labels, and extra environment variables.
+- `ZitiCA` and `ZitiJwtSigner` Observe modes, and `ZitiJwtSigner.spec.issuer` with `keys.certPEM` for static signers.
+- `manager export` writes the control-plane configuration as applyable CRs with `managementPolicy: Observe` by default.
+- `manager access` prints the dialers, binders, routers, and posture roles of every service.
+
+### Changed
+
+- TLS Ingresses can be published through an ingress controller with `ziti.alialjaffer.com/via-ingress=true` and `ziti.alialjaffer.com/ingress-backend=<namespace>/<service>:<port>`. Existing HTTP-only behavior is unchanged.
+- A cross-namespace `ZitiApp` target needs `ziti.alialjaffer.com/allow-expose=true` on the target Service.
+- The existing-resources docs now say that a `ZitiApp` can be adopted, matching the controller.
+
+See [ADR 0004](docs/adr/0004-backward-compatible-roadmap.md) for the breaking cleanups that are deliberately deferred.
+
 ## v0.3.2
 
 A quality-of-life release. No API fields change shape and existing resources keep working. Manager

@@ -23,6 +23,9 @@ Checks that need the network stay in the reconciler: a name that clashes in Ziti
 not exist, a missing config type or auth policy, an invalid certificate, an offline router. Those keep
 their `InvalidSpec`, `TargetNotFound`, `ZitiRejected`, and `NameConflict` reasons and conditions.
 
+`ZitiGroup`, `ZitiAuthPolicy`, and `ZitiPostureCheck` are validated by their CRD markers and the
+reconciler. They are not in the webhook yet.
+
 ## Enabling it
 
 The webhook is off by default, so an existing install is unchanged. In the Helm chart:

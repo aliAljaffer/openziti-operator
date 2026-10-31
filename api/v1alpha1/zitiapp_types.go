@@ -75,9 +75,16 @@ type Target struct {
 	// +optional
 	Address string `json:"address,omitempty"`
 
-	// kubernetesService is a Service name in this namespace.
+	// kubernetesService is a Service name. It defaults to this namespace.
 	// +optional
 	KubernetesService string `json:"kubernetesService,omitempty"`
+
+	// namespace is the namespace of kubernetesService. It defaults to the ZitiApp namespace. A
+	// cross-namespace target needs the annotation ziti.alialjaffer.com/allow-expose=true on the Service.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// port is where the app is actually served, the backend port the router dials. It is one number per target.
 	// Without it the router uses the port the client dialed. Think of "exposedPorts:port" like "docker run -p".
@@ -100,6 +107,11 @@ type Target struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Cost int32 `json:"cost,omitempty"`
+
+	// precedence ranks this target against others: required, default, or failed.
+	// +kubebuilder:validation:Enum=required;default;failed
+	// +optional
+	Precedence string `json:"precedence,omitempty"`
 }
 
 // Allow says who may connect. Groups and identities are combined.
@@ -112,6 +124,27 @@ type Allow struct {
 	// A name that does not exist yet is reported in the AccessResolved condition.
 	// +optional
 	Identities []string `json:"identities,omitempty"`
+
+	// postureCheckRoles are posture check role attributes that the Dial policy requires. "#attr" selects
+	// by role attribute and follows the connection roleScope. Use ZitiAccessPolicy for "@name" selectors.
+	// +optional
+	PostureCheckRoles []string `json:"postureCheckRoles,omitempty"`
+}
+
+// AppService sets service-level Ziti fields that the app would otherwise default.
+type AppService struct {
+	// encryptionRequired makes the traffic end-to-end encrypted. It defaults to true.
+	// +optional
+	EncryptionRequired *bool `json:"encryptionRequired,omitempty"`
+
+	// terminatorStrategy is how Ziti picks a terminator. It defaults to smartrouting.
+	// +optional
+	TerminatorStrategy string `json:"terminatorStrategy,omitempty"`
+
+	// maxIdleTimeMillis closes a circuit after this idle time. Zero means never.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	MaxIdleTimeMillis int64 `json:"maxIdleTimeMillis,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
@@ -171,6 +204,20 @@ type ZitiAppSpec struct {
 	// It defaults to the first entry.
 	// +optional
 	HostedBy string `json:"hostedBy,omitempty"`
+
+	// hostedByAnyOf are additional routers that may host the same targets. Together with hostedBy they
+	// remove the single-router failure mode. Every name must be in the connection hostingRouters.
+	// +optional
+	HostedByAnyOf []string `json:"hostedByAnyOf,omitempty"`
+
+	// service sets service-level Ziti fields. Empty keeps the current defaults.
+	// +optional
+	Service AppService `json:"service,omitzero"`
+
+	// additionalConfigs are names of Ziti configs to attach to every service this app creates. Use them
+	// for config types that the app does not generate itself.
+	// +optional
+	AdditionalConfigs []string `json:"additionalConfigs,omitempty"`
 
 	// entryRouters are the routers clients connect through. The hosting router is always allowed for the app.
 	// When set, an edge router policy gives the allowed identities access to them.

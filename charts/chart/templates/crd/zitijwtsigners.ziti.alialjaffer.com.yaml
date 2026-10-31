@@ -92,9 +92,19 @@ spec:
                 - Delete
                 - Orphan
                 type: string
+              issuer:
+                description: |-
+                  issuer is the iss claim of the tokens. It is required with keys.certPEM and ignored when the keys
+                  field supplies an issuer itself.
+                type: string
               keys:
                 description: keys tells Ziti how to verify signatures.
                 properties:
+                  certPEM:
+                    description: |-
+                      certPEM is a PEM certificate that carries the public signing key. Use it to represent a signer that
+                      uses a static key, for example one imported from an existing network.
+                    type: string
                   jwksEndpoint:
                     description: jwksEndpoint lets the Ziti controller fetch the keys,
                       for any identity provider.
@@ -112,6 +122,10 @@ spec:
                     - issuer
                     - url
                     type: object
+                  kid:
+                    description: kid is the key id that matches certPEM. Empty lets
+                      Ziti use the certificate key id.
+                    type: string
                   kubernetes:
                     description: |-
                       kubernetes reads the issuer and the keys from this cluster. The operator picks the key that signs
@@ -119,8 +133,19 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: set exactly one of kubernetes and jwksEndpoint
-                  rule: has(self.kubernetes) != has(self.jwksEndpoint)
+                - message: set exactly one of kubernetes, jwksEndpoint, and certPEM
+                  rule: '(has(self.kubernetes) ? 1 : 0) + (has(self.jwksEndpoint)
+                    ? 1 : 0) + (has(self.certPEM) ? 1 : 0) == 1'
+              managementPolicy:
+                default: Manage
+                description: |-
+                  managementPolicy Manage creates the signer. Adopt takes it over. Observe only reads it and reports status,
+                  for a signer that was registered outside the operator.
+                enum:
+                - Manage
+                - Adopt
+                - Observe
+                type: string
               useExternalId:
                 default: true
                 description: useExternalId matches the claim to the identity externalId.
@@ -142,6 +167,8 @@ spec:
                 == oldSelf.zitiName)'
             - message: deletionPolicy is immutable
               rule: self.deletionPolicy == oldSelf.deletionPolicy
+            - message: issuer is required with keys.certPEM
+              rule: '!has(self.keys.certPEM) || has(self.issuer)'
           status:
             description: status defines the observed state of ZitiJwtSigner
             properties:

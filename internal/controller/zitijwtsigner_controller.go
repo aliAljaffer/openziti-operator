@@ -66,7 +66,7 @@ func (r *ZitiJwtSignerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if !sg.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, r.finalize(ctx, &sg)
 	}
-	if controllerutil.AddFinalizer(&sg, Finalizer) {
+	if sg.Spec.ManagementPolicy != zitiv1alpha1.ManagementObserve && controllerutil.AddFinalizer(&sg, Finalizer) {
 		if err := r.Update(ctx, &sg); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -75,7 +75,11 @@ func (r *ZitiJwtSignerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	before := sg.Status.DeepCopy()
 	conn, zc, err := connect(ctx, r.Client, r.Clients, sg.Spec.ConnectionRef)
 	if err == nil {
-		err = r.sync(ctx, &sg, conn, zc)
+		if sg.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+			err = r.observe(ctx, &sg, zc)
+		} else {
+			err = r.sync(ctx, &sg, conn, zc)
+		}
 	}
 
 	var se *specError
@@ -108,6 +112,10 @@ func (r *ZitiJwtSignerReconciler) finalize(ctx context.Context, sg *zitiv1alpha1
 	if !controllerutil.ContainsFinalizer(sg, Finalizer) {
 		return nil
 	}
+	if sg.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
+		controllerutil.RemoveFinalizer(sg, Finalizer)
+		return r.Update(ctx, sg)
+	}
 	_, zc, err := connect(ctx, r.Client, r.Clients, sg.Spec.ConnectionRef)
 	if err != nil {
 		r.Recorder.Eventf(sg, "Warning", "DeleteBlocked", "cannot reach Ziti: %v", err)
@@ -132,6 +140,9 @@ func (r *ZitiJwtSignerReconciler) finalize(ctx context.Context, sg *zitiv1alpha1
 // keyMaterial returns the issuer, the key id, and the certificate that carry the signing key.
 // With jwksEndpoint the Ziti controller fetches the keys itself and the last two are empty.
 func (r *ZitiJwtSignerReconciler) keyMaterial(ctx context.Context, sg *zitiv1alpha1.ZitiJwtSigner) (issuer, kid, certPEM string, err error) {
+	if sg.Spec.Keys.CertPEM != "" {
+		return sg.Spec.Issuer, sg.Spec.Keys.Kid, sg.Spec.Keys.CertPEM, nil
+	}
 	if ep := sg.Spec.Keys.JwksEndpoint; ep != nil {
 		return ep.Issuer, "", "", nil
 	}
@@ -180,6 +191,30 @@ func pickKey(keys []ziti.JWK, currentKid string) (ziti.JWK, error) {
 	return ziti.JWK{}, fmt.Errorf("the cluster publishes %d signing keys and none matches the operator's own token, so the current key is unknown", len(keys))
 }
 
+func (r *ZitiJwtSignerReconciler) observe(ctx context.Context, sg *zitiv1alpha1.ZitiJwtSigner, zc ziti.Client) error {
+	name := desired.SignerName(sg)
+	found, err := zc.List(ctx, ziti.ExternalJWTSigners, `name="`+name+`"`)
+	if err != nil {
+		return err
+	}
+	if len(found) == 0 {
+		return &specError{ReasonNotFound, "external JWT signer " + `"` + name + `"` + " not found in Ziti"}
+	}
+	e := found[0]
+	sg.Status.SignerID = e.ID()
+	if issuer, _ := e["issuer"].(string); issuer != "" {
+		sg.Status.Issuer = issuer
+	} else {
+		sg.Status.Issuer = sg.Spec.Issuer
+	}
+	if kid, _ := e["kid"].(string); kid != "" {
+		sg.Status.KeyID = kid
+	}
+	setCond(&sg.Status.Conditions, sg.Generation, CondSynced, true, "Observed", "", "")
+	setCond(&sg.Status.Conditions, sg.Generation, CondReady, true, "Observed", "", "")
+	return nil
+}
+
 func (r *ZitiJwtSignerReconciler) sync(ctx context.Context, sg *zitiv1alpha1.ZitiJwtSigner, conn *zitiv1alpha1.ZitiConnection, zc ziti.Client) error {
 	name := desired.SignerName(sg)
 	if err := desired.CheckName(name); err != nil {
@@ -193,6 +228,7 @@ func (r *ZitiJwtSignerReconciler) sync(ctx context.Context, sg *zitiv1alpha1.Zit
 	if err != nil {
 		return err
 	}
+	set.adopt = sg.Spec.ManagementPolicy == zitiv1alpha1.ManagementAdopt
 	signerID, err := set.ensure(ctx, ziti.ExternalJWTSigners, desired.JwtSigner(sg, conn, issuer, kid, certPEM))
 	if err != nil {
 		return err

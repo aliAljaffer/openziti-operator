@@ -21,12 +21,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// IdentityImport copies an existing identity file into an operator-owned Secret. The source Secret is
+// read only. It is for an identity that enrolled outside the operator.
+type IdentityImport struct {
+	// identityFileSecretRef names the Secret that holds the existing identity file.
+	// +required
+	IdentityFileSecretRef SecretRef `json:"identityFileSecretRef"`
+
+	// key is the key in that Secret. It defaults to identity.json.
+	// +kubebuilder:default=identity.json
+	// +optional
+	Key string `json:"key,omitempty"`
+}
+
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.zitiName) || (has(self.zitiName) && self.zitiName == oldSelf.zitiName)",message="zitiName is immutable"
 // +kubebuilder:validation:XValidation:rule="self.deletionPolicy == oldSelf.deletionPolicy",message="deletionPolicy is immutable"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode == oldSelf.enrollmentMode",message="enrollmentMode is immutable"
 // +kubebuilder:validation:XValidation:rule="!(has(self.serviceAccount) && has(self.externalId))",message="set only one of serviceAccount and externalId"
 // +kubebuilder:validation:XValidation:rule="!has(self.certificate) || (self.enrollmentMode == 'None' && has(self.externalId))",message="certificate needs enrollmentMode None and externalId"
 // +kubebuilder:validation:XValidation:rule="self.enrollmentMode != 'None' || (has(self.authPolicy) && (has(self.serviceAccount) || has(self.externalId)))",message="enrollmentMode None needs authPolicy and serviceAccount or externalId"
+// +kubebuilder:validation:XValidation:rule="!has(self.importFrom) || (self.enrollmentMode == 'OperatorEnrolled' && self.managementPolicy == 'Adopt')",message="importFrom needs enrollmentMode OperatorEnrolled and managementPolicy Adopt"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || (has(self.type) && self.type == oldSelf.type)",message="type is immutable"
 type ZitiIdentitySpec struct {
 	// connectionRef is the name of the ZitiConnection to use. It defaults to "default".
 	// +kubebuilder:default=default
@@ -39,9 +54,16 @@ type ZitiIdentitySpec struct {
 	// +optional
 	ZitiName string `json:"zitiName,omitempty"`
 
-	// roleAttributes follow the connection roleScope, like ZitiApp roleAttributes.
+	// roleAttributes follow the connection roleScope, like ZitiApp roleAttributes. A ZitiGroup in this
+	// namespace also adds its roleAttribute to this list.
 	// +optional
 	RoleAttributes []string `json:"roleAttributes,omitempty"`
+
+	// type is the Ziti identity type: User, Device, Service, or Default. It cannot change later.
+	// +kubebuilder:default=Default
+	// +kubebuilder:validation:Enum=User;Device;Service;Default
+	// +optional
+	Type string `json:"type,omitempty"`
 
 	// authPolicy is a Ziti auth policy name. It defaults to "Default".
 	// +optional
@@ -63,6 +85,19 @@ type ZitiIdentitySpec struct {
 	// +kubebuilder:validation:MaxLength=1000
 	// +optional
 	ExternalID string `json:"externalId,omitempty"`
+
+	// disabled rejects this identity's API session requests. Use disabledUntil for a temporary lock.
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
+
+	// disabledUntil disables the identity until this time. It is ignored when disabled is false.
+	// +optional
+	DisabledUntil *metav1.Time `json:"disabledUntil,omitempty"`
+
+	// importFrom copies an existing identity file into the operator Secret, so an identity that enrolled
+	// elsewhere can be adopted and renewed. It needs enrollmentMode OperatorEnrolled and managementPolicy Adopt.
+	// +optional
+	ImportFrom *IdentityImport `json:"importFrom,omitempty"`
 
 	// enrollmentMode JwtOnly writes the enrollment JWT to the Secret. A person or workload enrolls with it.
 	// OperatorEnrolled makes the operator enroll and write identity.json to the Secret.

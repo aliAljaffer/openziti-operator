@@ -229,8 +229,11 @@ func TestHostingRouterErrors(t *testing.T) {
 func TestAllowedRolesDialAndERP(t *testing.T) {
 	b := builder(nil)
 	roles, missing, err := b.AllowedRoles(nil)
-	if err != nil || len(roles) != 0 || len(missing) != 0 || b.Dial("svc-1", roles) != nil {
+	if err != nil || len(roles) != 0 || len(missing) != 0 {
 		t.Errorf("no allow: %v %v %v", roles, missing, err)
+	}
+	if dial, err := b.Dial("svc-1", roles); err != nil || dial != nil {
+		t.Errorf("no allow dial = %v %v", dial, err)
 	}
 
 	b = builder(func(s *zitiv1.ZitiApp, _ *zitiv1.ZitiConnection) {
@@ -241,9 +244,9 @@ func TestAllowedRolesDialAndERP(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(roles, []string{"#team-a.staff", "@id-alice"}) || !reflect.DeepEqual(missing, []string{"ghost"}) {
 		t.Fatalf("roles = %v missing = %v err = %v", roles, missing, err)
 	}
-	dial := b.Dial("svc-1", roles)
-	if dial["type"] != "Dial" || dial.Name() != "team-a.app-dial" || !reflect.DeepEqual(dial["serviceRoles"], []string{"@svc-1"}) {
-		t.Errorf("dial = %v", dial)
+	dial, err := b.Dial("svc-1", roles)
+	if err != nil || dial["type"] != "Dial" || dial.Name() != "team-a.app-dial" || !reflect.DeepEqual(dial["serviceRoles"], []string{"@svc-1"}) {
+		t.Errorf("dial = %v %v", dial, err)
 	}
 	erp, err := b.ERP(roles)
 	if err != nil || erp.Name() != "team-a.app-erp" ||
