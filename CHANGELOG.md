@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0
 
 Additive, backward-compatible features. Existing fields keep their names, types, and defaults.
 
@@ -23,6 +23,12 @@ Additive, backward-compatible features. Existing fields keep their names, types,
 - The existing-resources docs now say that a `ZitiApp` can be adopted, matching the controller.
 
 See [ADR 0004](docs/adr/0004-backward-compatible-roadmap.md) for the breaking cleanups that are deliberately deferred.
+
+### Upgrade
+
+```bash
+helm upgrade ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.4.0 -n ziti-operator-system
+```
 
 ## v0.3.2
 
