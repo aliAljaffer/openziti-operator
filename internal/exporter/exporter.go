@@ -149,12 +149,12 @@ func readAll(ctx context.Context, zc ziti.Client, terminators bool) (map[ziti.Ki
 		kinds = append(kinds, ziti.Terminators)
 	}
 	out := map[ziti.Kind][]ziti.Entity{}
-	for _, kind := range kinds {
-		list, err := zc.List(ctx, kind, "")
-		if err != nil {
-			return nil, fmt.Errorf("list %s: %w", kind, err)
-		}
-		out[kind] = list
+	lists, err := ziti.ListAll(ctx, zc, kinds, "")
+	if err != nil {
+		return nil, err
+	}
+	for i, kind := range kinds {
+		out[kind] = lists[i]
 	}
 	return out, nil
 }

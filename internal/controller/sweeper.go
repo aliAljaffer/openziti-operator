@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -88,13 +89,13 @@ func (s *OrphanSweeper) Sweep(ctx context.Context, conn *zitiv1.ZitiConnection) 
 	if cluster == "" {
 		cluster = "default"
 	}
+	lists, err := ziti.ListAll(ctx, zc, sweepKinds, fmt.Sprintf(`tags.%s="%s"`, desired.TagCluster, cluster))
+	if err != nil {
+		return err
+	}
 	found := map[ziti.Kind][]ziti.Entity{}
-	for _, kind := range sweepKinds {
-		list, err := zc.List(ctx, kind, fmt.Sprintf(`tags.%s="%s"`, desired.TagCluster, cluster))
-		if err != nil {
-			return err
-		}
-		found[kind] = list
+	for i, kind := range sweepKinds {
+		found[kind] = lists[i]
 	}
 	live, err := s.liveOwners(ctx)
 	if err != nil {
@@ -151,10 +152,17 @@ func ownerLists() []client.ObjectList {
 }
 
 func (s *OrphanSweeper) liveOwners(ctx context.Context) (map[types.UID]bool, error) {
+	lists := ownerLists()
+	errs := make([]error, len(lists))
+	var wg sync.WaitGroup
+	for i, list := range lists {
+		wg.Go(func() { errs[i] = s.Reader.List(ctx, list) })
+	}
+	wg.Wait()
 	live := map[types.UID]bool{}
-	for _, list := range ownerLists() {
-		if err := s.Reader.List(ctx, list); err != nil {
-			return nil, err
+	for i, list := range lists {
+		if errs[i] != nil {
+			return nil, errs[i]
 		}
 		items, err := apimeta.ExtractList(list)
 		if err != nil {
