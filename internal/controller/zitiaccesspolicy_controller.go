@@ -164,14 +164,11 @@ func (r *ZitiAccessPolicyReconciler) sync(ctx context.Context, ap *zitiv1alpha1.
 		return err
 	}
 
-	identities, err := zc.List(ctx, ziti.Identities, "")
+	lists, err := ziti.ListAll(ctx, zc, []ziti.Kind{ziti.Identities, ziti.Services}, "")
 	if err != nil {
 		return err
 	}
-	services, err := zc.List(ctx, ziti.Services, "")
-	if err != nil {
-		return err
-	}
+	identities, services := lists[0], lists[1]
 	ap.Status.ZitiName, ap.Status.DialPolicyID, ap.Status.EdgeRouterPolicyID = name, dialID, erpID
 	dial = withID(dial, dialID)
 	ap.Status.Identities = int32(len(check.Selected(identities, dial, "identityRoles")))

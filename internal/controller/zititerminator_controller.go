@@ -123,11 +123,18 @@ func (r *ZitiTerminatorReconciler) sync(ctx context.Context, t *zitiv1alpha1.Zit
 	if strings.ContainsAny(t.Spec.Service+t.Spec.Router, `"\`) {
 		return &specError{"InvalidSpec", "service and router must not contain quotes or backslashes"}
 	}
-	serviceID, err := idByName(ctx, zc, ziti.Services, t.Spec.Service)
+	lists, err := ziti.ListEach(ctx, zc, []ziti.ListRequest{
+		{Kind: ziti.Services, Filter: fmt.Sprintf(`name="%s"`, t.Spec.Service)},
+		{Kind: ziti.EdgeRouters, Filter: fmt.Sprintf(`name="%s"`, t.Spec.Router)},
+	})
 	if err != nil {
 		return err
 	}
-	routerID, err := idByName(ctx, zc, ziti.EdgeRouters, t.Spec.Router)
+	serviceID, err := idFromList(lists[0], ziti.Services, t.Spec.Service)
+	if err != nil {
+		return err
+	}
+	routerID, err := idFromList(lists[1], ziti.EdgeRouters, t.Spec.Router)
 	if err != nil {
 		return err
 	}
@@ -170,11 +177,7 @@ func (r *ZitiTerminatorReconciler) sync(ctx context.Context, t *zitiv1alpha1.Zit
 	return nil
 }
 
-func idByName(ctx context.Context, zc ziti.Client, kind ziti.Kind, name string) (string, error) {
-	found, err := zc.List(ctx, kind, fmt.Sprintf(`name="%s"`, name))
-	if err != nil {
-		return "", err
-	}
+func idFromList(found []ziti.Entity, kind ziti.Kind, name string) (string, error) {
 	if len(found) == 0 {
 		return "", &desired.MissingError{Msg: fmt.Sprintf("no %s named %q in Ziti", strings.TrimSuffix(string(kind), "s"), name)}
 	}

@@ -387,29 +387,39 @@ func (r *ZitiIdentityReconciler) sync(ctx context.Context, id *zitiv1alpha1.Ziti
 	}
 
 	mode := id.Spec.ManagementPolicy
-	var body ziti.Entity
+	var (
+		body     ziti.Entity
+		existing []ziti.Entity
+		err      error
+	)
 	if mode != zitiv1alpha1.ManagementObserve {
 		policyName := id.Spec.AuthPolicy
 		if policyName == "" {
 			policyName = defaultAuthPolicy
 		}
 		policyName = r.authPolicyName(ctx, id, policyName)
-		policies, err := zc.List(ctx, ziti.AuthPolicies, fmt.Sprintf(`name="%s"`, policyName))
+		lists, err := ziti.ListEach(ctx, zc, []ziti.ListRequest{
+			{Kind: ziti.AuthPolicies, Filter: fmt.Sprintf(`name="%s"`, policyName)},
+			{Kind: ziti.Identities, Filter: tagFilter(id.UID)},
+		})
 		if err != nil {
 			return err
 		}
+		policies := lists[0]
+		existing = lists[1]
 		if len(policies) != 1 {
 			return &specError{"InvalidSpec", fmt.Sprintf("auth policy %q not found in Ziti", policyName)}
 		}
 		if body, err = desired.Identity(id, conn, policies[0].ID()); err != nil {
 			return &specError{"InvalidSpec", err.Error()}
 		}
+	} else {
+		existing, err = zc.List(ctx, ziti.Identities, tagFilter(id.UID))
+		if err != nil {
+			return err
+		}
 	}
 
-	existing, err := zc.List(ctx, ziti.Identities, tagFilter(id.UID))
-	if err != nil {
-		return err
-	}
 	var zid ziti.Entity
 	switch {
 	case len(existing) > 0:

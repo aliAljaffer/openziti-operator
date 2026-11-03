@@ -214,12 +214,13 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 		return nil, &specError{"InvalidSpec", "zitiName must not contain quotes or backslashes"}
 	}
 
-	routers, err := zc.List(ctx, ziti.EdgeRouters, "")
+	lists, err := ziti.ListAll(ctx, zc, []ziti.Kind{ziti.EdgeRouters, ziti.ConfigTypes}, "")
 	if err != nil {
 		return nil, err
 	}
+	routers, configTypes := lists[0], lists[1]
 	if svc.Spec.ManagementPolicy == zitiv1alpha1.ManagementObserve {
-		return r.observeExisting(ctx, zc, name, routers)
+		return r.observeExisting(ctx, zc, name, routers, configTypes)
 	}
 	if err := r.validateTargets(ctx, svc); err != nil {
 		return nil, err
@@ -227,10 +228,6 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	b.RouterIDs = map[string]string{}
 	for _, rt := range routers {
 		b.RouterIDs[rt.Name()] = rt.ID()
-	}
-	configTypes, err := zc.List(ctx, ziti.ConfigTypes, "")
-	if err != nil {
-		return nil, err
 	}
 	typeIDs := map[string]string{}
 	for _, t := range configTypes {
@@ -290,14 +287,18 @@ func (r *ZitiAppReconciler) sync(ctx context.Context, svc *zitiv1alpha1.ZitiApp,
 	}
 
 	out := &syncResult{missing: missing}
+	if len(results) == 0 {
+		return out, nil
+	}
+	graph, err := loadServiceGraph(ctx, zc, routers, configTypes)
+	if err != nil {
+		return nil, err
+	}
 	for _, res := range results {
-		sr, err := r.observe(ctx, zc, res.group.Name, res.ids, routers, configTypes, []ziti.Entity{
+		sr := observeService(graph, res.group.Name, res.ids, []ziti.Entity{
 			withID(res.ic, res.ids.Intercept), withID(res.hc, res.ids.Host),
 		}, withID(res.svc, res.ids.Service))
-		if err != nil {
-			return nil, err
-		}
-		out.services = append(out.services, *sr)
+		out.services = append(out.services, sr)
 	}
 	return out, nil
 }
@@ -442,30 +443,25 @@ func (r *ZitiAppReconciler) validateTargets(ctx context.Context, svc *zitiv1alph
 }
 
 // observeExisting reports on a service that was created outside this operator. It never writes to Ziti.
-func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers []ziti.Entity) (*syncResult, error) {
-	found, err := zc.List(ctx, ziti.Services, fmt.Sprintf(`name="%s"`, name))
+func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client, name string, routers, configTypes []ziti.Entity) (*syncResult, error) {
+	lists, err := ziti.ListEach(ctx, zc, []ziti.ListRequest{
+		{Kind: ziti.Services, Filter: fmt.Sprintf(`name="%s"`, name)},
+		{Kind: ziti.Configs},
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(found) == 0 {
+	if len(lists[0]) == 0 {
 		return nil, &specError{ReasonNotFound, fmt.Sprintf("service %q not found in Ziti", name)}
 	}
-	svc := found[0]
-	configTypes, err := zc.List(ctx, ziti.ConfigTypes, "")
-	if err != nil {
-		return nil, err
-	}
+	svc := lists[0][0]
 	typeNames := map[string]string{}
 	for _, t := range configTypes {
 		typeNames[t.ID()] = t.Name()
 	}
-	all, err := zc.List(ctx, ziti.Configs, "")
-	if err != nil {
-		return nil, err
-	}
 	ids := zitiv1alpha1.EntityIDs{Service: svc.ID()}
 	var configs []ziti.Entity
-	for _, c := range all {
+	for _, c := range lists[1] {
 		if !slices.Contains(anyStrings(svc["configs"]), c.ID()) {
 			continue
 		}
@@ -477,11 +473,12 @@ func (r *ZitiAppReconciler) observeExisting(ctx context.Context, zc ziti.Client,
 			ids.Host = c.ID()
 		}
 	}
-	sr, err := r.observe(ctx, zc, name, ids, routers, configTypes, configs, svc)
+	graph, err := loadServiceGraph(ctx, zc, routers, configTypes)
 	if err != nil {
 		return nil, err
 	}
-	return &syncResult{services: []serviceResult{*sr}}, nil
+	sr := observeService(graph, name, ids, configs, svc)
+	return &syncResult{services: []serviceResult{sr}}, nil
 }
 
 func anyStrings(v any) []string {
@@ -503,27 +500,33 @@ func withID(e ziti.Entity, id string) ziti.Entity {
 	return out
 }
 
-func (r *ZitiAppReconciler) observe(ctx context.Context, zc ziti.Client, name string, ids zitiv1alpha1.EntityIDs,
-	routers, configTypes, configs []ziti.Entity, svc ziti.Entity) (*serviceResult, error) {
-	g := &check.Graph{Services: []ziti.Entity{svc}, Configs: configs, ConfigTypes: configTypes, Routers: routers}
-	err := check.LoadInto(ctx, zc, g,
-		ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Identities, ziti.Terminators)
-	if err != nil {
+// loadServiceGraph reads the kinds the service report needs, once for every service of an app.
+func loadServiceGraph(ctx context.Context, zc ziti.Client, routers, configTypes []ziti.Entity) (*check.Graph, error) {
+	g := &check.Graph{Routers: routers, ConfigTypes: configTypes}
+	if err := check.LoadInto(ctx, zc, g,
+		ziti.ServicePolicies, ziti.ServiceEdgeRouterPolicies, ziti.EdgeRouterPolicies, ziti.Identities, ziti.Terminators); err != nil {
 		return nil, err
 	}
-	out := &serviceResult{name: name, ids: ids, report: g.Service(svc)}
+	return g, nil
+}
+
+func observeService(g *check.Graph, name string, ids zitiv1alpha1.EntityIDs, configs []ziti.Entity, svc ziti.Entity) serviceResult {
+	gg := *g
+	gg.Services = []ziti.Entity{svc}
+	gg.Configs = configs
+	out := serviceResult{name: name, ids: ids, report: gg.Service(svc)}
 	routerNames := map[string]string{}
-	for _, rt := range routers {
+	for _, rt := range gg.Routers {
 		routerNames[rt.ID()] = rt.Name()
 	}
-	for _, t := range g.Terminators {
+	for _, t := range gg.Terminators {
 		if t["serviceId"] == ids.Service {
 			rid, _ := t["routerId"].(string)
 			out.terminators = append(out.terminators, zitiv1alpha1.Terminator{Router: routerNames[rid]})
 		}
 	}
 	slices.SortFunc(out.terminators, func(a, b zitiv1alpha1.Terminator) int { return strings.Compare(a.Router, b.Router) })
-	return out, nil
+	return out
 }
 
 func setCond(conds *[]metav1.Condition, gen int64, typ string, ok bool, reasonTrue, reasonFalse, msg string) {

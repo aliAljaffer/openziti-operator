@@ -29,14 +29,14 @@ type entitySet struct {
 func newEntitySet(ctx context.Context, zc ziti.Client, rec record.EventRecorder, obj client.Object, uid types.UID, kinds []ziti.Kind) (*entitySet, error) {
 	s := &entitySet{zc: zc, rec: rec, obj: obj, kinds: kinds,
 		existing: map[ziti.Kind]map[string]ziti.Entity{}, keep: map[ziti.Kind]map[string]bool{}}
-	for _, kind := range kinds {
-		list, err := zc.List(ctx, kind, tagFilter(uid))
-		if err != nil {
-			return nil, err
-		}
+	lists, err := ziti.ListAll(ctx, zc, kinds, tagFilter(uid))
+	if err != nil {
+		return nil, err
+	}
+	for i, kind := range kinds {
 		s.existing[kind] = map[string]ziti.Entity{}
 		s.keep[kind] = map[string]bool{}
-		for _, e := range list {
+		for _, e := range lists[i] {
 			s.existing[kind][e.Name()] = e
 		}
 	}

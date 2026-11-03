@@ -38,13 +38,13 @@ var graphField = map[ziti.Kind]func(*Graph, []ziti.Entity){
 // LoadInto reads the named kinds into g. A reconciler passes only the kinds its check reads, because
 // Ziti cannot filter terminators by router and cannot filter services by config.
 func LoadInto(ctx context.Context, zc ziti.Client, g *Graph, kinds ...ziti.Kind) error {
-	for _, kind := range kinds {
-		list, err := zc.List(ctx, kind, "")
-		if err != nil {
-			return err
-		}
+	lists, err := ziti.ListAll(ctx, zc, kinds, "")
+	if err != nil {
+		return err
+	}
+	for i, kind := range kinds {
 		if set := graphField[kind]; set != nil {
-			set(g, list)
+			set(g, lists[i])
 		}
 	}
 	return nil
