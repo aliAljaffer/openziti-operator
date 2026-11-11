@@ -72,7 +72,9 @@ func Main(args []string) int {
 		fmt.Fprintln(os.Stderr, "audit: unexpected arguments:", fs.Args())
 		return 2
 	}
-	if err := Run(context.Background(), opts); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := Run(ctx, opts); err != nil {
 		fmt.Fprintln(os.Stderr, "audit:", err)
 		if _, ok := errors.AsType[*FindingsError](err); ok {
 			return 1
