@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -107,6 +108,33 @@ type REST struct {
 
 var _ Client = (*REST)(nil)
 
+const (
+	requestTimeout = 30 * time.Second
+	maxAttempts    = 4
+	retryBase      = 200 * time.Millisecond
+	retryCap       = 5 * time.Second
+	// maxConns covers every controller worker that can call one client at once.
+	maxConns = 16
+)
+
+// retryDelay is capped exponential backoff with full jitter.
+func retryDelay(attempt int) time.Duration {
+	d := min(retryCap, retryBase<<attempt)
+	return rand.N(d) + 1
+}
+
+// retryable says whether a failed attempt is safe to repeat. 429 and 503 mean Ziti did not act, so any method may retry.
+// Other 5xx and network errors may have applied the change, so only idempotent methods retry.
+func retryable(method string, status int, err error) bool {
+	if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
+		return true
+	}
+	if method == http.MethodPost {
+		return false
+	}
+	return err != nil || status == http.StatusBadGateway || status == http.StatusGatewayTimeout
+}
+
 func NewREST(managementURL string, auth rest_util.Authenticator, requestsPerSecond float64) (*REST, error) {
 	u, err := url.Parse(managementURL)
 	if err != nil {
@@ -115,6 +143,12 @@ func NewREST(managementURL string, auth rest_util.Authenticator, requestsPerSeco
 	hc, err := auth.BuildHttpClient()
 	if err != nil {
 		return nil, err
+	}
+	hc.Timeout = requestTimeout
+	if t, ok := hc.Transport.(*http.Transport); ok {
+		t.MaxIdleConnsPerHost, t.MaxConnsPerHost = maxConns, maxConns
+		t.MaxIdleConns, t.IdleConnTimeout = maxConns, 90*time.Second
+		t.ResponseHeaderTimeout = requestTimeout
 	}
 	return &REST{base: u, auth: auth, http: hc, limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), 1)}, nil
 }
@@ -166,11 +200,12 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 	u := c.base.JoinPath(path)
 	u.RawQuery = query.Encode()
 
+	renew := false
 	for attempt := 0; ; attempt++ {
 		if err := c.limiter.Wait(ctx); err != nil {
 			return nil, err
 		}
-		token, err := c.session(attempt > 0)
+		token, err := c.session(renew)
 		if err != nil {
 			return nil, err
 		}
@@ -181,23 +216,37 @@ func (c *REST) do(ctx context.Context, method, path string, query url.Values, bo
 		req.Header.Set("zt-session", token)
 		req.Header.Set("Content-Type", contentType)
 		resp, err := c.http.Do(req)
-		if err != nil {
-			metrics.APIRequests.WithLabelValues(method, kindOf(path), "error").Inc()
-			return nil, err
+		status := 0
+		var raw []byte
+		if err == nil {
+			status = resp.StatusCode
+			raw, err = io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
 		}
-		metrics.APIRequests.WithLabelValues(method, kindOf(path), strconv.Itoa(resp.StatusCode)).Inc()
-		raw, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
+		label := strconv.Itoa(status)
 		if err != nil {
-			return nil, err
+			label = "error"
 		}
-		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+		metrics.APIRequests.WithLabelValues(method, kindOf(path), label).Inc()
+		if status == http.StatusUnauthorized && !renew {
+			renew = true
 			continue
+		}
+		if attempt+1 < maxAttempts && retryable(method, status, err) {
+			select {
+			case <-time.After(retryDelay(attempt)):
+				continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		if err != nil {
+			return nil, err
 		}
 		var env envelope
 		_ = json.Unmarshal(raw, &env)
-		if resp.StatusCode >= 300 {
-			ae := &APIError{Status: resp.StatusCode}
+		if status >= 300 {
+			ae := &APIError{Status: status}
 			if env.Error != nil {
 				ae.Code, ae.Message = env.Error.Code, env.Error.Message
 				if len(env.Error.Cause) > 0 && string(env.Error.Cause) != "null" {

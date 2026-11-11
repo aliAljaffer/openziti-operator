@@ -36,6 +36,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -252,6 +253,7 @@ func main() {
 			&corev1.Secret{}: secretCache(secretNamespaces),
 		}},
 		Scheme:                  scheme,
+		Controller:              ctrlconfig.Controller{ReconciliationTimeout: 5 * time.Minute},
 		Metrics:                 metricsServerOptions,
 		WebhookServer:           webhookServer,
 		HealthProbeBindAddress:  probeAddr,
