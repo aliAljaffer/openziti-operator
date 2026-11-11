@@ -25,7 +25,7 @@ func TestRetryable(t *testing.T) {
 	if retryable(http.MethodPost, 0, http.ErrHandlerTimeout) || !retryable(http.MethodPut, 0, http.ErrHandlerTimeout) {
 		t.Error("network errors retry only for idempotent methods")
 	}
-	for a := 0; a < 10; a++ {
+	for a := range 10 {
 		if d := retryDelay(a); d <= 0 || d > retryCap+time.Nanosecond {
 			t.Errorf("attempt %d: delay %v out of range", a, d)
 		}
