@@ -72,7 +72,8 @@ A workload can log in to Ziti with its Kubernetes service account token. There i
 | `kubernetes: {}` | The operator reads the cluster issuer and keys. Ziti takes one key per signer. The operator picks the key that signs its own token. When Kubernetes rotates the key, the next sync (about 10 minutes) updates the signer. Tokens signed by the new key fail until then. |
 | `jwksEndpoint: {url, issuer}` | The Ziti controller fetches the keys itself and follows rotation at once. The controller must reach the URL. Use it for other identity providers, or when your API server publishes its JWKS. |
 
-With `kubernetes: {}`, a cluster that publishes several keys and an operator that runs outside the cluster (so it has no token to compare) gives `KeyAmbiguous`. The operator then creates nothing.
+> [!NOTE]
+> With `kubernetes: {}`, a cluster that publishes several keys and an operator that runs outside the cluster (so it has no token to compare) gives `KeyAmbiguous`. The operator then creates nothing.
 
 ## Rules
 

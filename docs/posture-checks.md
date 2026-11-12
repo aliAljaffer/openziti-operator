@@ -43,8 +43,11 @@ spec:
 
 `roleAttributes` follow the connection `roleScope`, like identity and service attributes. With
 `Namespaced`, `managed` becomes `team-a.managed`, and `#managed` in a policy becomes
-`#team-a.managed`. A cluster-wide posture check with a global attribute will not match under
-`Namespaced`; use `roleScope: Global` or set the scoped attribute.
+`#team-a.managed`.
+
+> [!WARNING]
+> A cluster-wide posture check with a global attribute will not match under
+> `Namespaced`; use `roleScope: Global` or set the scoped attribute.
 
 ## Data shapes
 

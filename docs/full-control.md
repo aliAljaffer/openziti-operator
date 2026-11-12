@@ -135,7 +135,10 @@ spec:
     - "@router-a"
 ```
 
-The `@router-a` role selects the identity of the router that hosts the service. A router in tunnel mode has an identity with the same name as the router. The bind policy and the service edge router policy must both include the hosting router, or the service gets no terminator.
+The `@router-a` role selects the identity of the router that hosts the service. A router in tunnel mode has an identity with the same name as the router.
+
+> [!NOTE]
+> The bind policy and the service edge router policy must both include the hosting router, or the service gets no terminator.
 
 Everything with `@` roles needs `roleScope: Global` on the connection. With `Namespaced` scope, use `#attribute` roles.
 

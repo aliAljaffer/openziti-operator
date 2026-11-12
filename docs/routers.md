@@ -132,19 +132,15 @@ The tunneler needs an edge listener, and an edge listener needs an advertise val
 | `deployment.podAnnotations`, `labels`, `extraEnv` | Extra metadata and environment variables. Do not override the variables the operator owns. |
 | `deployment.serviceType` | The Service the operator creates. Default `ClusterIP`, which only clients inside the cluster reach. Use `LoadBalancer` where the cluster has one, or `NodePort`, then set `advertisedAddress` to a node address. |
 
-Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollment`, in the same namespace, because the router pod reads the token from it. With `enrollmentSecretRef` the pod reads that Secret instead.
+### Workload behavior
 
-The pod runs one replica as uid 2171 with all capabilities dropped. The Deployment is `Recreate`, never `RollingUpdate`: two router processes with the same identity fight each other.
-
-The enrollment token expires after about three hours. The operator removes it from the Secret once the router has enrolled, and the pod reads it as an optional key. A restarted pod starts from its volume with no token at all. If you delete the volume, the router needs a new enrollment: delete the resource and apply it again.
-
-A volume claim cannot change its storage class once it exists, so set `storageClassName` before the first reconcile. A later change leaves the `Workload` condition `False` with reason `StorageClassLocked`. Delete the claim to let the operator make a new one.
-
-Check the reclaim policy of the storage class. With `Retain`, deleting the resource leaves the volume behind, and a later `ZitiRouter` of the same name can pick it up with a certificate for a Ziti identity that no longer exists. That router never connects. Delete the volume as well when you delete the resource.
-
-The router needs one replica and a volume. It does not need CPU or memory requests, and the operator does not set them.
-
-The JWT works once and expires after about three hours. The operator writes new bundles when it issues a new JWT. It removes the JWT and both bundles when the router has enrolled. The bundles need the controller version, so the `ZitiConnection` must be connected.
+- Without `enrollmentSecretRef` the operator keeps its own Secret, `<name>-enrollment`, in the same namespace, because the router pod reads the token from it. With `enrollmentSecretRef` the pod reads that Secret instead.
+- The pod runs one replica as uid 2171 with all capabilities dropped. The Deployment is `Recreate`, never `RollingUpdate`: two router processes with the same identity fight each other.
+- The enrollment token expires after about three hours. The operator removes it from the Secret once the router has enrolled, and the pod reads it as an optional key. A restarted pod starts from its volume with no token at all. If you delete the volume, the router needs a new enrollment: delete the resource and apply it again.
+- A volume claim cannot change its storage class once it exists, so set `storageClassName` before the first reconcile. A later change leaves the `Workload` condition `False` with reason `StorageClassLocked`. Delete the claim to let the operator make a new one.
+- Check the reclaim policy of the storage class. With `Retain`, deleting the resource leaves the volume behind, and a later `ZitiRouter` of the same name can pick it up with a certificate for a Ziti identity that no longer exists. That router never connects. Delete the volume as well when you delete the resource.
+- The router needs one replica and a volume. It does not need CPU or memory requests, and the operator does not set them.
+- The JWT works once and expires after about three hours. The operator writes new bundles when it issues a new JWT. It removes the JWT and both bundles when the router has enrolled. The bundles need the controller version, so the `ZitiConnection` must be connected.
 
 ## Give the JWT to the router
 

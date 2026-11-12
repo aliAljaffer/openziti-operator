@@ -31,11 +31,15 @@ The manager serves Prometheus metrics. Enable them with `--metrics-bind-address`
 | `ziti_operator_build_info{version,commit,go}` | Version, commit, and Go version of the running manager. The value is always 1. |
 | `controller_runtime_reconcile_time_seconds`, `controller_runtime_reconcile_errors_total` | Reconcile duration and errors, from controller-runtime. |
 
-The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics. Set
-`prometheus.enabled=true` for the ServiceMonitor and the alert rules (set `prometheus.rules.enabled=false`
-to keep only the ServiceMonitor), and `grafanaDashboard.enabled=true` to install the dashboard as a
-ConfigMap for the kube-prometheus-stack sidecar. Both need prometheus-operator, or kube-prometheus-stack
-with its dashboard sidecar.
+The chart can ship a `PrometheusRule` and a Grafana dashboard for these metrics:
+
+| Chart value | Effect |
+|---|---|
+| `prometheus.enabled=true` | Installs the ServiceMonitor and the alert rules |
+| `prometheus.rules.enabled=false` | Keeps only the ServiceMonitor |
+| `grafanaDashboard.enabled=true` | Installs the dashboard as a ConfigMap for the kube-prometheus-stack sidecar |
+
+Both need prometheus-operator, or kube-prometheus-stack with its dashboard sidecar.
 
 ## Import, export, and access review
 

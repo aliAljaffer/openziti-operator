@@ -8,13 +8,13 @@ reconcile, when it is not. Both use the same offline checks, so the two cannot d
 The webhook validates `ZitiApp`, `ZitiIdentity`, `ZitiAccessPolicy`, and `ZitiConnection` on create and
 update. It never calls the Ziti controller, so admission works while Ziti is down.
 
-- Every kind: `zitiName` has no `"` or `\`.
-- `ZitiApp`: the target grouping errors (a port served by no target, a port served by two target
-  groups, a service name over 1024), the expose and target shape, and `hostedBy` when set must name a
-  router in the referenced `ZitiConnection.spec.hostingRouters`.
-- `ZitiAccessPolicy`: the role checks, including `#all` and `@id` roles under a `Namespaced` scope.
-- `ZitiIdentity`: the role attributes and `externalId`, which needs `roleScope: Global`.
-- `ZitiConnection`: `spec.allowedNamespaces` parses as a label selector.
+| Kind | Checked on admission |
+|---|---|
+| Every kind | `zitiName` has no `"` or `\` |
+| `ZitiApp` | The target grouping errors (a port served by no target, a port served by two target groups, a service name over 1024), the expose and target shape, and `hostedBy` when set must name a router in the referenced `ZitiConnection.spec.hostingRouters` |
+| `ZitiAccessPolicy` | The role checks, including `#all` and `@id` roles under a `Namespaced` scope |
+| `ZitiIdentity` | The role attributes and `externalId`, which needs `roleScope: Global` |
+| `ZitiConnection` | `spec.allowedNamespaces` parses as a label selector |
 
 When the referenced `ZitiConnection` does not exist yet, the checks that need it are skipped and the
 webhook adds a warning. Resources are often applied together, so install order must not fail admission.
