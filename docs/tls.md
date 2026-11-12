@@ -121,4 +121,5 @@ curl -v https://web.example.com
 
 Every service must show `HOSTED`, `DIALABLE`, `ROUTEPATH`, and `READY` as `True`. The `HOSTED` condition can take several minutes to change after the router registers the service. Dial the port to see the real state. If it fails, read [Conditions and reasons](conditions.md).
 
-Do not use `curl -k` as proof. It skips the certificate check.
+> [!WARNING]
+> Do not use `curl -k` as proof. It skips the certificate check.

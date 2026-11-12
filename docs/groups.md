@@ -37,16 +37,16 @@ spec:
     - "#group.platform"
 ```
 
-Members are `ZitiIdentity` names in the same namespace. The selector matches labels on those
-identities. The identity controller is the only writer: it merges the group role attribute into the
-identity entity. The group controller only reports `status.members` and `Ready`.
-
-A group cannot change identities in another namespace, and it does not write an identity in
-`managementPolicy: Observe`. An explicit member name that does not exist is reported with
-`Ready=False` and reason `MemberNotFound`; the member is not created.
-
-Deleting a group removes its role attribute from its members at the next reconcile, unless the
-attribute is also listed in the identity's own `spec.roleAttributes`.
+- Members are `ZitiIdentity` names in the same namespace. The selector matches labels on those
+  identities.
+- The identity controller is the only writer: it merges the group role attribute into the
+  identity entity. The group controller only reports `status.members` and `Ready`.
+- A group cannot change identities in another namespace, and it does not write an identity in
+  `managementPolicy: Observe`.
+- An explicit member name that does not exist is reported with `Ready=False` and reason
+  `MemberNotFound`; the member is not created.
+- Deleting a group removes its role attribute from its members at the next reconcile, unless the
+  attribute is also listed in the identity's own `spec.roleAttributes`.
 
 ## Limits
 

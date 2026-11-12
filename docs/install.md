@@ -19,7 +19,12 @@
 
    For certificate login, create a Secret with the keys `tls.crt` and `tls.key` instead. cert-manager writes this format.
 
-2. Install the chart. It creates the CRDs, the RBAC, a Deployment with two replicas, and the `ZitiConnection`. The chart is published for every release. The image is `ghcr.io/alialjaffer/openziti-operator`, tag from the chart `appVersion`. To install from a clone of the repository instead, use `charts/chart` in place of the `oci://` address. Use `--set manager.image.repository=<registry>/ziti-operator --set manager.image.tag=<tag>` for your own build.
+2. Install the chart. It creates the CRDs, the RBAC, a Deployment with two replicas, and the `ZitiConnection`.
+
+   - The chart is published for every release.
+   - The image is `ghcr.io/alialjaffer/openziti-operator`, tag from the chart `appVersion`.
+   - To install from a clone of the repository instead, use `charts/chart` in place of the `oci://` address.
+   - Use `--set manager.image.repository=<registry>/ziti-operator --set manager.image.tag=<tag>` for your own build.
 
    ```sh
    helm install ziti-operator oci://ghcr.io/alialjaffer/charts/ziti-operator --version 0.4.0 -n ziti-operator-system \

@@ -28,7 +28,8 @@ Store the bundle in a ConfigMap with the key `ca.crt`. The default name is `ziti
    kubectl -n ziti-operator-system create configmap ziti-root-ca --from-file=ca.crt=ca.pem
    ```
 
-The controller serves its own certificate and an intermediate, but not the root. Do not copy the certificates from `s_client` alone. The bundle then lacks the root and the check fails.
+> [!WARNING]
+> The controller serves its own certificate and an intermediate, but not the root. Do not copy the certificates from `s_client` alone. The bundle then lacks the root and the check fails.
 
 Also check that the management URL host is in the certificate names (SAN). For a Service inside the cluster, use a name such as `ziti-controller-mgmt.ziti.svc`.
 

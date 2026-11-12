@@ -22,7 +22,11 @@ An earlier draft wrote a `service.yaml` manifest to the enrollment Secret and as
 
 A namespaced `Role` is still flagged by trivy `AVD-KSV-0056`, so scoping does not satisfy the scanner. It only limits blast radius, and it costs a second values key plus a per-namespace template. Making that the default would take the capability away from the common case and still leave the finding.
 
-`rbac.serviceNamespaces` is therefore empty by default. When set, Service write moves to per-namespace Roles and the ClusterRole keeps read access, because the router controller, the Service controller, the Ingress controller, and the `ZitiApp` selector all list and watch Services in every namespace. A router outside the list still gets its Deployment and claim, and its `Workload` condition reports `ServiceNamespaceNotAllowed`, because a router without a stable address is still a working router. A Service applied by hand is left alone and reports `NameConflict`: the operator never adopts one it did not create, and the router keeps running.
+`rbac.serviceNamespaces` is therefore empty by default.
+
+- When set, Service write moves to per-namespace Roles and the ClusterRole keeps read access, because the router controller, the Service controller, the Ingress controller, and the `ZitiApp` selector all list and watch Services in every namespace.
+- A router outside the list still gets its Deployment and claim, and its `Workload` condition reports `ServiceNamespaceNotAllowed`, because a router without a stable address is still a working router.
+- A Service applied by hand is left alone and reports `NameConflict`: the operator never adopts one it did not create, and the router keeps running.
 
 ## What this does not fix
 
